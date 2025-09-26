@@ -5,7 +5,6 @@
 #include "../include/Engine/Core.h"
 
 void Engine::Core::Init() {
-
 }
 
 void Engine::Core::Update() {

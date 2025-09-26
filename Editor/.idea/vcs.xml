@@ -2,5 +2,8 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$/.." vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/extern/glad" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/extern/glfw" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/extern/imgui" vcs="Git" />
   </component>
 </project>
