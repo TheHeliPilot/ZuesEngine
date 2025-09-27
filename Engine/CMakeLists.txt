@@ -18,24 +18,33 @@ add_library(Engine STATIC
         src/EventSystem.cpp
         include/Engine/EventSystem/EventSystem.h
         include/Engine/EngineDefines.h
-        include/Engine/EventSystem/Events.h)
+        include/Engine/EventSystem/Events.h
+)
 
 target_include_directories(Engine PRIVATE
-        ${CMAKE_SOURCE_DIR}/extern/glfw/include
-        ${CMAKE_SOURCE_DIR}/extern/glad/include
-        ${CMAKE_SOURCE_DIR}/extern/KHR
+        ${CMAKE_CURRENT_SOURCE_DIR}/extern/glfw/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/extern/glad/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/extern/KHR
+        ${CMAKE_CURRENT_SOURCE_DIR}/extern/enet/include
 )
 
+# Build ENet
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/extern/enet)
+
+# Link to ENet using its alias target
+target_link_libraries(Engine PUBLIC enet::enet_static)
+
+# Link other libraries
 target_link_libraries(Engine PRIVATE
-        ${CMAKE_SOURCE_DIR}/extern/glfw/cmake-build-debug/src/libglfw3.a
-        ${CMAKE_SOURCE_DIR}/extern/glad/cmake-build-debug/libglad.a
+        ${CMAKE_CURRENT_SOURCE_DIR}/extern/glfw/cmake-build-debug/src/libglfw3.a
+        ${CMAKE_CURRENT_SOURCE_DIR}/extern/glad/cmake-build-debug/libglad.a
 )
 
-if (APPLE)
+if (WIN32)
+    target_link_libraries(Engine PRIVATE opengl32 ws2_32 winmm)
+elseif (APPLE)
     find_library(OpenGL_LIBRARY OpenGL)
     target_link_libraries(Engine PRIVATE ${OpenGL_LIBRARY})
 elseif (UNIX)
     target_link_libraries(Engine PRIVATE GL X11 pthread Xrandr Xi dl)
-elseif (WIN32)
-    target_link_libraries(Engine PRIVATE opengl32)
 endif()

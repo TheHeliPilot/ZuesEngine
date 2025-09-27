@@ -8,7 +8,7 @@
 
 Engine::Log::EngineLog::LogLevel Engine::Log::EngineLog::currentLogLevel = LOGLEVEL_INFO;
 
-void Engine::Log::EngineLog::LogMessage(const std::string &message, LogLevel level) {
+void Engine::Log::EngineLog::LogMessage(const std::string &message, const LogLevel level) {
     IEventSystem->Dispatch(LogEvent(
                 level, message
             ));

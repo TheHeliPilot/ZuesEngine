@@ -9,8 +9,7 @@
 
 int main() {
 
-    Engine::Initialize();
-
+    Engine::Initialize(Engine::Network::Role::Host, "0.0.0.0", 7777);
     Engine::IEventSystem->Subscribe<Engine::LogEvent>(EditorUi::TestGetLogEvent);
 
     if (!glfwInit()) return -1;

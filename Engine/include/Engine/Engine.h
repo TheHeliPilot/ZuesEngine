@@ -8,12 +8,16 @@
 #include "Log.h"
 #include "Types.h"
 #include "EngineDefines.h"
+#include "Network.h"
+#include "Network.h"
 #include "EventSystem/EventSystem.h"
 #include "EventSystem/Events.h"
 
 namespace Engine {
     extern EventSystem* IEventSystem;
-    void Initialize();
+    extern Network* INetwork;
+
+    void Initialize(Network::Role role, const std::string& address, const uint16_t port);
     void Update();
     void Shutdown();
 }

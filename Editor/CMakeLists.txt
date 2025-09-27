@@ -11,13 +11,12 @@ set(IMGUI_SRC
         ${IMGUI_DIR}/imgui_tables.cpp
         ${IMGUI_DIR}/imgui_widgets.cpp
         ${IMGUI_DIR}/imgui_demo.cpp
-        ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp        # <-- add ImGui GLFW backend
+        ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
         ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
         src/EditorUi.cpp
-        include/EditorUi.h     # <-- add ImGui OpenGL3 backend
+        include/EditorUi.h
 )
 
-# Add your executable
 add_executable(Editor
         ${IMGUI_SRC}
         ${CMAKE_SOURCE_DIR}/extern/glfw/src
@@ -25,24 +24,22 @@ add_executable(Editor
         src/main.cpp
 )
 
-# Path to Engine headers
 target_include_directories(Editor PRIVATE
         ${CMAKE_SOURCE_DIR}/../Engine/include/Engine
         ${CMAKE_SOURCE_DIR}/extern/imgui
-        ${CMAKE_SOURCE_DIR}/extern/imgui/backends          # <-- add backends headers
+        ${CMAKE_SOURCE_DIR}/extern/imgui/backends
         ${CMAKE_SOURCE_DIR}/extern/glfw/include
         ${CMAKE_SOURCE_DIR}/extern/glad/include
         ${CMAKE_SOURCE_DIR}/extern/KHR
-
 )
 
-# Path to Engine static library
-target_link_libraries(Editor PRIVATE
-        ${CMAKE_SOURCE_DIR}/../Engine/cmake-build-debug/libEngine.a
-        ${CMAKE_SOURCE_DIR}/extern/glfw/cmake-build-debug/src/libglfw3.a
-        ${CMAKE_SOURCE_DIR}/extern/glad/cmake-build-debug/libglad.a
-)
+# Add Engine as a subdirectory so CMake builds Engine first
+add_subdirectory(${CMAKE_SOURCE_DIR}/../Engine ${CMAKE_BINARY_DIR}/EngineBuild)
 
+# Link to Engine
+target_link_libraries(Editor PRIVATE Engine)
+
+# Link platform-specific libraries
 if (APPLE)
     find_library(OpenGL_LIBRARY OpenGL)
     target_link_libraries(Editor PRIVATE ${OpenGL_LIBRARY})
