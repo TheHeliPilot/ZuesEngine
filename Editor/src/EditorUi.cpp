@@ -8,7 +8,8 @@
 #include <string>
 #include <EventSystem/Events.h>
 
-std::string s;
+std::vector<std::string> logs; // Store logs
+bool autoScroll = true;        // Auto-scroll toggle
 
 void EditorUi::DrawWindowUi() {
     static bool opt_fullscreen = true;
@@ -87,7 +88,22 @@ void EditorUi::DrawWindowUi() {
     {
         ImGui::Begin("Logger");
 
-        ImGui::Text(s.c_str());
+        if (ImGui::Button("Clear")) logs.clear();
+        ImGui::SameLine();
+        ImGui::Checkbox("Auto-scroll", &autoScroll);
+
+        ImGui::Separator();
+
+        // Scrollable child region
+        ImGui::BeginChild("LogScrollRegion", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
+
+        for (const auto& log : logs)
+            ImGui::TextUnformatted(log.c_str());
+
+        if (autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+            ImGui::SetScrollHereY(1.0f);
+
+        ImGui::EndChild();
 
         ImGui::End();
     }
@@ -100,10 +116,10 @@ void EditorUi::DrawWindowUi() {
 
     ImGui::End();
 
-    ImGui::ShowDemoWindow();
+    //ImGui::ShowDemoWindow();
 
 }
 
 void EditorUi::TestGetLogEvent(const Engine::LogEvent &event) {
-    s = event.GetMessage();
+    logs.push_back(event.GetMessage());
 }
