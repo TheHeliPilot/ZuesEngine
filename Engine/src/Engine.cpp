@@ -8,7 +8,11 @@
 #include "../include/Engine/Network.h"
 
 namespace Engine {
+
+    EventSystem* IEventSystem = nullptr;
+
     void Initialize() {
+        IEventSystem = new EventSystem();
         Core::Init();
         Renderer::Init();
         Network::Init();

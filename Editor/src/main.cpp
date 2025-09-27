@@ -5,8 +5,13 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include "../include/EditorUi.h"
+
 int main() {
+
     Engine::Initialize();
+
+    Engine::IEventSystem->Subscribe<Engine::LogEvent>(EditorUi::TestGetLogEvent);
 
     if (!glfwInit()) return -1;
 
@@ -24,6 +29,8 @@ int main() {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
 
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 150");
 
@@ -32,14 +39,13 @@ int main() {
 
         Engine::Update();
 
+        ENGINE_LOG("Some random log message", LOGLEVEL_INFO);
+
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        static float f = 0.0f;
-        ImGui::Text("Hello, world!");
-        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-        ImGui::ShowDemoWindow();
+        EditorUi::DrawWindowUi();
 
         ImGui::Render();
         int display_w, display_h;

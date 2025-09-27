@@ -12,7 +12,9 @@ set(IMGUI_SRC
         ${IMGUI_DIR}/imgui_widgets.cpp
         ${IMGUI_DIR}/imgui_demo.cpp
         ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp        # <-- add ImGui GLFW backend
-        ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp     # <-- add ImGui OpenGL3 backend
+        ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+        src/EditorUi.cpp
+        include/EditorUi.h     # <-- add ImGui OpenGL3 backend
 )
 
 # Add your executable
