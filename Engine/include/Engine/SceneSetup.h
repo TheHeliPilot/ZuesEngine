@@ -32,9 +32,9 @@ namespace Engine {
             .rotation = 0.0f // Rotated 45 degrees
         });
         world->AddComponent<SpriteComponent>(redSquare, {
-            .textureID = 0, // Use the provided texture
+            .textureID = textureHandle, // Use the provided texture
             .size = {2.0f, 2.0f},
-            .color = {1.0f, 0.0f, 0.0f, 1.0f} // Solid Red
+            .color = {1.0f, 1.0f, 1.0f, 1.0f}
         });
     }
 }
