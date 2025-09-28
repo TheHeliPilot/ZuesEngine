@@ -1,92 +1,142 @@
-﻿#include "Engine.h"
+﻿#include <filesystem>
+#include <iostream> // Added for the fatal error message
+
+#include "Engine.h"
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "../include/EditorUi.h"
-#include "ECS/World.h" // Include World for the pointer type
+// #include "ECS/World.h" // No longer needed for pointer type
+#include "Input.h"
+#include "Renderer.h" // For LoadTexture
+
+// Global pointer for Input handling
+extern GLFWwindow* g_MainWindow;
+GLFWwindow* g_MainWindow = nullptr;
 
 int main() {
 
     if (!glfwInit()) return -1;
 
+    // --- Window Creation ---
+    // HINT: May need to set GLFW hints for correct context version if not using 150/330 core.
     GLFWwindow* window = glfwCreateWindow(1280, 720, "Editor", nullptr, nullptr);
-    if (!window) return -1;
-
-    glfwMakeContextCurrent(window);
-    glfwSwapInterval(1);
-
-    if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
+    if (!window) {
+        glfwTerminate();
         return -1;
     }
 
+    g_MainWindow = window;
+
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1); // Enable V-Sync
+
+    if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
+        std::cerr << "FATAL: Failed to initialize GLAD.\n";
+        return -1;
+    }
+
+    // --- Engine Initialization (Calls Core::Init() and creates the static World) ---
     Engine::Initialize(Engine::Network::Role::Host, "0.0.0.0", 7777);
     Engine::IEventSystem->Subscribe<Engine::LogEvent>(EditorUi::TestGetLogEvent);
 
-    const uint32_t textureID = Engine::Renderer::LoadTexture("C:/Users/bucka/Pictures/.jpg");
-    World* world = new World();
+    const std::filesystem::path projectDir = "../../MyGameProject";
 
-    world->RegisterSystem(std::make_unique<CameraSystem>());
-    world->RegisterSystem(std::make_unique<RenderingSystem>());
+    if (!Engine::ProjectManager::OpenOrCreate(projectDir)) {
+        // If the project fails to load or create, we can't continue.
+        std::cerr << "FATAL: Failed to open or create project at " << projectDir << "\n";
+        return -1;
+    }
 
-    Engine::SetupSimpleScene(world, textureID);
+    // Load the texture. The scene entities are created in Core::Init(), but
+    // a later fix will be needed to pass this textureID correctly to those entities.
+    // For now, the square in the scene will likely default to the white texture (ID 0/1).
+    const uint32_t textureID = Engine::Renderer::LoadTexture("assets/bucka.png");
 
+
+    // ----------------------------------------------------------------------------------
+    // FIX: Removed redundant World creation and system registration:
+    // World* world = new World();
+    // world->RegisterSystem(std::make_unique<CameraSystem>());
+    // world->RegisterSystem(std::make_unique<RenderingSystem>());
+    // Engine::SetupSimpleScene(world, textureID); // This must run on Core's world, handled in Core::Init()
+    // ----------------------------------------------------------------------------------
+
+
+    // --- ImGui Setup ---
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
 
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+    // Set up viewport for initial sizing
+    int display_w, display_h;
+    glfwGetFramebufferSize(window, &display_w, &display_h);
+
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 150");
+
+
+    // --- MAIN LOOP ---
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
-        // 1. SCENE PREP (Binds FBO 1, Clears it)
+        // --- 1. GAME UPDATE PHASE ---
+        Engine::Input::UpdateState();
+
+        // FIX: The ECS update must happen *after* the FBO is bound,
+        // but *before* the batch is finalized (EndBatch).
+
+        // Renderer::Render() binds the Framebuffer (FBO) and clears it.
         Engine::Renderer::Render();
 
-        // 2. ECS EXECUTION (This was missing!)
-        // NOTE: This runs CameraSystem (sets ViewProjection) and RenderingSystem (submits quads).
-        world->UpdateSystems(1); // <--- MISSING ECS UPDATE
+        // Engine::Update() calls Core::Update(deltaTime), which runs the ECS systems
+        // (CameraSystem -> updates VP matrix, RenderingSystem -> submits quads to batch).
+        Engine::Update();
 
-        // 3. FLUSH THE BATCH (This issues the draw call for all submitted quads to FBO 1)
-        Engine::Renderer::EndBatch(); // <--- MISSING DRAW CALL
+        // Flushes the accumulated batch data (quads) to the FBO's texture.
+        Engine::Renderer::EndBatch();
 
-        // 4. UNBIND FBO (Switches back to the default framebuffer/screen)
-        glBindFramebuffer(GL_FRAMEBUFFER, 0); // <--- Final step for scene rendering
+        // --- 2. EDITOR RENDER PHASE ---
 
-        ENGINE_LOG("Some random log message", LOGLEVEL_INFO);
+        // Bind the default framebuffer (the window) for ImGui to draw on.
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        // Optional: Reset viewport for main window (needed for correct ImGui rendering)
-        int display_w, display_h;
+        // Reset the main viewport to the full window size.
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
 
-        // 5. UI Rendering
-        Engine::Update(); // (If you want to keep the engine-level update here)
-
+        // Start the ImGui Frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        // Draw the editor UI, which reads the FBO texture and draws it in the viewport panel.
         EditorUi::DrawWindowUi();
 
+        // Render ImGui data
         ImGui::Render();
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-        glViewport(0, 0, display_w, display_h);
+
+        // Clear the screen BEFORE drawing the ImGui output.
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwSwapBuffers(window);
     }
 
+    // --- Cleanup ---
+    Engine::Shutdown();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+
     glfwDestroyWindow(window);
     glfwTerminate();
 
-    Engine::Shutdown();
+    return 0;
 }

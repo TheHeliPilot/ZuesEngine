@@ -9,12 +9,19 @@
 #include <functional>
 #include <memory>
 #include "../EngineDefines.h"
+#include <sstream>
+#include <iomanip>
 
 namespace Engine {
 
     enum class EventType {
         None = 0,
-        LogE
+        LogE,
+        KeyPressE,
+        KeyReleaseE,
+        MouseMoveE,
+        MouseButtonPressE,
+        MouseButtonReleaseE
     };
 
     // ------------------------------

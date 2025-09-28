@@ -33,6 +33,10 @@ add_library(Engine STATIC
         include/Engine/SceneSetup.h
         include/Engine/ECS/Systems/CameraSystem.h
         include/Engine/ECS/Systems/Systems.h
+        src/Input.cpp
+        include/Engine/Input.h
+        src/ProjectManager.cpp
+        include/Engine/ProjectManager.h
 )
 
 target_include_directories(Engine PRIVATE

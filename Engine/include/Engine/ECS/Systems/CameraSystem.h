@@ -9,7 +9,7 @@
 // Conversions utility (Degrees to Radians)
 
 // This system finds the active camera and tells the Renderer what the view matrix should be.
-class CameraSystem : public SystemBase<PositionComponent*, CameraComponent*> {
+class CameraSystem final : public SystemBase<PositionComponent*, CameraComponent*> {
 public:
     // The base System::Run (in World.inl) will call QueryAndRun, which calls this Update.
     void Update(float deltaTime, PositionComponent* pos, CameraComponent* cam) override {
@@ -22,6 +22,8 @@ public:
                 cam->halfHeight,
                 pos->rotation * Engine::Math::DEGREES_TO_RADIANS
             );
+
+            Engine::Renderer::SetClearColor(cam->backgroundColor);
         }
     }
     // No need to override Run; the base SystemBase::Run handles the iteration setup.

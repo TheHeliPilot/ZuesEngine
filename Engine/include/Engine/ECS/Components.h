@@ -25,7 +25,10 @@ struct CameraComponent {
     // Orthographic projection settings
     float zoom = 1.0f;      // 1.0 = normal view
     float halfHeight = 10.0f; // Half the height of the view volume in world units.
-    
+    Engine::Vec4 backgroundColor = {0.1f, 0.1f, 0.1f, 1.0f};
     // Optional: Only render the scene if this camera is active.
     bool isActive = true; 
 };
+
+//TAGS
+struct ViewportCameraTag{};

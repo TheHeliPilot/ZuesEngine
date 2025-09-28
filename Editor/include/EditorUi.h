@@ -1,18 +1,23 @@
-﻿//
-// Created by bucka on 9/27/2025.
-//
-
-#ifndef EDITOR_EDITORUI_H
-#define EDITOR_EDITORUI_H
+﻿#pragma once
+#include <string>
+#include <vector>
+#include <functional>
 #include <EventSystem/Events.h>
-#include <EventSystem/EventSystem.h>
+#include "Log.h" // For LogLevel
 
-namespace EditorUi {
-
-    void DrawWindowUi();
-
-    void TestGetLogEvent(const Engine::LogEvent& event);
-
+// Forward declarations
+namespace Engine {
+    class World; // If needed later for system integration
 }
 
-#endif //EDITOR_EDITORUI_H
+class EditorUi final {
+public:
+    static void DrawWindowUi();
+
+    // Event callback for the LogEvent
+    static void TestGetLogEvent(const Engine::LogEvent& e);
+
+    // NEW: Function to initiate a manual project build
+    static void BuildProject();
+
+};

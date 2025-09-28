@@ -50,6 +50,7 @@ namespace Engine {
         static uint32_t GetRenderTextureID();
         static void SetViewportSize(float width, float height);
         static uint32_t LoadTexture(const std::string& filePath);
+        static void SetClearColor(const Vec4& color);
 
     private:
 
@@ -75,6 +76,7 @@ namespace Engine {
             float ViewportWidth = 0.0f;
             float ViewportHeight = 0.0f;
             Mat4 ViewProjectionMatrix; // CRITICAL FIX: Storage for the matrix calculated by SetCamera
+            Math::Vec4 ClearColor;
 
             uint32_t ShaderID = 0;
 

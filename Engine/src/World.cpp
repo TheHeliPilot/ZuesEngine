@@ -26,15 +26,15 @@ EntityID World::CreateEntity() {
     Archetype* defaultArchetype = GetOrCreateArchetype(ComponentSignature());
 
     // Initialize data
-    EntityID newID(index, generation);
+    const EntityID newID(index, generation);
     entityLookup[index] = { generation, defaultArchetype, defaultArchetype->entityIDs.size() };
     defaultArchetype->entityIDs.push_back(newID);
 
     return newID;
 }
 
-void World::DestroyEntity(EntityID entityID) {
-    EntityIndex index = entityID.GetIndex();
+void World::DestroyEntity(const EntityID entityID) {
+    const EntityIndex index = entityID.GetIndex();
 
     // 1. Validation check
     if (index >= entityLookup.size() || entityLookup[index].generation != entityID.GetGeneration() || entityLookup[index].archetypePtr == nullptr) {
@@ -44,12 +44,12 @@ void World::DestroyEntity(EntityID entityID) {
 
     EntityData& data = entityLookup[index];
     Archetype* currentArchetype = static_cast<Archetype*>(data.archetypePtr);
-    size_t indexInArchetype = data.archetypeIndex;
+    const size_t indexInArchetype = data.archetypeIndex;
 
     // 2. Perform Swap-and-Pop on the Archetype
 
     // The entity we are swapping in (the last one in the list)
-    EntityID entityToSwapID = currentArchetype->entityIDs.back();
+    const EntityID entityToSwapID = currentArchetype->entityIDs.back();
 
     // a) Swap-and-Pop component data
     for (auto const& [typeID, arrayPtr] : currentArchetype->componentArrays) {
@@ -78,16 +78,16 @@ void World::RegisterSystem(std::unique_ptr<System> system) {
     systems.push_back(std::move(system));
 }
 
-void World::UpdateSystems(float deltaTime) {
+void World::UpdateSystems(const float deltaTime) {
     for (const auto& system : systems) {
         system->Run(this, deltaTime);
     }
 }
 
 // The heart of entity migration
-void World::MoveEntity(EntityID id, Archetype* currentArchetype, Archetype* nextArchetype) {
+void World::MoveEntity(const EntityID id, Archetype* currentArchetype, Archetype* nextArchetype) {
     EntityData& data = entityLookup[id.GetIndex()];
-    size_t indexInCurrent = data.archetypeIndex;
+    const size_t indexInCurrent = data.archetypeIndex;
 
     // 1. Transfer components from the current archetype to the next archetype.
     // The component arrays only contain the components that their respective archetype's signature requires.
@@ -103,7 +103,7 @@ void World::MoveEntity(EntityID id, Archetype* currentArchetype, Archetype* next
     // 2. Handle the Swap-and-Pop cleanup within the current archetype.
 
     // Entity ID to swap in (last entity in the current archetype)
-    EntityID entityToSwapID = currentArchetype->entityIDs.back();
+    const EntityID entityToSwapID = currentArchetype->entityIDs.back();
 
     // a) Perform Swap-and-Pop for all component arrays in the current archetype.
     for (auto const& [typeID, arrayPtr] : currentArchetype->componentArrays) {
@@ -130,7 +130,7 @@ void World::MoveEntity(EntityID id, Archetype* currentArchetype, Archetype* next
 
 Archetype* World::GetOrCreateArchetype(const ComponentSignature& signature) {
     // 1. Try to find an existing archetype with the exact signature
-    auto it = archetypes.find(signature);
+    const auto it = archetypes.find(signature);
     if (it != archetypes.end()) {
         return it->second.get();
     }

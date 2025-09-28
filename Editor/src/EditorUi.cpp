@@ -11,6 +11,8 @@
 #include <iostream>
 
 #include "Renderer.h"
+// Include the new Engine component
+#include "ProjectManager.h"
 
 std::vector<std::string> logs; // Store logs
 bool autoScroll = true;        // Auto-scroll toggle
@@ -68,6 +70,7 @@ void EditorUi::DrawWindowUi() {
 
     if (ImGui::BeginMenuBar())
     {
+        // ... (Existing Menu Bar Logic) ...
         if (ImGui::BeginMenu("Options"))
         {
             // Disabling fullscreen would allow the window to be moved to the front of other windows,
@@ -84,8 +87,30 @@ void EditorUi::DrawWindowUi() {
             if (ImGui::MenuItem("Flag: PassthruCentralNode",    "", (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode) != 0, opt_fullscreen)) { dockspace_flags ^= ImGuiDockNodeFlags_PassthruCentralNode; }
             ImGui::Separator();
 
+            // Menu item for building
+            if (ImGui::MenuItem("Build Project (Engine)")) {
+                EditorUi::BuildProject();
+            }
+            // -----------------------------------------------------------------------
+
             ImGui::EndMenu();
         }
+
+        // --- NEW: BIG BUILD BUTTON IN THE MENU BAR ---
+        // Pushes color for visual prominence
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1f, 0.7f, 0.1f, 1.0f)); // Green background
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.8f, 0.2f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.6f, 0.0f, 1.0f));
+
+        // This is the actual button in the menu bar
+        if (ImGui::Button("🚀 Build Project 🚀")) {
+            EditorUi::BuildProject();
+        }
+
+        ImGui::PopStyleColor(3); // Pop the three style colors
+
+        // ---------------------------------------------
+
         ImGui::EndMenuBar();
     }
 
@@ -153,4 +178,10 @@ void EditorUi::DrawWindowUi() {
 
 void EditorUi::TestGetLogEvent(const Engine::LogEvent &event) {
     logs.push_back(event.GetMessage());
+}
+
+void EditorUi::BuildProject() {
+    // The Editor component now simply delegates the build task to the Engine's ProjectManager.
+    // This correctly separates the Editor's UI concerns from the Engine's core tooling.
+    Engine::ProjectManager::BuildProject();
 }

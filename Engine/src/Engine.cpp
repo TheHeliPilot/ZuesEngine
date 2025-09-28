@@ -21,6 +21,7 @@ namespace Engine {
         Engine::ECS::Component::RegisterComponent<PositionComponent>();
         Engine::ECS::Component::RegisterComponent<SpriteComponent>();
         Engine::ECS::Component::RegisterComponent<CameraComponent>();
+        Engine::ECS::Component::RegisterComponent<ViewportCameraTag>();
 
         switch (role) {
             case Network::Role::Client:
@@ -47,10 +48,15 @@ namespace Engine {
         }
     }
 
+    float lastFrameTime = static_cast<float>(glfwGetTime());
     void Update() {
         INetwork->Update();
 
-        Core::Update();
+        const float currentTime = static_cast<float>(glfwGetTime());
+        const float deltaTime = currentTime - lastFrameTime;
+        lastFrameTime = currentTime;
+
+        Core::Update(deltaTime);
         //Renderer::Render();
     }
 
