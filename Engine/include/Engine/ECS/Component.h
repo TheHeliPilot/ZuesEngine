@@ -1,8 +1,9 @@
 ﻿#pragma once
-#include <cstddef>
-#include <map>
+#include "ECSConfig.h"
+#include <vector>
+#include <algorithm>
 #include <memory>
-#include <typeindex>
+#include <stdexcept>
 
 // Utility function to get a unique ID for each component type at compile time
 namespace Engine::ECS::Component {
@@ -11,6 +12,10 @@ namespace Engine::ECS::Component {
     // Use a static counter to generate unique IDs
     inline TypeID GetNextID() {
         static TypeID lastID = 0;
+        // Check for overflow against MAX_COMPONENTS
+        if (lastID >= MAX_COMPONENTS) {
+            throw std::runtime_error("Exceeded MAX_COMPONENTS limit. Increase MAX_COMPONENTS in ECSConfig.h.");
+        }
         return lastID++;
     }
 
@@ -20,13 +25,55 @@ namespace Engine::ECS::Component {
         static TypeID id = GetNextID();
         return id;
     }
+
+    // All components should be plain data structs.
+    // NOTE: Components must be registered via World::RegisterComponent<T>() before use.
 }
 
-// All components should be plain data structs.
-// Example Component (Defined where you use it, not here)
-/*
-struct Position {
-    float x = 0.0f;
-    float y = 0.0f;
+
+// Component Storage Interface (Base class for type erasure)
+class IComponentArray {
+public:
+    virtual ~IComponentArray() = default;
+    // Performs Swap-and-Pop on the component at 'index'
+    virtual void RemoveComponent(size_t index) = 0;
+    // Copies/Moves a component from 'other' array at 'index' to this array's back
+    virtual void AddComponentFrom(IComponentArray* other, size_t index) = 0;
+    // Adds a default-constructed component to the back of the array
+    virtual void AddDefaultComponent() = 0;
+    // Returns a void* to the element at 'index'
+    virtual void* GetVoidPtr(size_t index) = 0;
 };
-*/
+
+// Templated Component Storage (The contiguous arrays)
+template<typename T>
+class ComponentArray : public IComponentArray {
+public:
+    std::vector<T> data;
+
+    void RemoveComponent(size_t index) override {
+        // Swap-and-Pop: Copy the last element over the one being removed
+        // O(1) removal, but destroys iteration order.
+        data[index] = std::move(data.back());
+        data.pop_back();
+    }
+
+    void AddComponentFrom(IComponentArray* other, size_t index) override {
+        // Cast the generic IComponentArray back to the specific ComponentArray<T>
+        ComponentArray<T>* otherArray = static_cast<ComponentArray<T>*>(other);
+        // Move the component from the old array into the new array
+        data.push_back(std::move(otherArray->data[index]));
+    }
+
+    void AddDefaultComponent() override {
+        data.emplace_back();
+    }
+
+    T& Get(size_t index) {
+        return data[index];
+    }
+
+    void* GetVoidPtr(size_t index) override {
+        return static_cast<void*>(&data[index]);
+    }
+};

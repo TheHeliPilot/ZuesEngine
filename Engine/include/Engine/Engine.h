@@ -12,6 +12,8 @@
 #include "Network.h"
 #include "EventSystem/EventSystem.h"
 #include "EventSystem/Events.h"
+#include "SceneSetup.h"
+#include "ECS/Systems/Systems.h"
 
 namespace Engine {
     extern EventSystem* IEventSystem;

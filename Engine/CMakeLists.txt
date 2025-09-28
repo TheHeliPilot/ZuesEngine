@@ -26,6 +26,13 @@ add_library(Engine STATIC
         src/World.cpp
         include/Engine/ECS/World.h
         include/Engine/ECS/World.inl
+        include/Engine/ECS/Components.h
+        include/Engine/ECS/Systems/RenderingSystem.h
+        include/Engine/Math.h
+        include/Engine/SceneSetup.h
+        include/Engine/SceneSetup.h
+        include/Engine/ECS/Systems/CameraSystem.h
+        include/Engine/ECS/Systems/Systems.h
 )
 
 target_include_directories(Engine PRIVATE

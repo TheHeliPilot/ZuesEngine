@@ -4,13 +4,10 @@
 #include "backends/imgui_impl_opengl3.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-
 #include "../include/EditorUi.h"
+#include "ECS/World.h" // Include World for the pointer type
 
 int main() {
-
-    Engine::Initialize(Engine::Network::Role::Host, "0.0.0.0", 7777);
-    Engine::IEventSystem->Subscribe<Engine::LogEvent>(EditorUi::TestGetLogEvent);
 
     if (!glfwInit()) return -1;
 
@@ -23,6 +20,17 @@ int main() {
     if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
         return -1;
     }
+
+    Engine::Initialize(Engine::Network::Role::Host, "0.0.0.0", 7777);
+    Engine::IEventSystem->Subscribe<Engine::LogEvent>(EditorUi::TestGetLogEvent);
+
+    const uint32_t textureID = Engine::Renderer::LoadTexture("C:/Users/bucka/Pictures/.jpg");
+    World* world = new World();
+
+    world->RegisterSystem(std::make_unique<CameraSystem>());
+    world->RegisterSystem(std::make_unique<RenderingSystem>());
+
+    Engine::SetupSimpleScene(world, textureID);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -37,6 +45,8 @@ int main() {
         glfwPollEvents();
 
         Engine::Update();
+
+        Engine::Renderer::Render();
 
         ENGINE_LOG("Some random log message", LOGLEVEL_INFO);
 

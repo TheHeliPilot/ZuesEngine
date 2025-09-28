@@ -6,6 +6,7 @@
 #include "../include/Engine/Core.h"
 #include "../include/Engine/Renderer.h"
 #include "../include/Engine/Network.h"
+#include <GLFW/glfw3.h>
 
 namespace Engine {
 
@@ -15,6 +16,11 @@ namespace Engine {
     void Initialize(const Network::Role role, const std::string& address, const uint16_t port) {
         IEventSystem = new EventSystem();
         INetwork = new Network();
+
+        //ECS Component Registrations, BEFORE FIRST CALL!
+        Engine::ECS::Component::RegisterComponent<PositionComponent>();
+        Engine::ECS::Component::RegisterComponent<SpriteComponent>();
+        Engine::ECS::Component::RegisterComponent<CameraComponent>();
 
         switch (role) {
             case Network::Role::Client:
@@ -33,7 +39,12 @@ namespace Engine {
         }
 
         Core::Init();
-        Renderer::Init();
+
+        if (!glfwInit()) {
+            ENGINE_LOG("Failed to initialize GLFW", LOGLEVEL_ERR);
+        }else {
+            Renderer::Init();
+        }
     }
 
     void Update() {

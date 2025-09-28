@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <cstdint>
+#include <functional> // For std::hash
 
 // 64-bit Entity ID: 32 bits for Index, 32 bits for Generation
 using EntityIndex = uint32_t;
@@ -24,9 +25,24 @@ struct EntityID {
         return static_cast<EntityGeneration>(id >> 32);
     }
 
+    bool IsValid() const {
+        return id != 0;
+    }
+
     bool operator==(const EntityID& other) const { return id == other.id; }
     bool operator!=(const EntityID& other) const { return id != other.id; }
+    bool operator<(const EntityID& other) const { return id < other.id; }
 };
 
 // Global definition for an invalid entity
 const EntityID NULL_ENTITY_ID = EntityID();
+
+// Required for using EntityID in std::unordered_map/set
+namespace std {
+    template<>
+    struct hash<EntityID> {
+        size_t operator()(const EntityID& entityID) const {
+            return std::hash<uint64_t>()(entityID.id);
+        }
+    };
+}

@@ -1,5 +1,4 @@
-﻿// System.h (Corrected)
-#pragma once
+﻿#pragma once
 #include "Entity.h"
 #include "Component.h"
 #include "ECSConfig.h"
@@ -8,36 +7,27 @@
 
 class World; // Forward declaration
 
-using ComponentSignature = std::bitset<MAX_COMPONENTS>;
-
 class System {
 public:
+    virtual ~System() = default;
     virtual void Run(World* world, float deltaTime) = 0; // The base execution function
     ComponentSignature signature;
-    virtual ~System() = default;
-
-protected:
-    template<typename T>
-    void RequireComponent() {
-        // Use a 'using' or fully qualify the namespace
-        signature.set(Engine::ECS::Component::GetTypeID<T>());
-    }
-
-    template<typename T>
-    void ExcludeComponent() {
-        signature.reset(Engine::ECS::Component::GetTypeID<T>());
-    }
 };
 
+
+// SystemBase: A convenience class for defining component requirements cleanly.
+// TArgs should be the component types, typically pointers (e.g., Position*, Velocity*)
 template<typename... TArgs>
 class SystemBase : public System {
 public:
     SystemBase() {
-        // Automatically build the signature
+        // Automatically build the signature by OR-ing all required component TypeIDs
+        // The pack expansion handles all TArgs
         (signature.set(Engine::ECS::Component::GetTypeID<std::remove_pointer_t<TArgs>>()), ...);
     }
 
     // This is the clean, mandatory signature the user implements
+    // It receives pointers to the component data for iteration.
     virtual void Update(float deltaTime, TArgs... components) = 0;
 
     // DECLARATION ONLY: Definition will be in World.inl

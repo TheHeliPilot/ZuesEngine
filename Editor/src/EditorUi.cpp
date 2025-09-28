@@ -7,6 +7,10 @@
 #include "imgui.h"
 #include <string>
 #include <EventSystem/Events.h>
+#include <cstdint> // Ensure uint32_t is available for texture IDs
+#include <iostream>
+
+#include "Renderer.h"
 
 std::vector<std::string> logs; // Store logs
 bool autoScroll = true;        // Auto-scroll toggle
@@ -85,6 +89,7 @@ void EditorUi::DrawWindowUi() {
         ImGui::EndMenuBar();
     }
 
+    // --- Logger Window ---
     {
         ImGui::Begin("Logger");
 
@@ -108,10 +113,36 @@ void EditorUi::DrawWindowUi() {
         ImGui::End();
     }
 
+    // --- Viewport Window (Game View) ---
     {
+        // Remove padding for the image to fill the window perfectly
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
+
         ImGui::Begin("Viewport");
 
+        // 1. Get the current size of the ImGui viewport window content region
+        const ImVec2 viewportSize = ImGui::GetContentRegionAvail();
+
+        // 2. Tell the engine to resize its Framebuffer (FBO)
+        Engine::Renderer::SetViewportSize(viewportSize.x, viewportSize.y);
+
+        // 3. Get the texture ID
+
+        // 4. Display the texture using ImGui::Image()
+        if (const uint32_t textureID = Engine::Renderer::GetRenderTextureID(); textureID != 0) {
+            // Note: We use a flipped UV coordinate set (V coord: 0->1 instead of 1->0)
+            // because OpenGL/FBO textures are often rendered bottom-up, while ImGui expects top-down.
+            ImGui::Image(
+                (ImTextureID)(intptr_t)textureID,
+                viewportSize,
+                ImVec2(0, 1), // Bottom-left UV (start point)
+                ImVec2(1, 0)  // Top-right UV (end point, effectively flipped vertically)
+            );
+        }
+        else std::cout << "AAAAA\n";
+
         ImGui::End();
+        ImGui::PopStyleVar(); // Restore padding
     }
 
     ImGui::End();
