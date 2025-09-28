@@ -19,6 +19,13 @@ add_library(Engine STATIC
         include/Engine/EventSystem/EventSystem.h
         include/Engine/EngineDefines.h
         include/Engine/EventSystem/Events.h
+        include/Engine/ECS/Component.h
+        include/Engine/ECS/Entity.h
+        include/Engine/ECS/System.h
+        include/Engine/ECS/ECSConfig.h
+        src/World.cpp
+        include/Engine/ECS/World.h
+        include/Engine/ECS/World.inl
 )
 
 target_include_directories(Engine PRIVATE
