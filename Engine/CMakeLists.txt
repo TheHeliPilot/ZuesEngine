@@ -37,6 +37,7 @@ add_library(Engine STATIC
         include/Engine/Input.h
         src/ProjectManager.cpp
         include/Engine/ProjectManager.h
+        include/Engine/ECS/Systems/ViewportCameraSystem.h
 )
 
 target_include_directories(Engine PRIVATE

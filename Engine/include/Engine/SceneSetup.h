@@ -22,8 +22,11 @@ namespace Engine {
             .backgroundColor = {0.2f, 0.2f, 0.2f, 1.0f},
             .isActive = true
         });
+        world->AddComponent<ViewportCameraTag>(cameraEntity, {
 
-        const EntityID testSquare = world->CreateEntity();
+        });
+
+         const EntityID testSquare = world->CreateEntity();
         world->AddComponent<PositionComponent>(testSquare, {
             .position = {0.0f, 0.0f},
             .rotation = 0.0f

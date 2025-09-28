@@ -31,4 +31,6 @@ struct CameraComponent {
 };
 
 //TAGS
-struct ViewportCameraTag{};
+struct ViewportCameraTag {
+    float cameraSpeed = 5;
+};
