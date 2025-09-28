@@ -90,6 +90,7 @@ namespace Engine {
     // CRITICAL FIX 1: Change return type from Mat4 to Vec4
     // Resolves: error: could not convert 'result' from 'Engine::Vec4' ... to 'Engine::Mat4'
     Vec4 operator*(const Mat4& transform, const Vec4& vector) {
+        std::cout << "[DEBUG] Operator*: Mat4 * Vec4" << std::endl; // DEBUG
         Vec4 result;
         // Standard 4x4 Matrix * 4x1 Vector multiplication (assuming column-major storage)
         // Mat4::elements[column + row * 4]
@@ -122,6 +123,7 @@ namespace Engine {
     // CRITICAL FIX 2: Correct the signature of CompileShader to match the declaration in Renderer.h.
     // Resolves: undefined reference to `Engine::Renderer::CompileShader(std::__cxx11::basic_string<char...
     uint32_t Renderer::CompileShader(const std::string& vertexSrc, const std::string& fragmentSrc) {
+        std::cout << "[DEBUG] Compiling Shaders..." << std::endl; // DEBUG
         // 1. Create and Compile Vertex Shader
         const uint32_t vs = glCreateShader(GL_VERTEX_SHADER);
         const char* vSource = vertexSrc.c_str(); // Use c_str() to get a C-style string
@@ -137,6 +139,7 @@ namespace Engine {
             glDeleteShader(vs);
             return 0;
         }
+        std::cout << "[DEBUG] Vertex Shader compiled successfully. ID: " << vs << std::endl; // DEBUG
 
         // 2. Create and Compile Fragment Shader
         const uint32_t fs = glCreateShader(GL_FRAGMENT_SHADER);
@@ -152,6 +155,7 @@ namespace Engine {
             glDeleteShader(fs);
             return 0;
         }
+        std::cout << "[DEBUG] Fragment Shader compiled successfully. ID: " << fs << std::endl; // DEBUG
 
         // 3. Link Program
         const uint32_t program = glCreateProgram();
@@ -174,38 +178,46 @@ namespace Engine {
         glDetachShader(program, fs);
         glDeleteShader(vs);
         glDeleteShader(fs);
+        std::cout << "[DEBUG] Shader Program linked successfully. ID: " << program << std::endl; // DEBUG
 
         return program;
     }
 
     // Implementation for the header's LoadDefaultAssets() helper
     void Renderer::LoadDefaultAssets() {
+        std::cout << "[DEBUG] LoadDefaultAssets called (currently a stub)." << std::endl; // DEBUG
         // Load the default 1x1 white texture here if needed, or keep it in Init()
     }
 
     // Implementation for the header's Flush() helper
     void Renderer::Flush() {
+        std::cout << "[DEBUG] Flush called." << std::endl; // DEBUG
         // Flush logic (similar to EndBatch but without the texture/buffer setup)
     }
 
     // --- Core Lifecycle Implementations ---
 
     void Renderer::Init() {
+        std::cout << "[DEBUG] Renderer::Init() called." << std::endl; // DEBUG
         // ... (Initialization logic remains the same) ...
         if (s_Data != nullptr) {
             // Already initialized
+            std::cout << "[DEBUG] Renderer already initialized. Returning." << std::endl; // DEBUG
             return;
         }
 
         s_Data = new RendererData();
+        std::cout << "[DEBUG] Allocating RendererData struct." << std::endl; // DEBUG
         // CRITICAL FIX 3: Allocate the vertex buffer base memory
         s_Data->VertexBufferBase = new Vertex[MaxVertices];
         s_Data->VertexBufferPtr = s_Data->VertexBufferBase; // Initialize pointer
+        std::cout << "[DEBUG] Allocated " << MaxVertices * sizeof(Vertex) << " bytes for VertexBufferBase." << std::endl; // DEBUG
 
         // OpenGL Global State
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glEnable(GL_DEPTH_TEST); // Optional for 2D, but good for z-ordering
+        std::cout << "[DEBUG] OpenGL State: GL_BLEND enabled, GL_DEPTH_TEST enabled." << std::endl; // DEBUG
 
         // 1. Compile Shader
         // CRITICAL FIX 2: Now calls the correct signature of CompileShader.
@@ -218,10 +230,12 @@ namespace Engine {
         // 2. Setup Batching Buffers (VAO, VBO, EBO)
         glGenVertexArrays(1, &s_Data->QuadVAO);
         glBindVertexArray(s_Data->QuadVAO);
+        std::cout << "[DEBUG] Created QuadVAO: " << s_Data->QuadVAO << std::endl; // DEBUG
 
         glGenBuffers(1, &s_Data->QuadVBO);
         glBindBuffer(GL_ARRAY_BUFFER, s_Data->QuadVBO);
         glBufferData(GL_ARRAY_BUFFER, MaxVertices * sizeof(Vertex), nullptr, GL_DYNAMIC_DRAW);
+        std::cout << "[DEBUG] Created QuadVBO: " << s_Data->QuadVBO << std::endl; // DEBUG
 
         // Define Vertex Attributes (must match the Vertex struct)
         // Position (Vec2, 8 bytes offset)
@@ -236,6 +250,7 @@ namespace Engine {
         // TexID (float, 28 bytes offset)
         glEnableVertexAttribArray(3);
         glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, TexID));
+        std::cout << "[DEBUG] Configured Vertex Attributes." << std::endl; // DEBUG
 
 
         // Create Index Buffer (EBO)
@@ -256,6 +271,7 @@ namespace Engine {
         glGenBuffers(1, &s_Data->QuadEBO);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_Data->QuadEBO);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, MaxIndices * sizeof(uint32_t), quadIndices.data(), GL_STATIC_DRAW);
+        std::cout << "[DEBUG] Created QuadEBO with " << MaxIndices << " indices. ID: " << s_Data->QuadEBO << std::endl; // DEBUG
 
         // 3. Setup Texture Slots (Uniform Array)
         // Set the u_Textures uniform once, as it's static.
@@ -267,6 +283,7 @@ namespace Engine {
         glUseProgram(s_Data->ShaderID);
         const int texturesUniform = glGetUniformLocation(s_Data->ShaderID, "u_Textures");
         glUniform1iv(texturesUniform, MaxTextureSlots, samplers.data());
+        std::cout << "[DEBUG] Set u_Textures uniform array in shader." << std::endl; // DEBUG
 
         // 4. Create a default 1x1 white texture (slot 0)
         uint32_t whiteTextureID;
@@ -282,10 +299,12 @@ namespace Engine {
         // Assign to slot 0
         s_Data->TextureSlots[0] = whiteTextureID;
         s_Data->TextureSlotIndex = 1; // Slot 0 is reserved for the white texture
+        std::cout << "[DEBUG] Created default 1x1 white texture. ID: " << whiteTextureID << ". Reserved slot 0." << std::endl; // DEBUG
 
         // 5. Setup Framebuffer (FBO)
         glGenFramebuffers(1, &s_Data->EditorFBO);
         glBindFramebuffer(GL_FRAMEBUFFER, s_Data->EditorFBO);
+        std::cout << "[DEBUG] Created EditorFBO: " << s_Data->EditorFBO << std::endl; // DEBUG
 
         // Create Color Attachment Texture
         glGenTextures(1, &s_Data->ColorAttachment);
@@ -295,25 +314,34 @@ namespace Engine {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, s_Data->ColorAttachment, 0);
+        std::cout << "[DEBUG] Created ColorAttachment: " << s_Data->ColorAttachment << std::endl; // DEBUG
 
         // Create Depth/Stencil Attachment Texture
         glGenTextures(1, &s_Data->DepthAttachment);
         glBindTexture(GL_TEXTURE_2D, s_Data->DepthAttachment);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, 1, 1, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nullptr);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, s_Data->DepthAttachment, 0);
+        std::cout << "[DEBUG] Created DepthAttachment: " << s_Data->DepthAttachment << std::endl; // DEBUG
 
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
             std::cerr << "Framebuffer is not complete!" << std::endl;
+        else
+            std::cout << "[DEBUG] Framebuffer is complete." << std::endl; // DEBUG
 
         // Unbind everything
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glBindVertexArray(0);
         glBindTexture(GL_TEXTURE_2D, 0);
+        std::cout << "[DEBUG] Renderer::Init() finished successfully." << std::endl; // DEBUG
     }
 
     void Renderer::Shutdown() {
+        std::cout << "[DEBUG] Renderer::Shutdown() called." << std::endl; // DEBUG
         // ... (Shutdown logic remains the same) ...
-        if (s_Data == nullptr) return;
+        if (s_Data == nullptr) {
+            std::cout << "[DEBUG] Renderer already shut down or never initialized. Returning." << std::endl; // DEBUG
+            return;
+        }
 
         // Delete OpenGL objects
         glDeleteProgram(s_Data->ShaderID);
@@ -323,41 +351,53 @@ namespace Engine {
         glDeleteFramebuffers(1, &s_Data->EditorFBO);
         glDeleteTextures(1, &s_Data->ColorAttachment);
         glDeleteTextures(1, &s_Data->DepthAttachment);
+        std::cout << "[DEBUG] Deleted OpenGL resources." << std::endl; // DEBUG
 
         // Delete Texture Slots
         glDeleteTextures(MaxTextureSlots, s_Data->TextureSlots.data());
+        std::cout << "[DEBUG] Deleted texture slot IDs." << std::endl; // DEBUG
 
         // Delete allocated memory (Matched with new[] in Init)
         delete[] s_Data->VertexBufferBase;
         delete s_Data;
         s_Data = nullptr;
+        std::cout << "[DEBUG] Deleted allocated CPU memory." << std::endl; // DEBUG
+        std::cout << "[DEBUG] Renderer::Shutdown() finished." << std::endl; // DEBUG
     }
 
     void Renderer::Render() {
         // ... (Render logic remains the same) ...
         if (s_Data == nullptr) return;
 
+        std::cout << "[DEBUG] Renderer::Render() called." << std::endl; // DEBUG
+
         // 1. Bind the FBO
         glBindFramebuffer(GL_FRAMEBUFFER, s_Data->EditorFBO);
         glViewport(0, 0, (int)s_Data->ViewportWidth, (int)s_Data->ViewportHeight);
+        std::cout << "[DEBUG] Bound FBO " << s_Data->EditorFBO << ". Viewport set to (" << s_Data->ViewportWidth << ", " << s_Data->ViewportHeight << ")" << std::endl; // DEBUG
 
         // 2. Clear buffers (Color and Depth/Stencil)
         glClearColor(0.8f, 0.2f, 0.8f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        std::cout << "[DEBUG] Cleared color and depth/stencil buffers." << std::endl; // DEBUG
 
         // Rendering is done via ECS systems calling BeginBatch/EndBatch.
         // The main Render() function's role is just to manage the FBO/Viewport.
 
         // 3. Unbind the FBO
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        //glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        //std::cout << "[DEBUG] Unbound FBO." << std::endl; // DEBUG
     }
 
     void Renderer::SetViewportSize(float width, float height) {
         if (s_Data == nullptr) return;
 
+        std::cout << "[DEBUG] SetViewportSize called: (" << width << ", " << height << ")" << std::endl; // DEBUG
+
         if (s_Data->ViewportWidth != width || s_Data->ViewportHeight != height) {
             s_Data->ViewportWidth = width;
             s_Data->ViewportHeight = height;
+            std::cout << "[DEBUG] Viewport size changed. Resizing FBO attachments." << std::endl; // DEBUG
 
             // Resize the FBO attachments
             glBindTexture(GL_TEXTURE_2D, s_Data->ColorAttachment);
@@ -365,11 +405,16 @@ namespace Engine {
 
             glBindTexture(GL_TEXTURE_2D, s_Data->DepthAttachment);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, (int)width, (int)height, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nullptr);
+            std::cout << "[DEBUG] FBO attachments resized successfully." << std::endl; // DEBUG
+        } else {
+            std::cout << "[DEBUG] Viewport size unchanged." << std::endl; // DEBUG
         }
     }
 
     uint32_t Renderer::GetRenderTextureID() {
-        return (s_Data != nullptr) ? s_Data->ColorAttachment : 0;
+        const uint32_t id = (s_Data != nullptr) ? s_Data->ColorAttachment : 0;
+        std::cout << "[DEBUG] GetRenderTextureID called. Returning: " << id << std::endl; // DEBUG
+        return id;
     }
 
     // --- Batching Implementations ---
@@ -385,47 +430,65 @@ namespace Engine {
     void Renderer::BeginBatch() {
         if (s_Data == nullptr) return;
 
+        std::cout << "[DEBUG] BeginBatch called." << std::endl; // DEBUG
+
+        SetTextureUniforms();
         // Reset the data for a new batch
         s_Data->IndexCount = 0;
         s_Data->VertexBufferPtr = s_Data->VertexBufferBase;
         s_Data->TextureSlotIndex = 1; // Keep white texture at slot 0
+        std::cout << "[DEBUG] Batch reset: IndexCount=0, VertexBufferPtr reset, TextureSlotIndex=1." << std::endl; // DEBUG
     }
 
     void Renderer::EndBatch() {
-        if (s_Data == nullptr) return;
+        // Check if there's anything to draw
+        if (s_Data->IndexCount == 0) return;
 
-        // Calculate the actual size of the data to upload
-        const uint32_t dataSize = (uint32_t)((uint8_t*)s_Data->VertexBufferPtr - (uint8_t*)s_Data->VertexBufferBase);
+        // 1. Calculate the actual number of vertices written
+        GLsizeiptr size = (uint8_t*)s_Data->VertexBufferPtr - (uint8_t*)s_Data->VertexBufferBase;
 
-        if (dataSize == 0) return;
-
-        // 1. Upload the vertex data to the GPU VBO
+        // 2. Upload the accumulated vertex data to the GPU
         glBindBuffer(GL_ARRAY_BUFFER, s_Data->QuadVBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, dataSize, s_Data->VertexBufferBase);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, size, s_Data->VertexBufferBase);
 
-        // 2. Bind Textures
+        // 3. Bind the shader program and upload uniforms
+        glUseProgram(s_Data->ShaderID);
+
+        // --- CRITICAL FIX: UPLOAD THE VIEW-PROJECTION MATRIX ---
+        GLint location = glGetUniformLocation(s_Data->ShaderID, "u_ViewProjection");
+        if (location != -1) {
+            // The Mat4::elements is an array of 16 floats.
+            glUniformMatrix4fv(location, 1, GL_FALSE, s_Data->ViewProjectionMatrix.elements);
+        }
+        // -----------------------------------------------------
+
+        // 4. Bind textures
         for (uint32_t i = 0; i < s_Data->TextureSlotIndex; i++) {
             glActiveTexture(GL_TEXTURE0 + i);
             glBindTexture(GL_TEXTURE_2D, s_Data->TextureSlots[i]);
         }
 
-        // 3. Draw
-        glUseProgram(s_Data->ShaderID);
+        // 5. Perform the draw call (Draws quads to the currently bound FBO)
         glBindVertexArray(s_Data->QuadVAO);
-        // The index count is 6 indices per quad * number of quads.
-        // We use glDrawElements to draw using the EBO.
         glDrawElements(GL_TRIANGLES, s_Data->IndexCount, GL_UNSIGNED_INT, nullptr);
 
-        // Cleanup
-        glBindVertexArray(0);
+        // 6. Reset batching state
+        s_Data->IndexCount = 0;
+        s_Data->VertexBufferPtr = s_Data->VertexBufferBase;
+
+        // 7. Unbind the FBO (crucial: draws are complete, return to default framebuffer)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind FBO
     }
 
     void Renderer::SubmitQuad(const Vec2& position, float rotation, const Vec2& size, const Vec4& color, uint32_t textureID) {
         if (s_Data == nullptr) return;
 
+        // std::cout << "[DEBUG] SubmitQuad: Pos(" << position.x << ", " << position.y << ") Rot:" << rotation << " Size(" << size.x << ", " << size.y << ") TexID:" << textureID << std::endl; // DEBUG (Verbose)
+
         // 1. Check if the buffer is full or if a new texture requires a draw call.
         // MaxIndices is 6 indices per quad * MaxQuads. If we don't have enough space for a new quad (6 indices), draw.
-        if (s_Data->IndexCount >= MaxIndices) {
+        if (s_Data->IndexCount + 6 > MaxIndices) {
+            std::cout << "[DEBUG] Index buffer full. Forcing EndBatch/BeginBatch." << std::endl; // DEBUG
             EndBatch();
             BeginBatch();
         }
@@ -440,6 +503,7 @@ namespace Engine {
                 if (s_Data->TextureSlots[i] == textureID) {
                     textureSlot = (float)i;
                     found = true;
+                    // std::cout << "[DEBUG] Texture ID " << textureID << " found in slot " << textureSlot << std::endl; // DEBUG (Verbose)
                     break;
                 }
             }
@@ -448,6 +512,7 @@ namespace Engine {
             if (!found) {
                 // If the next slot is beyond the limit, force a draw
                 if (s_Data->TextureSlotIndex >= MaxTextureSlots) {
+                    std::cout << "[DEBUG] Texture slots full. Forcing EndBatch/BeginBatch to free slots." << std::endl; // DEBUG
                     EndBatch();
                     BeginBatch(); // This batch will start with only the white texture in slot 0
 
@@ -455,11 +520,14 @@ namespace Engine {
                     textureSlot = (float)s_Data->TextureSlotIndex;
                     s_Data->TextureSlots[s_Data->TextureSlotIndex] = textureID;
                     s_Data->TextureSlotIndex++;
+                    std::cout << "[DEBUG] Texture ID " << textureID << " assigned to new slot " << textureSlot << std::endl; // DEBUG
+
                 } else {
                     // Assign to the next available slot
                     textureSlot = (float)s_Data->TextureSlotIndex;
                     s_Data->TextureSlots[s_Data->TextureSlotIndex] = textureID;
                     s_Data->TextureSlotIndex++;
+                    std::cout << "[DEBUG] Texture ID " << textureID << " assigned to next slot " << textureSlot << std::endl; // DEBUG
                 }
             }
         }
@@ -468,6 +536,7 @@ namespace Engine {
         // Combine transforms: Scale * Rotate * Translate (to move the quad to world space)
         // Order of application is Scale, then Rotate (around origin), then Translate.
         Mat4 transform = Mat4::Translate(position) * Mat4::Rotate(rotation) * Mat4::Scale(size);
+        // std::cout << "[DEBUG] Transform matrix created." << std::endl; // DEBUG (Verbose)
 
         // ERROR FIX 5: Change constexpr to const (or just define locally)
         const Vec2 quadPositions[4] = {
@@ -496,6 +565,7 @@ namespace Engine {
             s_Data->VertexBufferPtr->TexID = textureSlot;
             s_Data->VertexBufferPtr++;
         }
+        // std::cout << "[DEBUG] Wrote 4 vertices to VertexBufferPtr." << std::endl; // DEBUG (Verbose)
 
         // 4. Update index count (4 vertices added, 6 indices used)
         s_Data->IndexCount += 6;
@@ -506,40 +576,59 @@ namespace Engine {
     void Renderer::SetCamera(const Vec2& position, float zoom, float halfHeight, float rotationRadians) {
         if (s_Data == nullptr) return;
 
-        const float nearPlane = -1.0f;
-        const float farPlane = 1.0f;
+        std::cout << "[DEBUG] SetCamera called: Pos(" << position.x << ", " << position.y << "), Zoom:" << zoom << ", Rot:" << rotationRadians << std::endl; // DEBUG
 
-        // 1. Calculate Projection Matrix (Orthographic)
-        // The viewport height is 2 * halfHeight.
-        const float aspect = s_Data->ViewportWidth / s_Data->ViewportHeight;
+        // 1. Calculate Projection Matrix (from halfHeight and viewport size)
+        const float ratio = s_Data->ViewportWidth / s_Data->ViewportHeight;
+        const float right = ratio * halfHeight / zoom;
+        const float left = -right;
         const float top = halfHeight / zoom;
         const float bottom = -top;
-        const float right = top * aspect;
-        const float left = -right;
 
-        // CRITICAL FIX 5: Change Mat4::Ortho to Mat4::Orthographic to match Math.h
-        // Resolves: error: 'Ortho' is not a member of 'Engine::Mat4'
-        Mat4 projection = Mat4::Orthographic(left, right, bottom, top, nearPlane, farPlane);
+        // Assuming Mat4::Orthographic uses a standard near/far plane (e.g., -1.0f, 1.0f)
+        const Mat4 projection = Mat4::Orthographic(left, right, bottom, top, -1.0f, 1.0f);
+        std::cout << "[DEBUG] Projection calculated. Left: " << left << ", Right: " << right << std::endl; // DEBUG
 
-        // 2. Calculate View Matrix (Rotation and Translation)
-        // View matrix is the inverse of the camera's world transform.
-        // We use -position for translation to move the world opposite the camera.
-        Mat4 view = Mat4::Rotate(rotationRadians) * Mat4::Translate({-position.x, -position.y});
+        // 2. Calculate View Matrix (Inverse translation and rotation)
+        // The view matrix moves the world opposite to the camera
+        const Mat4 translate = Mat4::Translate(position * -1.0f);
+        const Mat4 rotate = Mat4::Rotate(rotationRadians * -1.0f);
+        const Mat4 view = rotate * translate; // Apply rotation THEN translation
+        std::cout << "[DEBUG] View matrix calculated." << std::endl; // DEBUG
 
-        // 3. Final View-Projection Matrix
-        Mat4 viewProjection = projection * view;
+        // 3. Combine and Store
+        s_Data->ViewProjectionMatrix = projection * view;
+        std::cout << "[DEBUG] ViewProjectionMatrix calculated and stored." << std::endl; // DEBUG
 
-        // 4. Send to Shader
+        // 4. CRITICAL FIX: Upload the matrix uniform
         glUseProgram(s_Data->ShaderID);
-        // Find the uniform location and set the matrix data
-        const int vpUniform = glGetUniformLocation(s_Data->ShaderID, "u_ViewProjection");
-        // GL_TRUE means the matrix is row-major, Mat4::elements is column-major so we pass GL_FALSE to match standard GLM/OpenGL.
-        glUniformMatrix4fv(vpUniform, 1, GL_FALSE, viewProjection.elements);
+
+        // You MUST get the uniform location and upload the matrix.
+        // If you cache the uniform location in Init(), use that ID. Otherwise, get it now:
+        const GLint location = glGetUniformLocation(s_Data->ShaderID, "u_ViewProjection");
+        glUniformMatrix4fv(location, 1, GL_FALSE, s_Data->ViewProjectionMatrix.elements); // Pass the matrix data
+        std::cout << "[DEBUG] Uploaded u_ViewProjection matrix uniform (Location: " << location << ")." << std::endl; // DEBUG
+    }
+
+    // You might also need this utility to correctly upload the array of texture uniform slots
+    // This should be called once in Renderer::Init() or Renderer::BeginBatch()
+    void Renderer::SetTextureUniforms() {
+        // You'll need to define the max texture slots in Renderer.h
+        std::array<int, MAX_TEXTURE_SLOTS> samplers;
+        for (int i = 0; i < MAX_TEXTURE_SLOTS; i++) {
+            samplers[i] = i;
+        }
+
+        glUseProgram(s_Data->ShaderID);
+        GLint texturesLoc = glGetUniformLocation(s_Data->ShaderID, "u_Textures");
+        glUniform1iv(texturesLoc, MAX_TEXTURE_SLOTS, samplers.data());
+        std::cout << "[DEBUG] SetTextureUniforms called. Re-uploaded u_Textures uniform array." << std::endl; // DEBUG
     }
 
     // --- Texture Implementation ---
 
     uint32_t Renderer::LoadTexture(const std::string& filePath) {
+        std::cout << "[DEBUG] LoadTexture called for path: " << filePath << std::endl; // DEBUG
         // ... (Texture loading logic remains the same) ...
         uint32_t textureID;
         glGenTextures(1, &textureID);
@@ -565,6 +654,7 @@ namespace Engine {
             glGenerateMipmap(GL_TEXTURE_2D);
 
             stbi_image_free(data);
+            std::cout << "[DEBUG] Texture loaded successfully: ID " << textureID << ", " << width << "x" << height << ", Channels: " << nrChannels << std::endl; // DEBUG
             return textureID;
         } else {
             std::cerr << "Texture failed to load at path: " << filePath << std::endl;

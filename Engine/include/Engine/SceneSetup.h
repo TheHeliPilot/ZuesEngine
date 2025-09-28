@@ -28,34 +28,13 @@ namespace Engine {
         // 1. Red Square Entity
         const EntityID redSquare = world->CreateEntity();
         world->AddComponent<PositionComponent>(redSquare, {
-            .position = {-5.0f, 5.0f}, // Top-left area
-            .rotation = 45.0f // Rotated 45 degrees
+            .position = {0.0f, 0.0f}, // Top-left area
+            .rotation = 0.0f // Rotated 45 degrees
         });
         world->AddComponent<SpriteComponent>(redSquare, {
-            .textureID = textureHandle, // Use the provided texture
+            .textureID = 0, // Use the provided texture
             .size = {2.0f, 2.0f},
             .color = {1.0f, 0.0f, 0.0f, 1.0f} // Solid Red
-        });
-
-
-        // 2. Green Rectangle Entity
-        EntityID greenRect = world->CreateEntity();
-        world->AddComponent<PositionComponent>(greenRect, {
-            .position = {3.0f, -3.0f}, // Bottom-right area
-            .rotation = 0.0f
-        });
-        world->AddComponent<SpriteComponent>(greenRect, {
-            .textureID = textureHandle,
-            .size = {4.0f, 1.0f},
-            .color = {0.0f, 1.0f, 0.0f, 1.0f} // Solid Green
-        });
-
-
-        // 3. Blue Entity (Only a Position, no Sprite - will be ignored by RenderingSystem)
-        EntityID blueMarker = world->CreateEntity();
-        world->AddComponent<PositionComponent>(blueMarker, {
-            .position = {0.0f, 0.0f},
-            .rotation = 0.0f
         });
     }
 }

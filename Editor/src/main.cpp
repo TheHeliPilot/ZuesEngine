@@ -44,11 +44,28 @@ int main() {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
-        Engine::Update();
-
+        // 1. SCENE PREP (Binds FBO 1, Clears it)
         Engine::Renderer::Render();
 
+        // 2. ECS EXECUTION (This was missing!)
+        // NOTE: This runs CameraSystem (sets ViewProjection) and RenderingSystem (submits quads).
+        world->UpdateSystems(1); // <--- MISSING ECS UPDATE
+
+        // 3. FLUSH THE BATCH (This issues the draw call for all submitted quads to FBO 1)
+        Engine::Renderer::EndBatch(); // <--- MISSING DRAW CALL
+
+        // 4. UNBIND FBO (Switches back to the default framebuffer/screen)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0); // <--- Final step for scene rendering
+
         ENGINE_LOG("Some random log message", LOGLEVEL_INFO);
+
+        // Optional: Reset viewport for main window (needed for correct ImGui rendering)
+        int display_w, display_h;
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+        glViewport(0, 0, display_w, display_h);
+
+        // 5. UI Rendering
+        Engine::Update(); // (If you want to keep the engine-level update here)
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -57,7 +74,6 @@ int main() {
         EditorUi::DrawWindowUi();
 
         ImGui::Render();
-        int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
         glClear(GL_COLOR_BUFFER_BIT);

@@ -51,7 +51,7 @@ namespace Engine {
         INetwork->Update();
 
         Core::Update();
-        Renderer::Render();
+        //Renderer::Render();
     }
 
     void Shutdown() {

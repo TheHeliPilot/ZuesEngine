@@ -44,6 +44,8 @@ namespace Engine {
         // halfHeight defines the size of the view volume (e.g., 10 world units vertically).
         static void SetCamera(const Vec2& position, float zoom, float halfHeight, float rotationRadians);
 
+        static void SetTextureUniforms();
+
         // --- Editor Interface ---
         static uint32_t GetRenderTextureID();
         static void SetViewportSize(float width, float height);
