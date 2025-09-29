@@ -10,6 +10,9 @@
 #include <glad/glad.h>
 #include <cmath>
 
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "../include/stb/stb_truetype.h"
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "../include/stb/stb_image.h"
 
@@ -59,7 +62,10 @@ void main()
 }
 )";
 
+
 namespace Engine {
+
+    std::vector<Renderer::Font> Renderer::s_Fonts;
 
     // --- Math Constants (Used internally) ---
     constexpr float PI = 3.14159265359f;
@@ -333,11 +339,11 @@ namespace Engine {
 
         // 1. Bind the FBO
         glBindFramebuffer(GL_FRAMEBUFFER, s_Data->EditorFBO);
-        glViewport(0, 0, (int)s_Data->ViewportWidth, (int)s_Data->ViewportHeight);
+        glViewport(0, 0, static_cast<int>(s_Data->ViewportWidth), static_cast<int>(s_Data->ViewportHeight));
 
         // Bind the editor's FBO
         glBindFramebuffer(GL_FRAMEBUFFER, s_Data->EditorFBO);
-        glViewport(0, 0, (GLsizei)s_Data->ViewportWidth, (GLsizei)s_Data->ViewportHeight);
+        glViewport(0, 0, static_cast<GLsizei>(s_Data->ViewportWidth), static_cast<GLsizei>(s_Data->ViewportHeight));
 
         // FIX: Use the stored clear color
         glClearColor(
@@ -360,10 +366,10 @@ namespace Engine {
 
             // Resize the FBO attachments
             glBindTexture(GL_TEXTURE_2D, s_Data->ColorAttachment);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (int)width, (int)height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, static_cast<int>(width), static_cast<int>(height), 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
             glBindTexture(GL_TEXTURE_2D, s_Data->DepthAttachment);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, (int)width, (int)height, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nullptr);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, static_cast<int>(width), static_cast<int>(height), 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nullptr);
         } else {
         }
     }
@@ -454,7 +460,7 @@ namespace Engine {
             // Search for existing slot
             for (uint32_t i = 1; i < s_Data->TextureSlotIndex; i++) {
                 if (s_Data->TextureSlots[i] == textureID) {
-                    textureSlot = (float)i;
+                    textureSlot = static_cast<float>(i);
                     found = true;
                     // std::cout << "[DEBUG] Texture ID " << textureID << " found in slot " << textureSlot << std::endl; // DEBUG (Verbose)
                     break;
@@ -469,13 +475,13 @@ namespace Engine {
                     BeginBatch(); // This batch will start with only the white texture in slot 0
 
                     // The new texture must now fit in the new batch, and it will be assigned to slot 1
-                    textureSlot = (float)s_Data->TextureSlotIndex;
+                    textureSlot = static_cast<float>(s_Data->TextureSlotIndex);
                     s_Data->TextureSlots[s_Data->TextureSlotIndex] = textureID;
                     s_Data->TextureSlotIndex++;
 
                 } else {
                     // Assign to the next available slot
-                    textureSlot = (float)s_Data->TextureSlotIndex;
+                    textureSlot = static_cast<float>(s_Data->TextureSlotIndex);
                     s_Data->TextureSlots[s_Data->TextureSlotIndex] = textureID;
                     s_Data->TextureSlotIndex++;
                 }
@@ -586,9 +592,8 @@ namespace Engine {
 
         int width, height, nrChannels;
         stbi_set_flip_vertically_on_load(true); // Flip texture on load
-        unsigned char *data = stbi_load(filePath.c_str(), &width, &height, &nrChannels, 0);
 
-        if (data) {
+        if (unsigned char *data = stbi_load(filePath.c_str(), &width, &height, &nrChannels, 0)) {
             GLenum format = GL_RGB;
             if (nrChannels == 4) format = GL_RGBA;
             else if (nrChannels == 1) format = GL_RED;
@@ -609,4 +614,209 @@ namespace Engine {
         if (!s_Data) return;
         s_Data->ClearColor = color;
     }
+
+    void Renderer::DrawLine(const Vec2& start, const Vec2& end, const Vec4& color, float thickness) {
+        if (s_Data == nullptr) return;
+
+        // Direction and length of the line
+        const Vec2 direction = end - start;
+        float length = direction.Length();
+        const float rotation = atan2(direction.y, direction.x);
+
+        // Centered at midpoint
+        const Vec2 position = (start + end) * 0.5f;
+
+        // Submit a thin quad (rectangle) rotated along the line direction
+        SubmitQuad(position, rotation, { length, thickness }, color, 0);
+    }
+
+    void Renderer::DrawRect(const Vec2& position, const Vec2& size, const Vec4& color, const float rotationRadians) {
+        SubmitQuad(position, rotationRadians, size, color, 0);
+    }
+
+    void Renderer::DrawCircle(const Vec2& center, const float radius, const Vec4& color, const int segments) {
+        const float step = 2.0f * 3.14159265f / segments;
+        for (int i = 0; i < segments; i++) {
+            Vec2 p0 = center + Vec2(cos(i * step), sin(i * step)) * radius;
+            Vec2 p1 = center + Vec2(cos((i + 1) * step), sin((i + 1) * step)) * radius;
+            DrawLine(p0, p1, color, 0.05f); // Reuse DrawLine
+        }
+    }
+
+    void Renderer::DrawArrow(const Vec2& start, const Vec2& end, const Vec4& color, const float thickness) {
+        DrawLine(start, end, color, thickness);
+
+        // Small triangle arrowhead
+        const Vec2 dir = (end - start).Normalize();
+        const auto perp = Vec2(-dir.y, dir.x); // perpendicular
+        constexpr float headSize = 0.5f;
+
+        const Vec2 tip = end;
+        const Vec2 left = end - dir * headSize + perp * (headSize * 0.5f);
+        const Vec2 right = end - dir * headSize - perp * (headSize * 0.5f);
+
+        // Triangle as 3 lines
+        DrawLine(tip, left, color, thickness);
+        DrawLine(tip, right, color, thickness);
+        DrawLine(left, right, color, thickness);
+    }
+
+    Vec2 Renderer::WorldToScreen(const Vec2& worldPos) {
+        if (!s_Data) return {};
+
+        Vec4 clip = s_Data->ViewProjectionMatrix * Vec4(worldPos.x, worldPos.y, 0.0f, 1.0f);
+        clip.x /= clip.w;
+        clip.y /= clip.w;
+
+        // Convert from NDC [-1,1] to screen space [0, viewportWidth/Height]
+        float x = (clip.x * 0.5f + 0.5f) * s_Data->ViewportWidth;
+        float y = (clip.y * 0.5f + 0.5f) * s_Data->ViewportHeight;
+        return { x, y };
+    }
+
+    Vec2 Renderer::ScreenToWorld(const Vec2& screenPos) {
+        if (!s_Data) return {};
+
+        // Screen → NDC
+        const float ndcX = (2.0f * screenPos.x) / s_Data->ViewportWidth - 1.0f;
+        const float ndcY = (2.0f * screenPos.y) / s_Data->ViewportHeight - 1.0f;
+        const Vec4 ndc(ndcX, ndcY, 0.0f, 1.0f);
+
+        // Inverse ViewProjection
+        const Mat4 inv = s_Data->ViewProjectionMatrix.Inverted();
+        Vec4 world = inv * ndc;
+        world.x /= world.w;
+        world.y /= world.w;
+
+        return { world.x, world.y };
+    }
+
+    uint32_t Renderer::LoadFont(const std::string& path, float pixelHeight) {
+        // Load file into memory
+        std::ifstream file(path, std::ios::binary | std::ios::ate);
+        if (!file) return 0;
+        std::streamsize size = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        std::vector<unsigned char> buffer(size);
+        if (!file.read(reinterpret_cast<char *>(buffer.data()), size)) return 0;
+
+        // Initialize stb_truetype
+        stbtt_fontinfo fontInfo;
+        if (!stbtt_InitFont(&fontInfo, buffer.data(), 0)) return 0;
+
+        // Pack ASCII 32–126
+        constexpr int atlasSize = 512;
+        unsigned char atlas[atlasSize * atlasSize];
+        stbtt_bakedchar baked[96]; // 96 printable ASCII chars
+
+        stbtt_BakeFontBitmap(buffer.data(), 0, pixelHeight,
+                             atlas, atlasSize, atlasSize,
+                             32, 126, baked);
+
+        // Upload atlas as OpenGL texture
+        uint32_t texID;
+        glGenTextures(1, &texID);
+        glBindTexture(GL_TEXTURE_2D, texID);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, atlasSize, atlasSize, 0,
+                     GL_RED, GL_UNSIGNED_BYTE, atlas);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        // Build font data
+        Font font;
+        font.TextureID = texID;
+        font.LineHeight = pixelHeight;
+
+        for (int c = 32; c < 126; c++) {
+            stbtt_bakedchar& b = baked[c - 32];
+
+            Glyph g;
+            g.Size = { static_cast<float>(b.x1) - b.x0, static_cast<float>(b.y1) - b.y0 };
+            g.Bearing = { b.xoff, b.yoff };
+            g.Advance = b.xadvance;
+            g.UV0 = { static_cast<float>(b.x0) / atlasSize, static_cast<float>(b.y0) / atlasSize };
+            g.UV1 = { static_cast<float>(b.x1) / atlasSize, static_cast<float>(b.y1) / atlasSize };
+
+            font.Glyphs[static_cast<char>(c)] = g;
+        }
+
+        s_Fonts.push_back(font);
+        return static_cast<uint32_t>(s_Fonts.size() - 1); // fontID
+    }
+
+    void Renderer::DrawText(const std::string& text, const Vec2& position, const float scale, const Vec4& color, const uint32_t fontID) {
+    if (s_Data == nullptr) return;
+    if (fontID >= s_Fonts.size()) return;
+
+    const Font& font = s_Fonts[fontID];
+    float x = position.x;
+    float y = position.y;
+
+    for (char c : text) {
+        if (c == '\n') {
+            y -= font.LineHeight * scale;
+            x = position.x;
+            continue;
+        }
+
+        auto it = font.Glyphs.find(c);
+        if (it == font.Glyphs.end()) continue;
+
+        const Glyph& g = it->second;
+
+        Vec2 glyphPos = { x + g.Bearing.x * scale, y - (g.Size.y - g.Bearing.y) * scale };
+        Vec2 glyphSize = { g.Size.x * scale, g.Size.y * scale };
+
+        // Submit quad (textured)
+        const Mat4 transform = Mat4::Translate(glyphPos) * Mat4::Scale(glyphSize);
+
+        const Vec2 texCoords[4] = {
+            {g.UV0.x, g.UV0.y},
+            {g.UV1.x, g.UV0.y},
+            {g.UV1.x, g.UV1.y},
+            {g.UV0.x, g.UV1.y}
+        };
+
+        float texSlot = 0.0f;
+        bool found = false;
+        for (uint32_t i = 1; i < s_Data->TextureSlotIndex; i++) {
+            if (s_Data->TextureSlots[i] == font.TextureID) {
+                texSlot = static_cast<float>(i);
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            if (s_Data->TextureSlotIndex >= MAX_TEXTURE_SLOTS) {
+                EndBatch();
+                BeginBatch();
+            }
+            texSlot = (float)s_Data->TextureSlotIndex;
+            s_Data->TextureSlots[s_Data->TextureSlotIndex++] = font.TextureID;
+        }
+
+        for (int i = 0; i < 4; i++) {
+            const Vec2 quadPositions[4] = {
+                {0.0f, 0.0f},
+                {1.0f, 0.0f},
+                {1.0f, 1.0f},
+                {0.0f, 1.0f}
+            };
+            Vec4 transformedPos = transform * Vec4(quadPositions[i].x, quadPositions[i].y, 0.0f, 1.0f);
+            s_Data->VertexBufferPtr->Position = { transformedPos.x, transformedPos.y };
+            s_Data->VertexBufferPtr->Color = color;
+            s_Data->VertexBufferPtr->TexCoord = texCoords[i];
+            s_Data->VertexBufferPtr->TexID = texSlot;
+            s_Data->VertexBufferPtr++;
+        }
+
+        s_Data->IndexCount += 6;
+
+        x += g.Advance * scale;
+    }
+}
+
+
 } // namespace Engine

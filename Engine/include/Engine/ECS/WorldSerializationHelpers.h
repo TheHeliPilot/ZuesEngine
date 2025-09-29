@@ -83,13 +83,9 @@ namespace Engine {
         return j;
     }
 
-    // Helper function to deserialize any data component struct T from a JSON object.
     template <typename T, std::size_t... Is>
     void ComponentFromJsonImpl(T& component, const json& j, std::index_sequence<Is...>) {
-        // FIX: Must use 'auto' instead of 'const auto&' to correctly bind the rvalue
-        // returned by std::tie(component), solving the Lvalue reference error.
         auto tup = std::tie(component);
-
         ((j.at("m" + std::to_string(Is)).get_to(std::get<Is>(tup))), ...);
     }
 

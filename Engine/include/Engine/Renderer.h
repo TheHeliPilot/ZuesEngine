@@ -4,6 +4,8 @@
 #include <cstdint> // For uint32_t
 #include <array>   // For std::array
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "Math.h"  // <--- NEW: Include the centralized math library
 
@@ -52,7 +54,39 @@ namespace Engine {
         static uint32_t LoadTexture(const std::string& filePath);
         static void SetClearColor(const Vec4& color);
 
+        static void DrawLine(const Vec2& start, const Vec2& end, const Vec4& color, float thickness = 1.0f);
+        static void DrawRect(const Vec2& position, const Vec2& size, const Vec4& color, float rotationRadians = 0.0f);
+        static void DrawCircle(const Vec2& center, float radius, const Vec4& color, int segments = 20);
+        static void DrawArrow(const Vec2& start, const Vec2& end, const Vec4& color, float thickness = 1.0f);
+
+        static Vec2 WorldToScreen(const Vec2 &worldPos);
+        static Vec2 ScreenToWorld(const Vec2 &screenPos);
+
+        // --- Font System ---
+        struct Glyph {
+            Vec2 Size;      // Pixel size of glyph
+            Vec2 Bearing;   // Offset from baseline to left/top of glyph
+            float Advance;  // Advance to next glyph
+            Vec2 UV0;       // Bottom-left texcoord
+            Vec2 UV1;       // Top-right texcoord
+        };
+
+        struct Font {
+            uint32_t TextureID;                   // OpenGL texture for the atlas
+            float LineHeight;                     // Font size in pixels
+            std::unordered_map<char, Glyph> Glyphs;
+        };
+
+        static uint32_t LoadFont(const std::string& path, float pixelHeight);
+        static void DrawText(const std::string& text,
+                             const Vec2& position,
+                             float scale,
+                             const Vec4& color,
+                             uint32_t fontID);
+
     private:
+
+        static std::vector<Font> s_Fonts;
 
         // 2D Vertex Structure for Batching
         struct Vertex {
