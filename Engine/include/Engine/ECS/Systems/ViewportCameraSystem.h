@@ -10,6 +10,10 @@
 
 class ViewportCameraSystem final : public SystemBase<PositionComponent*, CameraComponent*, ViewportCameraTag*> {
 public:
+    ViewportCameraSystem() {
+        role = SystemRole::Editor;
+    }
+
     void Update(const float deltaTime, PositionComponent* pos, CameraComponent* cam, ViewportCameraTag* vc_tag) override {
 
         //ENGINE_LOG(std::to_string(deltaTime));

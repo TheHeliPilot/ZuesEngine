@@ -1,7 +1,5 @@
 ﻿#pragma once
 #include "System.h"
-#include "Entity.h"
-#include "Component.h"
 #include "ECSConfig.h"
 
 #include <vector>
@@ -67,6 +65,7 @@ namespace Engine::ECS::Component {
             };
         }
     }
+
 }
 
 
@@ -89,7 +88,7 @@ public:
 
     // === System Management API ===
     void RegisterSystem(std::unique_ptr<System> system);
-    void UpdateSystems(float deltaTime);
+    void UpdateSystems(float deltaTime, System::SystemRole currentMode);
 
     // === Core Iteration Mechanism (Called by SystemBase::Run) ===
     // This function performs the Archetype filtering and the inner loop execution.

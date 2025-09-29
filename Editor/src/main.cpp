@@ -97,7 +97,7 @@ int main() {
 
         // Engine::Update() calls Core::Update(deltaTime), which runs the ECS systems
         // (CameraSystem -> updates VP matrix, RenderingSystem -> submits quads to batch).
-        Engine::Update();
+        Engine::Update(System::SystemRole::Editor);
 
         // Flushes the accumulated batch data (quads) to the FBO's texture.
         Engine::Renderer::EndBatch();

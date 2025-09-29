@@ -10,6 +10,10 @@
 
 class RenderingSystem : public SystemBase<PositionComponent*, SpriteComponent*> {
 public:
+    RenderingSystem() {
+        role = SystemRole::Shared;
+    }
+
     void Run(World* world, float deltaTime) override {
         // 1. Start the batching process (MUST be done first)
         Engine::Renderer::BeginBatch(); // <--- REQUIRED START

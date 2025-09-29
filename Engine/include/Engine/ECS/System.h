@@ -9,9 +9,13 @@ class World; // Forward declaration
 
 class System {
 public:
+    enum class SystemRole { Shared, Editor, Game };
+
     virtual ~System() = default;
     virtual void Run(World* world, float deltaTime) = 0; // The base execution function
     ComponentSignature signature;
+
+    SystemRole role = SystemRole::Game;
 };
 
 

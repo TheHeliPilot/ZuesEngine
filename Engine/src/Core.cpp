@@ -28,15 +28,15 @@ void Engine::Core::Init() {
     // 3. Setup Scene/Entities (Moved from main.cpp)
     Engine::SetupSimpleScene(s_World.get(), 0);
 
-    s_World->UpdateSystems(0);
+    s_World->UpdateSystems(0, System::SystemRole::Shared);
 
     ENGINE_LOG("Core Game Logic Initialized.", LOGLEVEL_INFO);
 }
 
-void Engine::Core::Update(const float deltaTime) {
+void Engine::Core::Update(const float deltaTime, const System::SystemRole currentMode) {
     // CRITICAL: Run all ECS systems with the calculated deltaTime
     if (s_World) {
-        s_World->UpdateSystems(deltaTime);
+        s_World->UpdateSystems(deltaTime, currentMode);
     }
 }
 

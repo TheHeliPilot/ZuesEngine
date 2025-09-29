@@ -62,7 +62,7 @@ int main() {
         Engine::Renderer::Render();
 
         // Engine::Update() runs ECS systems (submitting geometry).
-        Engine::Update();
+        Engine::Update(System::SystemRole::Game);
 
         // Flushes geometry to FBO. EndBatch() also UNBINDS the FBO (target is now 0).
         Engine::Renderer::EndBatch();

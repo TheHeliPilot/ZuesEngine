@@ -21,7 +21,7 @@ namespace Engine {
     extern Network* INetwork;
 
     void Initialize(Network::Role role, const std::string& address, const uint16_t port);
-    void Update();
+    void Update(System::SystemRole currentMode);
     void Shutdown();
 }
 

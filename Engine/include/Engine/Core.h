@@ -11,7 +11,7 @@ namespace Engine {
     public:
         static void Init();
         // Accepts deltaTime for framerate-independent updates
-        static void Update(float deltaTime);
+        static void Update(float deltaTime, System::SystemRole currentMode);
         static void Shutdown();
 
     private:

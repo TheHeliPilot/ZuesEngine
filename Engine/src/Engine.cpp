@@ -49,14 +49,14 @@ namespace Engine {
     }
 
     float lastFrameTime = static_cast<float>(glfwGetTime());
-    void Update() {
+    void Update(const System::SystemRole currentMode) {
         INetwork->Update();
 
         const float currentTime = static_cast<float>(glfwGetTime());
         const float deltaTime = currentTime - lastFrameTime;
         lastFrameTime = currentTime;
 
-        Core::Update(deltaTime);
+        Core::Update(deltaTime, currentMode);
         //Renderer::Render();
     }
 

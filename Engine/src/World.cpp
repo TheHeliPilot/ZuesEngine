@@ -78,9 +78,11 @@ void World::RegisterSystem(std::unique_ptr<System> system) {
     systems.push_back(std::move(system));
 }
 
-void World::UpdateSystems(const float deltaTime) {
+void World::UpdateSystems(const float deltaTime, const System::SystemRole currentMode) {
     for (const auto& system : systems) {
-        system->Run(this, deltaTime);
+        if (system->role == System::SystemRole::Shared || system->role == currentMode) {
+            system->Run(this, deltaTime);
+        }
     }
 }
 
