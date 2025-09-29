@@ -15,6 +15,7 @@
 #include "SceneSetup.h"
 #include "ECS/Systems/Systems.h"
 #include "ProjectManager.h"
+#include "HitTest.h"
 
 namespace Engine {
     extern EventSystem* IEventSystem;

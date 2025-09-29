@@ -615,51 +615,43 @@ namespace Engine {
         s_Data->ClearColor = color;
     }
 
-    void Renderer::DrawLine(const Vec2& start, const Vec2& end, const Vec4& color, float thickness) {
-        if (s_Data == nullptr) return;
-
-        // Direction and length of the line
-        const Vec2 direction = end - start;
-        float length = direction.Length();
-        const float rotation = atan2(direction.y, direction.x);
-
-        // Centered at midpoint
-        const Vec2 position = (start + end) * 0.5f;
-
-        // Submit a thin quad (rectangle) rotated along the line direction
-        SubmitQuad(position, rotation, { length, thickness }, color, 0);
+    Line Renderer::DrawLine(const Vec2& start, const Vec2& end, const Vec4& color, float thickness) {
+        Renderer::SubmitQuad((start + end) * 0.5f, atan2(end.y - start.y, end.x - start.x), { (end - start).Length(), thickness }, color, 0);
+        return { start, end, thickness };
     }
 
-    void Renderer::DrawRect(const Vec2& position, const Vec2& size, const Vec4& color, const float rotationRadians) {
-        SubmitQuad(position, rotationRadians, size, color, 0);
+    Rect Renderer::DrawRect(const Vec2& position, const Vec2& size, const Vec4& color, const float rotationRadians) {
+        Renderer::SubmitQuad(position, rotationRadians, size, color, 0);
+        return { position, size, rotationRadians };
     }
 
-    void Renderer::DrawCircle(const Vec2& center, const float radius, const Vec4& color, const int segments) {
+    Circle Renderer::DrawCircle(const Vec2& center, const float radius, const Vec4& color, const int segments, const bool outlineOnly, const float thickness) {
         const float step = 2.0f * 3.14159265f / segments;
         for (int i = 0; i < segments; i++) {
             Vec2 p0 = center + Vec2(cos(i * step), sin(i * step)) * radius;
             Vec2 p1 = center + Vec2(cos((i + 1) * step), sin((i + 1) * step)) * radius;
-            DrawLine(p0, p1, color, 0.05f); // Reuse DrawLine
+            DrawLine(p0, p1, color, 0.05f);
         }
+        return { center, radius, outlineOnly, thickness };
     }
 
-    void Renderer::DrawArrow(const Vec2& start, const Vec2& end, const Vec4& color, const float thickness) {
+    Arrow Renderer::DrawArrow(const Vec2& start, const Vec2& end, const Vec4& color, const float thickness) {
         DrawLine(start, end, color, thickness);
 
-        // Small triangle arrowhead
         const Vec2 dir = (end - start).Normalize();
-        const auto perp = Vec2(-dir.y, dir.x); // perpendicular
+        const Vec2 perp(-dir.y, dir.x);
         constexpr float headSize = 0.5f;
-
         const Vec2 tip = end;
         const Vec2 left = end - dir * headSize + perp * (headSize * 0.5f);
         const Vec2 right = end - dir * headSize - perp * (headSize * 0.5f);
 
-        // Triangle as 3 lines
         DrawLine(tip, left, color, thickness);
         DrawLine(tip, right, color, thickness);
         DrawLine(left, right, color, thickness);
+
+        return { start, end, thickness };
     }
+
 
     Vec2 Renderer::WorldToScreen(const Vec2& worldPos) {
         if (!s_Data) return {};

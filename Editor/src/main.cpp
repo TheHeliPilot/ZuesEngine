@@ -105,10 +105,15 @@ int main() {
         // (CameraSystem -> updates VP matrix, RenderingSystem -> submits quads to batch).
         Engine::Update(System::SystemRole::Editor);
 
-        Engine::Renderer::DrawCircle({0,0}, 3, {0,0,1,1}, 100);
+        Engine::Circle circle = Engine::Renderer::DrawCircle({0,0}, 3, {0,0,1,1}, 100);
 
-        Engine::Renderer::DrawArrow({0,0}, {3,0}, {1,0,0,1}, .05f);
+
+        Engine::Arrow arr1 = Engine::Renderer::DrawArrow({0,0}, {3,0}, {1,0,0,1}, .05f);
         Engine::Renderer::DrawArrow({0,0}, {0,3}, {0,1,0,1}, .05f);
+
+        Engine::Vec2 mousePos = EditorUi::viewportMousePos;
+        mousePos = Engine::Renderer::ScreenToWorld(mousePos);
+        ENGINE_LOG(std::to_string(Engine::HitTest::Arrow(mousePos, arr1)));
 
         // Example: Draw text overlay
         //Engine::Renderer::DrawText("FPS: 60", {10, 700}, 1.0f, {1,1,0,1}, fontID);

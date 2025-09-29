@@ -41,6 +41,8 @@ add_library(Engine STATIC
         include/Engine/ECS/WorldSerializationHelpers.h
         include/json/json.hpp
         include/json/json_fwd.hpp
+        src/HitTest.cpp
+        include/Engine/HitTest.h
 )
 
 target_include_directories(Engine PRIVATE

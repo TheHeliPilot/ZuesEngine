@@ -39,6 +39,10 @@ namespace Engine::Math {
             return {0.0f, 0.0f}; // return zero vector if can't normalize
         }
 
+        float Dot(const Vec2& other) const {
+            return x * other.x + y * other.y;
+        }
+
         // Operator overloads (Essential for game math)
         Vec2 operator+(const Vec2& other) const { return Vec2(x + other.x, y + other.y); }
         Vec2 operator-(const Vec2& other) const { return Vec2(x - other.x, y - other.y); }

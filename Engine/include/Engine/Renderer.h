@@ -16,6 +16,37 @@ namespace Engine {
     using Vec4 = Math::Vec4;
     using Mat4 = Math::Mat4;
 
+    struct Line {
+        Vec2 start;
+        Vec2 end;
+        float thickness;
+    };
+
+    struct Rect {
+        Vec2 position;
+        Vec2 size;
+        float rotationRadians;
+    };
+
+    struct Circle {
+        Vec2 center;
+        float radius;
+        bool outlineOnly = false;
+        float thickness = 1.0f; // only used if outlineOnly = true
+    };
+
+    struct Arrow {
+        Vec2 start;
+        Vec2 end;
+        float thickness;
+    };
+
+    struct Triangle {
+        Vec2 v0;
+        Vec2 v1;
+        Vec2 v2;
+    };
+
     // --- Renderer Class ---
 
     class Renderer {
@@ -54,10 +85,10 @@ namespace Engine {
         static uint32_t LoadTexture(const std::string& filePath);
         static void SetClearColor(const Vec4& color);
 
-        static void DrawLine(const Vec2& start, const Vec2& end, const Vec4& color, float thickness = 1.0f);
-        static void DrawRect(const Vec2& position, const Vec2& size, const Vec4& color, float rotationRadians = 0.0f);
-        static void DrawCircle(const Vec2& center, float radius, const Vec4& color, int segments = 20);
-        static void DrawArrow(const Vec2& start, const Vec2& end, const Vec4& color, float thickness = 1.0f);
+        static Line DrawLine(const Vec2& start, const Vec2& end, const Vec4& color, float thickness = 1.0f);
+        static Rect DrawRect(const Vec2& position, const Vec2& size, const Vec4& color, float rotationRadians = 0.0f);
+        static Circle DrawCircle(const Vec2& center, float radius, const Vec4& color, int segments = 20, bool outlineOnly = false, float thickness = 1.0f);
+        static Arrow DrawArrow(const Vec2& start, const Vec2& end, const Vec4& color, float thickness = 1.0f);
 
         static Vec2 WorldToScreen(const Vec2 &worldPos);
         static Vec2 ScreenToWorld(const Vec2 &screenPos);
