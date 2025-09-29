@@ -14,7 +14,7 @@ public:
         role = SystemRole::Shared;
     }
 
-    void Run(World* world, float deltaTime) override {
+    void Run(World* world, const float deltaTime) override {
         // 1. Start the batching process (MUST be done first)
         Engine::Renderer::BeginBatch(); // <--- REQUIRED START
 

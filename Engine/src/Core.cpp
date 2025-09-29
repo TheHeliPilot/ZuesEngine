@@ -45,3 +45,13 @@ void Engine::Core::Shutdown() {
     s_World.reset(); // Safely destroy the world and all entities/systems
     ENGINE_LOG("Core Game Logic Shut down.", LOGLEVEL_INFO);
 }
+
+bool Engine::Core::SaveWorld(const std::string &filePath) {
+    if (!s_World) return false;
+
+    return s_World->SaveToJson(filePath+"World.json");
+}
+
+bool Engine::Core::LoadWorld(const std::string &filePath) {
+    return s_World->LoadFromJson(filePath+"World.json");
+}

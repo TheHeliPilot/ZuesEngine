@@ -38,7 +38,9 @@ add_library(Engine STATIC
         src/ProjectManager.cpp
         include/Engine/ProjectManager.h
         include/Engine/ECS/Systems/ViewportCameraSystem.h
-        include/Engine/Serialization.h
+        include/Engine/ECS/WorldSerializationHelpers.h
+        include/json/json.hpp
+        include/json/json_fwd.hpp
 )
 
 target_include_directories(Engine PRIVATE

@@ -1,6 +1,10 @@
 ﻿#pragma once
 #include "../ECS/Component.h"
-#include "../Renderer.h" // For Engine::Vec4
+#include "../../json/json.hpp"
+#include "../Math.h"
+
+// You must include the json header here or ensure it's included higher up
+// #include "../../json/json.hpp" // Uncomment if WorldSerializationHelpers.h doesn't cover this
 
 // --- Core Data Structures ---
 
@@ -9,28 +13,34 @@ struct PositionComponent {
     Engine::Math::Vec2 position = {0.0f, 0.0f};
     float rotation = 0.0f; // Angle in degrees
 };
+// Add serialization for PositionComponent
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PositionComponent, position, rotation)
+
 
 // 2. Sprite Component
-// This component marks an entity as renderable and holds its visual properties.
 struct SpriteComponent {
-    // NOTE: This textureID must be the OpenGL handle for the texture (loaded in Renderer::Init)
-    uint32_t textureID = 0; 
-    Engine::Vec2 size = {1.0f, 1.0f}; // Width and Height in world units
-    Engine::Vec4 color = {1.0f, 1.0f, 1.0f, 1.0f}; // Tint (RGBA)
+    uint32_t textureID = 0;
+    Engine::Math::Vec2 size = {1.0f, 1.0f};
+    Engine::Math::Vec4 color = {1.0f, 1.0f, 1.0f, 1.0f};
 };
+// Add serialization for SpriteComponent (Fixes your compilation error for this type)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteComponent, textureID, size, color)
+
 
 // 3. Camera Component
-// An entity with this component will act as the viewport camera.
 struct CameraComponent {
-    // Orthographic projection settings
-    float zoom = 1.0f;      // 1.0 = normal view
-    float halfHeight = 10.0f; // Half the height of the view volume in world units.
-    Engine::Vec4 backgroundColor = {0.1f, 0.1f, 0.1f, 1.0f};
-    // Optional: Only render the scene if this camera is active.
-    bool isActive = true; 
+    float zoom = 1.0f;
+    float halfHeight = 10.0f;
+    Engine::Math::Vec4 backgroundColor = {0.1f, 0.1f, 0.1f, 1.0f};
+    bool isActive = true;
 };
+// Add serialization for CameraComponent (Fixes your compilation error for this type)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraComponent, zoom, halfHeight, backgroundColor, isActive)
 
-//TAGS
+
+// TAGS
 struct ViewportCameraTag {
     float cameraSpeed = 5;
 };
+// Add serialization for ViewportCameraTag (Fixes your compilation error for this type)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ViewportCameraTag, cameraSpeed)

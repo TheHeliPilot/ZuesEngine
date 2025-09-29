@@ -86,7 +86,18 @@ void SystemBase<TArgs...>::Run(World* world, float deltaTime) {
 // =========================================================================
 
 template<typename T>
-void World::AddComponent(EntityID entityID, const T& component) {
+void World::AddComponent(const EntityID entityID, const T& component) {
+
+    if (!IsComponentRegistered<T>()) {
+        // Use typeid(T).name() to generate a unique string name.
+        // This string will be compiler-specific (mangled), but it is unique
+        // and avoids requiring changes to the component structs.
+        const std::string componentName = typeid(T).name();
+
+        // Automatically register the component with the generated name
+        RegisterComponent<T>(componentName);
+    }
+
     // 1. Get the entity's current data and perform validation
     EntityData& data = entityLookup[entityID.GetIndex()];
     if (data.generation != entityID.GetGeneration() || !data.archetypePtr) {
@@ -120,7 +131,7 @@ void World::AddComponent(EntityID entityID, const T& component) {
 }
 
 template<typename T>
-void World::RemoveComponent(EntityID entityID) {
+void World::RemoveComponent(const EntityID entityID) {
     // 1. Get the entity's current data and validate
     EntityData& data = entityLookup[entityID.GetIndex()];
     if (data.generation != entityID.GetGeneration() || !data.archetypePtr) {
@@ -148,7 +159,7 @@ void World::RemoveComponent(EntityID entityID) {
 }
 
 template<typename T>
-T& World::GetComponent(EntityID entityID) {
+T& World::GetComponent(const EntityID entityID) {
     // 1. Get the entity's current data and validate
     EntityData& data = entityLookup[entityID.GetIndex()];
     if (data.generation != entityID.GetGeneration() || !data.archetypePtr) {
@@ -175,7 +186,7 @@ T& World::GetComponent(EntityID entityID) {
 }
 
 template<typename T>
-bool World::HasComponent(EntityID entityID) {
+bool World::HasComponent(const EntityID entityID) const {
     // 1. Get the entity's current data and validate
     EntityIndex index = entityID.GetIndex();
 
@@ -184,8 +195,147 @@ bool World::HasComponent(EntityID entityID) {
         return false;
     }
 
-    Archetype* currentArchetype = static_cast<Archetype*>(entityLookup[index].archetypePtr);
-    Engine::ECS::Component::TypeID componentID = Engine::ECS::Component::GetTypeID<T>();
+    const auto currentArchetype = static_cast<Archetype*>(entityLookup[index].archetypePtr);
+    const Engine::ECS::Component::TypeID componentID = Engine::ECS::Component::GetTypeID<T>();
 
     return currentArchetype->signature.test(componentID);
 }
+
+template<typename T>
+bool World::IsComponentRegistered() {
+    Engine::ECS::Component::TypeID id = Engine::ECS::Component::GetTypeID<T>();
+    return componentSerializationRegistry.serializers.count(id) > 0;
+}
+
+template<typename T>
+void World::RegisterComponent(const std::string& typeName) {
+    // 1. Ensures the static TypeID for this component is generated
+    Engine::ECS::Component::TypeID id = Engine::ECS::Component::GetTypeID<T>();
+
+    // 2. Registers the component type with the serialization registry.
+    componentSerializationRegistry.RegisterComponent<T>(typeName);
+}
+
+inline bool World::SaveToJson(const std::string& filename) const {
+    Engine::WorldSnapshot snapshot;
+
+    // Iterate over the entity lookup table to find active entities
+    for (EntityIndex i = 0; i < entityLookup.size(); ++i) {
+        const EntityData& data = entityLookup[i];
+
+        // Only process entities that are valid and in an archetype
+        if (data.archetypePtr && data.generation == EntityID(i, data.generation).GetGeneration()) {
+
+            auto currentArchetype = static_cast<Archetype*>(data.archetypePtr);
+            Engine::SerializedEntity se;
+            se.id = EntityID(i, data.generation);
+
+            // 1. Collect all components for this entity
+            for (const auto& pair : currentArchetype->componentArrays) {
+                Engine::ECS::Component::TypeID compID = pair.first;
+                IComponentArray* compArray = pair.second.get();
+
+                // 2. Get the type-erased serializer
+                Engine::IComponentSerializer* serializer = componentSerializationRegistry.GetSerializer(compID);
+
+                // 3. Use the serializer to extract the component data as JSON
+                json componentData = serializer->SerializeComponent(compArray, data.archetypeIndex);
+
+                Engine::SerializedComponent sc;
+                sc.typeID = compID;
+                sc.data = componentData;
+                se.components.push_back(std::move(sc));
+            }
+
+            snapshot.entities.push_back(std::move(se));
+        }
+    }
+
+    try {
+        json j = snapshot;
+
+        std::ofstream ofs(filename);
+        if (!ofs.is_open()) {
+            return false;
+        }
+        ofs << j.dump(4);
+        return true;
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
+inline bool World::LoadFromJson(const std::string& filename) {
+    try {
+        std::ifstream ifs(filename);
+        if (!ifs.is_open()) {
+            return false;
+        }
+
+        json j;
+        ifs >> j;
+
+        const auto [version, entities] = j.get<Engine::WorldSnapshot>();
+
+        // --- Clean up current world state ---
+        entityLookup.clear();
+        freeIndices.clear();
+        archetypes.clear();
+
+        // 1. Process all entities in the snapshot
+        for (const auto&[id, components] : entities) {
+            // Reconstruct the entity ID/index/generation
+            EntityIndex index = id.GetIndex();
+            EntityGeneration generation = id.GetGeneration();
+
+            // Grow the lookup table if necessary
+            if (index >= entityLookup.size()) {
+                entityLookup.resize(index + 1);
+            }
+
+            // 2. Determine the component signature for the target archetype
+            ComponentSignature newSignature;
+            for (const auto& sc : components) {
+                newSignature.set(sc.typeID);
+            }
+
+            // 3. Get or create the target archetype
+            Archetype* targetArchetype = GetOrCreateArchetype(newSignature);
+
+            // 4. Update the entity lookup data
+            EntityData& data = entityLookup[index];
+            data.generation = generation;
+            data.archetypePtr = targetArchetype;
+            data.archetypeIndex = targetArchetype->entityIDs.size(); // New component index
+            targetArchetype->entityIDs.push_back(id);
+
+            // 5. Populate component data
+            for (const auto& sc : components) {
+                // Get the type-erased serializer from the registry
+                Engine::IComponentSerializer* serializer = componentSerializationRegistry.GetSerializer(sc.typeID);
+
+                // Find the correct IComponentArray within the target archetype
+                auto compArrayIt = targetArchetype->componentArrays.find(sc.typeID);
+                if (compArrayIt == targetArchetype->componentArrays.end()) {
+                    throw std::runtime_error("Internal ECS error: Archetype component array missing after creation.");
+                }
+
+                // Use the serializer's type-erased method to deserialize the JSON data
+                // and add the component to the array.
+                serializer->DeserializeAndAdd(compArrayIt->second.get(), sc.data);
+            }
+        }
+
+        // 6. Recalculate free indices for future entity creation
+        for (size_t i = 0; i < entityLookup.size(); ++i) {
+            if (!entityLookup[i].archetypePtr) {
+                freeIndices.push_back(i);
+            }
+        }
+
+        return true;
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+

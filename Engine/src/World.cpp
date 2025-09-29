@@ -2,10 +2,16 @@
 #include <iostream>
 #include <stdexcept>
 #include <algorithm>
+#include "../include/Engine/ECS/WorldSerializationHelpers.h"
 
 // NEW: Define the global component registry
 namespace Engine::ECS::Component {
     std::map<TypeID, ComponentCreator> componentRegistry;
+}
+
+std::size_t std::hash<std::bitset<64>>::operator()(const ComponentSignature &signature) const {
+    // Safe for MAX_COMPONENTS=64
+    return std::hash<unsigned long long>()(signature.to_ullong());
 }
 
 EntityID World::CreateEntity() {

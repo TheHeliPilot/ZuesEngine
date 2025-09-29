@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include <filesystem>
 #include <string>
 #include <vector>
 #include <functional>
@@ -13,6 +14,7 @@ namespace Engine {
 class EditorUi final {
 public:
     static void DrawWindowUi();
+    static std::filesystem::path projectDir;
 
     // Event callback for the LogEvent
     static void TestGetLogEvent(const Engine::LogEvent& e);

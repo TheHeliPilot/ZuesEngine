@@ -16,6 +16,7 @@
 extern GLFWwindow* g_MainWindow;
 GLFWwindow* g_MainWindow = nullptr;
 
+
 int main() {
 
     if (!glfwInit()) return -1;
@@ -42,11 +43,10 @@ int main() {
     Engine::Initialize(Engine::Network::Role::Host, "0.0.0.0", 7777);
     Engine::IEventSystem->Subscribe<Engine::LogEvent>(EditorUi::TestGetLogEvent);
 
-    const std::filesystem::path projectDir = "../../MyGameProject";
 
-    if (!Engine::ProjectManager::OpenOrCreate(projectDir)) {
+    if (!Engine::ProjectManager::OpenOrCreate(EditorUi::projectDir)) {
         // If the project fails to load or create, we can't continue.
-        std::cerr << "FATAL: Failed to open or create project at " << projectDir << "\n";
+        std::cerr << "FATAL: Failed to open or create project at " << EditorUi::projectDir << "\n";
         return -1;
     }
 
@@ -69,9 +69,15 @@ int main() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // enables multi-platform windowing
+
+    ImGuiStyle& style = ImGui::GetStyle();
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        style.WindowRounding = 0.0f; // removes rounding for platform windows
+        style.Colors[ImGuiCol_WindowBg].w = 1.0f; // makes background fully opaque
+    }
 
     // Set up viewport for initial sizing
     int display_w, display_h;
@@ -125,6 +131,15 @@ int main() {
         // Clear the screen BEFORE drawing the ImGui output.
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        // ---- Multi-Viewport / Platform Windows ----
+        if (const ImGuiIO& im_gui_io = ImGui::GetIO(); im_gui_io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+            GLFWwindow* backup_current_context = glfwGetCurrentContext();
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+            glfwMakeContextCurrent(backup_current_context);
+        }
+        // ------------------------------------------
 
         glfwSwapBuffers(window);
     }

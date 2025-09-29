@@ -13,6 +13,8 @@ namespace Engine {
         // Accepts deltaTime for framerate-independent updates
         static void Update(float deltaTime, System::SystemRole currentMode);
         static void Shutdown();
+        static bool SaveWorld(const std::string& filePath);
+        static bool LoadWorld(const std::string& filePath);
 
     private:
         // Core Game/ECS State: The game's world is managed here

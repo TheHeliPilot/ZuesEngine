@@ -4,7 +4,7 @@
 #include <cmath> // For sin, cos, sqrt
 #include <cstring> // For memset (in Mat4)
 
-namespace Engine { namespace Math {
+namespace Engine::Math {
 
     // --- Constants ---
     constexpr float PI = 3.14159265359f;
@@ -122,6 +122,6 @@ namespace Engine { namespace Math {
         }
     };
 
-}}
+}
 
 #endif //ZUESENGINE_MATH_H

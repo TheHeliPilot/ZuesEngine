@@ -8,6 +8,7 @@
 #include <memory>
 #include <functional>
 
+#include "WorldSerializationHelpers.h" // Add this at the top
 // --- Helper Structs & Archetype Definitions ---
 
 // Entity Lookup Data: Maps EntityIndex -> where the entity is
@@ -41,10 +42,7 @@ struct Archetype {
 namespace std {
     template<>
     struct hash<ComponentSignature> {
-        size_t operator()(const ComponentSignature& signature) const {
-            // Safe for MAX_COMPONENTS=64
-            return std::hash<unsigned long long>()(signature.to_ullong());
-        }
+        size_t operator()(const ComponentSignature& signature) const;
     };
 }
 
@@ -77,18 +75,25 @@ public:
     World() = default;
     ~World() = default;
 
-    // === Entity & Component API ===
     EntityID CreateEntity();
     void DestroyEntity(EntityID entityID);
+
+    template<typename T> void RegisterComponent(const std::string& typeName); // <--- ADD THIS LINE
 
     template<typename T> void AddComponent(EntityID entityID, const T& component);
     template<typename T> void RemoveComponent(EntityID entityID);
     template<typename T> T& GetComponent(EntityID entityID);
-    template<typename T> bool HasComponent(EntityID entityID);
+    template<typename T> bool HasComponent(EntityID entityID) const;
 
     // === System Management API ===
     void RegisterSystem(std::unique_ptr<System> system);
     void UpdateSystems(float deltaTime, System::SystemRole currentMode);
+
+    template<typename T>
+    bool IsComponentRegistered();
+
+    bool SaveToJson(const std::string& filename) const;
+    bool LoadFromJson(const std::string& filename);
 
     // === Core Iteration Mechanism (Called by SystemBase::Run) ===
     // This function performs the Archetype filtering and the inner loop execution.
@@ -102,6 +107,8 @@ private:
     // Archetype storage: Fast lookup by signature
     std::unordered_map<ComponentSignature, std::unique_ptr<Archetype>> archetypes;
     std::vector<std::unique_ptr<System>> systems;
+
+    Engine::ComponentRegistry componentSerializationRegistry;
 
     // Archetype core logic
     Archetype* GetOrCreateArchetype(const ComponentSignature& signature);
