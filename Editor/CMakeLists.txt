@@ -15,6 +15,8 @@ set(IMGUI_SRC
         ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
         src/EditorUi.cpp
         include/EditorUi.h
+        src/LoggerUI.cpp
+        include/LoggerUI.h
 )
 
 add_executable(Editor

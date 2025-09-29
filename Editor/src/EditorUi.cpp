@@ -8,9 +8,9 @@
 #include "Renderer.h"
 #include "Core.h"
 #include "ProjectManager.h"
+#include "../include/LoggerUI.h"
 
-std::vector<std::string> logs; // Store logs
-bool autoScroll = true;        // Auto-scroll toggle
+using namespace EditorWindows;
 
 std::filesystem::path EditorUi::projectDir = "../../MyGameProject";
 
@@ -51,10 +51,11 @@ void EditorUi::DrawWindowUi() {
     }
 
     // ---------------- MENU BAR ----------------
+    ImGui::ShowDemoWindow();
     if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("New Project")) logs.push_back("[File] New Project clicked!");
-            if (ImGui::MenuItem("Load Project")) logs.push_back("[File] Load Project clicked!");
+            ImGui::MenuItem("New Project");
+            ImGui::MenuItem("Load Project");
             ImGui::Separator();
             if (ImGui::MenuItem("Exit")) {}
             ImGui::EndMenu();
@@ -87,19 +88,8 @@ void EditorUi::DrawWindowUi() {
     ImGui::End(); // DockSpaceHost
 
     // --- Logger Window ---
-    {
-        ImGui::Begin("Logger");
-        if (ImGui::Button("Clear")) logs.clear();
-        ImGui::SameLine();
-        ImGui::Checkbox("Auto-scroll", &autoScroll);
 
-        ImGui::Separator();
-        ImGui::BeginChild("LogScrollRegion", ImVec2(0,0), true, ImGuiWindowFlags_HorizontalScrollbar);
-        for (const auto& log : logs) ImGui::TextUnformatted(log.c_str());
-        if (autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) ImGui::SetScrollHereY(1.0f);
-        ImGui::EndChild();
-        ImGui::End();
-    }
+    LoggerUI::LoggerWindow();
 
     // --- Viewport Window ---
     {
@@ -126,10 +116,6 @@ void EditorUi::DrawWindowUi() {
         ImGui::End();
         ImGui::PopStyleVar();
     }
-}
-
-void EditorUi::TestGetLogEvent(const Engine::LogEvent& event) {
-    logs.push_back(event.GetMessage());
 }
 
 void EditorUi::BuildProject() {

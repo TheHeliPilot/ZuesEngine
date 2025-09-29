@@ -11,10 +11,10 @@
 namespace Engine {
 
     class LogEvent final : public Event {
+    public:
         std::string message;
         Log::EngineLog::LogLevel logLevel;
 
-    public:
         explicit LogEvent(const Log::EngineLog::LogLevel level, std::string message)
             : message(std::move(message)), logLevel(level) { }
 

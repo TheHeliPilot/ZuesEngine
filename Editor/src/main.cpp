@@ -11,7 +11,9 @@
 // #include "ECS/World.h" // No longer needed for pointer type
 #include "Input.h"
 #include "Renderer.h" // For LoadTexture
+#include "../include/LoggerUI.h"
 
+using namespace EditorWindows;
 // Global pointer for Input handling
 extern GLFWwindow* g_MainWindow;
 GLFWwindow* g_MainWindow = nullptr;
@@ -41,7 +43,7 @@ int main() {
 
     // --- Engine Initialization (Calls Core::Init() and creates the static World) ---
     Engine::Initialize(Engine::Network::Role::Host, "0.0.0.0", 7777);
-    Engine::IEventSystem->Subscribe<Engine::LogEvent>(EditorUi::TestGetLogEvent);
+    Engine::IEventSystem->Subscribe<Engine::LogEvent>(LoggerUI::GetLogEvent);
 
 
     if (!Engine::ProjectManager::OpenOrCreate(EditorUi::projectDir)) {
@@ -71,6 +73,7 @@ int main() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiWindowFlags_NoCollapse;
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // enables multi-platform windowing
 
     ImGuiStyle& style = ImGui::GetStyle();
