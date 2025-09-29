@@ -26,23 +26,23 @@ namespace Engine {
         switch (role) {
             case Network::Role::Client:
                 if (!INetwork->Connect(address, port)) {
-                    ENGINE_LOG("Continuing in singleplayer mode!", LOGLEVEL_WARN);
+                    LOG_WARN("Continuing in singleplayer mode!");
                 }
                 break;
             case Network::Role::Host:
                 if (INetwork->Host(address, port)) {
-                    ENGINE_LOG("Continuing in singleplayer mode!", LOGLEVEL_WARN);
+                    LOG_WARN("Continuing in singleplayer mode!");
                 }
                 break;
             case Network::Role::None:
-                ENGINE_LOG("No role selected for network initialization!", LOGLEVEL_WARN);
+                LOG_WARN("No role selected for network initialization!");
                 break;
         }
 
         Core::Init();
 
         if (!glfwInit()) {
-            ENGINE_LOG("Failed to initialize GLFW", LOGLEVEL_ERR);
+            LOG_ERROR("Failed to initialize GLFW");
         }else {
             Renderer::Init();
         }

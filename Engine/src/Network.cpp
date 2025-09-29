@@ -20,7 +20,7 @@ Engine::Network::~Network() {
 
 bool Engine::Network::Init() {
     if (enet_initialize() != 0) {
-        ENGINE_LOG("ENet initialization failed.", LOGLEVEL_ERR);
+        LOG_ERROR("ENet initialization failed.");
         return false;
     }
     return true;
@@ -41,7 +41,7 @@ bool Engine::Network::Host(const std::string& address, const uint16_t port, cons
 
     pImpl->host = enet_host_create(&pImpl->address, maxClients, 2, 0, 0);
     if (!pImpl->host) {
-        ENGINE_LOG("Failed to create ENet host.", LOGLEVEL_ERR);
+        LOG_ERROR("Failed to create ENet host.");
         return false;
     }
 
@@ -52,7 +52,7 @@ bool Engine::Network::Host(const std::string& address, const uint16_t port, cons
 bool Engine::Network::Connect(const std::string& host, const uint16_t port) const {
     pImpl->host = enet_host_create(nullptr, 1, 2, 0, 0);
     if (!pImpl->host) {
-        ENGINE_LOG("Failed to create ENet client host.", LOGLEVEL_ERR);
+        LOG_ERROR("Failed to create ENet client host.");
         return false;
     }
 
@@ -61,7 +61,7 @@ bool Engine::Network::Connect(const std::string& host, const uint16_t port) cons
 
     pImpl->serverPeer = enet_host_connect(pImpl->host, &pImpl->address, 2, 0);
     if (!pImpl->serverPeer) {
-        ENGINE_LOG("No available peers for connection.", LOGLEVEL_ERR);
+        LOG_ERROR("No available peers for connection.");
         return false;
     }
 
@@ -103,7 +103,7 @@ bool Engine::Network::Receive(std::vector<uint8_t>& outData, uint8_t& channel) c
     while (enet_host_service(pImpl->host, &event, 0) > 0) {
         switch (event.type) {
             case ENET_EVENT_TYPE_CONNECT:
-                ENGINE_LOG("Connection established.", LOGLEVEL_INFO);
+                LOG_INFO("Connection established.");
                 break;
             case ENET_EVENT_TYPE_RECEIVE:
                 channel = event.channelID;
@@ -111,7 +111,7 @@ bool Engine::Network::Receive(std::vector<uint8_t>& outData, uint8_t& channel) c
                 enet_packet_destroy(event.packet);
                 return true;
             case ENET_EVENT_TYPE_DISCONNECT:
-                ENGINE_LOG("Disconnected.", LOGLEVEL_INFO);
+                LOG_INFO("Disconnected.");
                 break;
             default:
                 break;

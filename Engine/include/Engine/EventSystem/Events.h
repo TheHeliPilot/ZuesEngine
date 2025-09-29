@@ -14,9 +14,12 @@ namespace Engine {
     public:
         std::string message;
         Log::EngineLog::LogLevel logLevel;
+        std::string file;
+        int line;
 
-        explicit LogEvent(const Log::EngineLog::LogLevel level, std::string message)
-            : message(std::move(message)), logLevel(level) { }
+        explicit LogEvent(const Log::EngineLog::LogLevel level, std::string message, std::string file, const int line)
+            : message(std::move(message)), logLevel(level), file(std::move(file)), line(line) {
+        }
 
         // Required for templated subscription
         static EventType StaticType() { return EventType::LogE; }

@@ -24,14 +24,14 @@ namespace Engine {
             std::filesystem::path engineIncludePath = zuesEngineRoot / "Engine/include/Engine";
 
             if (!std::filesystem::exists(engineIncludePath)) {
-                ENGINE_LOG("Warning: Calculated Engine Include Path does not exist: " + engineIncludePath.string(), LOGLEVEL_WARN);
+                LOG_WARN("Warning: Calculated Engine Include Path does not exist: " + engineIncludePath.string());
             }
 
             // Ensure the path is absolute for CMake's -D argument
             return std::filesystem::absolute(engineIncludePath);
 
         } catch (const std::exception& e) {
-            ENGINE_LOG("Critical: Failed to calculate engine path: " + std::string(e.what()), LOGLEVEL_ERR);
+            LOG_ERROR("Critical: Failed to calculate engine path: " + std::string(e.what()));
             return {};
         }
     }
@@ -62,7 +62,7 @@ namespace Engine {
             outFile << l << "\n";
         }
         outFile.close();
-        ENGINE_LOG("Updated EngineIncludePath in config: " + newPath.string(), LOGLEVEL_INFO);
+        LOG_INFO("Updated EngineIncludePath in config: " + newPath.string());
     }
     // ---------------------------------------------------------
 
@@ -70,7 +70,7 @@ namespace Engine {
 
     bool ProjectManager::OpenOrCreate(const std::filesystem::path& projectPath) {
         if (s_CurrentProject) {
-            ENGINE_LOG("Closing existing project before opening a new one.", LOGLEVEL_WARN);
+            LOG_WARN("Closing existing project before opening a new one.");
             delete s_CurrentProject;
             s_CurrentProject = nullptr;
         }
@@ -98,7 +98,7 @@ namespace Engine {
             .EngineIncludePath = currentEngineIncludePath
         };
 
-        ENGINE_LOG("Project loaded successfully: " + projectName, LOGLEVEL_INFO);
+        LOG_INFO("Project loaded successfully: " + projectName);
         return true;
     }
 
@@ -108,7 +108,7 @@ namespace Engine {
         try {
             // 1. Create Directories
             if (!std::filesystem::create_directories(projectPath) && !std::filesystem::exists(projectPath)) {
-                 ENGINE_LOG("Failed to create project root directory: " + projectPath.string(), LOGLEVEL_ERR);
+                 LOG_ERROR("Failed to create project root directory: " + projectPath.string());
                  return false;
             }
 
@@ -142,7 +142,7 @@ namespace Engine {
             std::filesystem::path cppTemplatePath = zuesEngineRoot / "Editor/Templates/GameProject.cpp.template";
 
             if (!std::filesystem::exists(cppTemplatePath)) {
-                ENGINE_LOG("FATAL: C++ template file not found. Ensure it exists at: " + cppTemplatePath.string(), LOGLEVEL_ERR);
+                LOG_ERROR("FATAL: C++ template file not found. Ensure it exists at: " + cppTemplatePath.string());
                 return false;
             }
 
@@ -228,11 +228,11 @@ namespace Engine {
                 .EngineIncludePath = currentEngineIncludePath
             };
 
-            ENGINE_LOG("New project created successfully, ready to build.", LOGLEVEL_INFO);
+            LOG_INFO("New project created successfully, ready to build.");
             return true;
 
         } catch (const std::exception& e) {
-            ENGINE_LOG("Exception during project creation: " + std::string(e.what()), LOGLEVEL_ERR);
+            LOG_ERROR("Exception during project creation: " + std::string(e.what()));
             return false;
         }
     }
@@ -241,12 +241,12 @@ namespace Engine {
 
     bool ProjectManager::BuildProject() {
     if (!s_CurrentProject) {
-        ENGINE_LOG("Cannot build: No project is currently loaded.", LOGLEVEL_WARN);
+        LOG_WARN("Cannot build: No project is currently loaded.");
         return false;
     }
 
     if (s_CurrentProject->EngineIncludePath.empty() || !std::filesystem::exists(s_CurrentProject->EngineIncludePath)) {
-        ENGINE_LOG("Build failed: Engine Include Path is missing or invalid in project configuration.", LOGLEVEL_ERR);
+        LOG_ERROR("Build failed: Engine Include Path is missing or invalid in project configuration.");
         return false;
     }
 
@@ -282,16 +282,16 @@ namespace Engine {
     // 1. Create and clean the temporary build directory
     try {
         if (std::filesystem::exists(tempBuildDir)) {
-            ENGINE_LOG("Cleaning temporary build directory: " + tempBuildDir.string(), LOGLEVEL_INFO);
+            LOG_INFO("Cleaning temporary build directory: " + tempBuildDir.string());
             std::filesystem::remove_all(tempBuildDir);
         }
         std::filesystem::create_directory(tempBuildDir);
     } catch (const std::exception& e) {
-        ENGINE_LOG("Failed to set up temporary build directory: " + std::string(e.what()), LOGLEVEL_ERR);
+        LOG_ERROR("Failed to set up temporary build directory: " + std::string(e.what()));
         return false;
     }
 
-    ENGINE_LOG("--- Starting Project Build: " + projectName + " ---", LOGLEVEL_INFO);
+    LOG_INFO("--- Starting Project Build: " + projectName + " ---");
 
     // 2. CMake Configure Step: Pass ALL Include and Library Paths
     std::string cmakeConfigureCommand =
@@ -301,11 +301,11 @@ namespace Engine {
          + " -DGLFW_INCLUDE_DIR=\"" + glfwIncludeDir.string() + "\""
          + " -DGLAD_INCLUDE_DIR=\"" + gladIncludeDir.string() + "\"";
 
-    ENGINE_LOG("Executing configure command: " + cmakeConfigureCommand, LOGLEVEL_INFO);
+    LOG_INFO("Executing configure command: " + cmakeConfigureCommand);
     int result = std::system(cmakeConfigureCommand.c_str());
 
     if (result != 0) {
-        ENGINE_LOG("Project build failed: CMake Configure step failed. Check console output.", LOGLEVEL_ERR);
+        LOG_ERROR("Project build failed: CMake Configure step failed. Check console output.");
         return false;
     }
 
@@ -313,18 +313,18 @@ namespace Engine {
     std::string cmakeBuildCommand =
          "cmake --build \"" + tempBuildDir.string() + "\" --target " + projectName + " --config Release";
 
-    ENGINE_LOG("Executing build command: " + cmakeBuildCommand, LOGLEVEL_INFO);
+    LOG_INFO("Executing build command: " + cmakeBuildCommand);
 
     result = std::system(cmakeBuildCommand.c_str());
 
     const std::string buildOutPath = (projectRoot / "Builds" / (projectName + ".exe")).string();
 
     if (result == 0) {
-        ENGINE_LOG("Project built successfully! 🎉", LOGLEVEL_INFO);
-        ENGINE_LOG("Executable Location: " + buildOutPath, LOGLEVEL_INFO);
+        LOG_INFO("Project built successfully! 🎉");
+        LOG_INFO("Executable Location: " + buildOutPath);
         return true;
     } else {
-        ENGINE_LOG("Project build failed: Compilation step returned a non-zero exit code. Check console for CMake/Compiler errors.", LOGLEVEL_ERR);
+        LOG_ERROR("Project build failed: Compilation step returned a non-zero exit code. Check console for CMake/Compiler errors.");
         return false;
     }
 }

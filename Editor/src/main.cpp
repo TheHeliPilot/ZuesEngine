@@ -116,7 +116,7 @@ int main() {
 
         Engine::Vec2 mousePos = EditorUi::viewportMousePos;
         mousePos = Engine::Renderer::ScreenToWorld(mousePos);
-        ENGINE_LOG(std::to_string(Engine::HitTest::Arrow(mousePos, arr1)));
+        LOG_INFO(std::to_string(Engine::HitTest::Arrow(mousePos, arr1)));
 
         // Example: Draw text overlay
         //Engine::Renderer::DrawText("FPS: 60", {10, 700}, 1.0f, {1,1,0,1}, fontID);

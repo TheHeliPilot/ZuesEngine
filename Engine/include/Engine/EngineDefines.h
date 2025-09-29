@@ -16,13 +16,12 @@
 #define LOGLEVEL_WARN Engine::Log::EngineLog::LogLevel::Warning
 #define LOGLEVEL_ERR Engine::Log::EngineLog::LogLevel::Err
 
-//default is info
-inline void ENGINE_LOG(const std::string& msg) {
-    Engine::Log::EngineLog::LogMessage(msg, Engine::Log::EngineLog::LogLevel::Info);
-}
+#define LOG_INFO(msg) engine_log(msg, LOGLEVEL_INFO, __FILE__, __LINE__)
+#define LOG_WARN(msg) engine_log(msg, LOGLEVEL_WARN, __FILE__, __LINE__)
+#define LOG_ERROR(msg) engine_log(msg, LOGLEVEL_ERR, __FILE__, __LINE__)
 
-inline void ENGINE_LOG(const std::string& msg, const Engine::Log::EngineLog::LogLevel level) {
-    Engine::Log::EngineLog::LogMessage(msg, level);
+inline void engine_log(const std::string& msg, const Engine::Log::EngineLog::LogLevel level, const std::string &file, const int line) {
+    Engine::Log::EngineLog::LogMessage(msg, level, file, line);
 }
 
 

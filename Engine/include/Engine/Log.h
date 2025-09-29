@@ -12,7 +12,7 @@ namespace Engine::Log {
     public:
         enum class LogLevel { Info, Warning, Err };
 
-        static void LogMessage(const std::string& message, LogLevel level);
+        static void LogMessage(const std::string &message, LogLevel level, std::string file, int line);
 
         static void ChangeLogLevel(const LogLevel newLevel);
 

@@ -18,7 +18,7 @@ std::unique_ptr<World> Engine::Core::s_World = nullptr;
 void Engine::Core::Init() {
     // 1. Create the ECS World instance (Moved from main.cpp)
     s_World = std::make_unique<World>();
-    ENGINE_LOG("Initializing Core Game Logic...", LOGLEVEL_INFO);
+    LOG_INFO("Initializing Core Game Logic...");
 
     // 2. Register Systems (Moved from main.cpp)
     s_World->RegisterSystem(std::make_unique<CameraSystem>());
@@ -30,7 +30,7 @@ void Engine::Core::Init() {
 
     s_World->UpdateSystems(0, System::SystemRole::Shared);
 
-    ENGINE_LOG("Core Game Logic Initialized.", LOGLEVEL_INFO);
+    LOG_INFO("Core Game Logic Initialized.");
 }
 
 void Engine::Core::Update(const float deltaTime, const System::SystemRole currentMode) {
@@ -41,9 +41,9 @@ void Engine::Core::Update(const float deltaTime, const System::SystemRole curren
 }
 
 void Engine::Core::Shutdown() {
-    ENGINE_LOG("Shutting down Core Game Logic...", LOGLEVEL_INFO);
+    LOG_INFO("Shutting down Core Game Logic...");
     s_World.reset(); // Safely destroy the world and all entities/systems
-    ENGINE_LOG("Core Game Logic Shut down.", LOGLEVEL_INFO);
+    LOG_INFO("Core Game Logic Shut down.");
 }
 
 bool Engine::Core::SaveWorld(const std::string &filePath) {
