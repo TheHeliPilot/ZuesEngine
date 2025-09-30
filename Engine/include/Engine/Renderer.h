@@ -9,6 +9,17 @@
 
 #include "Math.h"
 
+// Forward declaration of the internal stb_truetype struct
+// to make function signatures in the header possible.
+// This struct is fully defined when STB_TRUETYPE_IMPLEMENTATION is used in the CPP file.
+struct stbtt_quad {
+    float x0, y0, s0, t0; // Top-Left position and UV
+    float x1, y1, s1, t1; // Bottom-Right position and UV
+};
+
+// Include the stb_truetype header for the definition of stbtt_bakedchar
+#include "../stb/stb_truetype.h"
+// Removed the unused include: #include "../include/stb/stb_easy_font.h"
 
 namespace Engine {
 
@@ -43,6 +54,21 @@ namespace Engine {
         Math::Vec2 v2;
     };
 
+
+    // --- TEXTURE/FONT ATLAS CONSTANTS ---
+    static constexpr uint32_t FONT_ATLAS_WIDTH = 512;
+    static constexpr uint32_t FONT_ATLAS_HEIGHT = 512;
+    static constexpr uint32_t FIRST_CHAR = 32; // First printable ASCII character (' ')
+    static constexpr uint32_t CHAR_COUNT = 96; // Total count of printable ASCII characters (32-127)
+
+    struct Font {
+        uint32_t AtlasTextureID = 0;
+        float Size = 0.0f; // The pixel height the font was rendered at
+        stbtt_bakedchar BakedChars[CHAR_COUNT]; // stb_truetype character metrics
+        uint8_t* FontBuffer = nullptr; // Raw font data buffer (must remain allocated)
+    };
+
+
     // --- Renderer Class ---
 
     class Renderer {
@@ -70,12 +96,7 @@ namespace Engine {
                                float z);
 
         // --- Camera Management ---
-
-        // Fix: Added the rotationRadians parameter to the declaration.
-        // Updates the camera's view-projection matrix uniform in the shader.
-        // halfHeight defines the size of the view volume (e.g., 10 world units vertically).
         static void SetCamera(const Math::Vec2& position, float zoom, float halfHeight, float rotationRadians);
-
         static void SetTextureUniforms();
 
         // --- Editor Interface ---
@@ -92,31 +113,23 @@ namespace Engine {
         static Math::Vec2 WorldToScreen(const Math::Vec2 &worldPos);
         static Math::Vec2 ScreenToWorld(const Math::Vec2 &screenPos);
 
-        // --- Font System ---
-        struct Glyph {
-            Math::Vec2 Size;      // Pixel size of glyph
-            Math::Vec2 Bearing;   // Offset from baseline to left/top of glyph
-            float Advance;  // Advance to next glyph
-            Math::Vec2 UV0;       // Bottom-left texcoord
-            Math::Vec2 UV1;       // Top-right texcoord
-        };
-
-        struct Font {
-            uint32_t TextureID;                   // OpenGL texture for the atlas
-            float LineHeight;                     // Font size in pixels
-            std::unordered_map<char, Glyph> Glyphs;
-        };
-
+        // --- Text Rendering ---
         static uint32_t LoadFont(const std::string& path, float pixelHeight);
-        static void DrawText(const std::string& text,
+        static void DrawText(uint32_t fontID,
+                             const std::string& text,
                              const Math::Vec2& position,
-                             float scale,
                              const Math::Vec4& color,
-                             uint32_t fontID);
+                             float scale = 1.0f); // Scale parameter moved to the end, made optional
+
 
     private:
 
-        static std::vector<Font> s_Fonts;
+        static std::vector<Font> s_Fonts; // Static storage for loaded fonts (ID is index + 1)
+
+        // Internal helper to submit text quads directly to the vertex buffer
+        // Now compiles because stbtt_quad is forward-declared
+        static void SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& color, uint32_t textureID);
+
 
         // 2D Vertex Structure for Batching
         struct Vertex {
@@ -131,6 +144,7 @@ namespace Engine {
 
         // Internal struct to hold the graphics context and FBO data
         struct RendererData {
+            // ... (RendererData members) ...
             // --- Framebuffer Data ---
             uint32_t EditorFBO = 0;
             uint32_t ColorAttachment = 0;
@@ -162,14 +176,11 @@ namespace Engine {
         static RendererData* s_Data; // Ptr to the static data
 
         // Internal helper functions
-        // CRITICAL FIX: This signature matches the implementation now
         static uint32_t CompileShader(const std::string& vertexSrc, const std::string& fragmentSrc);
-
-        // These declarations were missing implementations in the provided Renderer.cpp
         static void Flush();
         static void LoadDefaultAssets();
     };
 
 }
 
-#endif //ZUESENGINE_RENDERER_H
+#endif // ZUESENGINE_RENDERER_H

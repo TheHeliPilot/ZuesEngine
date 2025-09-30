@@ -56,16 +56,27 @@ uniform sampler2D u_Textures[32]; // Must match MAX_TEXTURE_SLOTS
 void main()
 {
     // Sample the correct texture from the array based on v_TexID
-    // The texture ID is a float, so we cast it to an integer for the array index.
-    vec4 texColor = texture(u_Textures[int(v_TexID)], v_TexCoord);
-    f_Color = v_Color * texColor;
+    // Since we applied GL_TEXTURE_SWIZZLE_RGBA, all components hold the opacity value.
+    float opacity = texture(u_Textures[int(v_TexID)], v_TexCoord).a;
+
+    // 🔑 FIX:
+    // 1. Start with the desired text color (v_Color).
+    f_Color = v_Color;
+
+    // 2. ONLY modulate the final alpha channel using the opacity from the texture atlas.
+    f_Color.a *= opacity;
+
+    // Optional: discard fragments that are completely transparent (can improve performance)
+    // if (f_Color.a < 0.01) {
+    //     discard;
+    // }
 }
 )";
 
 
 namespace Engine {
 
-    std::vector<Renderer::Font> Renderer::s_Fonts;
+    std::vector<Font> Renderer::s_Fonts = {};
 
     // --- Math Constants (Used internally) ---
     constexpr float PI = 3.14159265359f;
@@ -688,134 +699,199 @@ namespace Engine {
         return { world.x, world.y };
     }
 
-
-
-    uint32_t Renderer::LoadFont(const std::string& path, float pixelHeight) {
-        // Load file into memory
-        std::ifstream file(path, std::ios::binary | std::ios::ate);
-        if (!file) return 0;
-        std::streamsize size = file.tellg();
-        file.seekg(0, std::ios::beg);
-
-        std::vector<unsigned char> buffer(size);
-        if (!file.read(reinterpret_cast<char *>(buffer.data()), size)) return 0;
-
-        // Initialize stb_truetype
-        stbtt_fontinfo fontInfo;
-        if (!stbtt_InitFont(&fontInfo, buffer.data(), 0)) return 0;
-
-        // Pack ASCII 32–126
-        constexpr int atlasSize = 512;
-        unsigned char atlas[atlasSize * atlasSize];
-        stbtt_bakedchar baked[96]; // 96 printable ASCII chars
-
-        stbtt_BakeFontBitmap(buffer.data(), 0, pixelHeight,
-                             atlas, atlasSize, atlasSize,
-                             32, 126, baked);
-
-        // Upload atlas as OpenGL texture
-        uint32_t texID;
-        glGenTextures(1, &texID);
-        glBindTexture(GL_TEXTURE_2D, texID);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, atlasSize, atlasSize, 0,
-                     GL_RED, GL_UNSIGNED_BYTE, atlas);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        // Build font data
-        Font font;
-        font.TextureID = texID;
-        font.LineHeight = pixelHeight;
-
-        for (int c = 32; c < 126; c++) {
-            stbtt_bakedchar& b = baked[c - 32];
-
-            Glyph g;
-            g.Size = { static_cast<float>(b.x1) - b.x0, static_cast<float>(b.y1) - b.y0 };
-            g.Bearing = { b.xoff, b.yoff };
-            g.Advance = b.xadvance;
-            g.UV0 = { static_cast<float>(b.x0) / atlasSize, static_cast<float>(b.y0) / atlasSize };
-            g.UV1 = { static_cast<float>(b.x1) / atlasSize, static_cast<float>(b.y1) / atlasSize };
-
-            font.Glyphs[static_cast<char>(c)] = g;
+void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& color, uint32_t textureID) {
+        // Replace 5000 with your actual MaxIndices constant if needed
+        if (s_Data->IndexCount >= 5000) {
+            EndBatch();
+            BeginBatch();
         }
 
-        s_Fonts.push_back(font);
-        return static_cast<uint32_t>(s_Fonts.size() - 1); // fontID
-    }
-
-    void Renderer::DrawText(const std::string& text, const Math::Vec2& position, const float scale, const Math::Vec4& color, const uint32_t fontID) {
-    if (s_Data == nullptr) return;
-    if (fontID >= s_Fonts.size()) return;
-
-    const Font& font = s_Fonts[fontID];
-    float x = position.x;
-    float y = position.y;
-
-    for (char c : text) {
-        if (c == '\n') {
-            y -= font.LineHeight * scale;
-            x = position.x;
-            continue;
-        }
-
-        auto it = font.Glyphs.find(c);
-        if (it == font.Glyphs.end()) continue;
-
-        const Glyph& g = it->second;
-
-        Math::Vec2 glyphPos = { x + g.Bearing.x * scale, y - (g.Size.y - g.Bearing.y) * scale };
-        Math::Vec2 glyphSize = { g.Size.x * scale, g.Size.y * scale };
-
-        // Submit quad (textured)
-        const Math::Mat4 transform = Math::Mat4::Translate(glyphPos) * Math::Mat4::Scale(glyphSize);
-
-        const Math::Vec2 texCoords[4] = {
-            {g.UV0.x, g.UV0.y},
-            {g.UV1.x, g.UV0.y},
-            {g.UV1.x, g.UV1.y},
-            {g.UV0.x, g.UV1.y}
-        };
-
-        float texSlot = 0.0f;
-        bool found = false;
+        // Texture ID slot lookup logic (remains the same)
+        float textureSlot = 0.0f;
         for (uint32_t i = 1; i < s_Data->TextureSlotIndex; i++) {
-            if (s_Data->TextureSlots[i] == font.TextureID) {
-                texSlot = static_cast<float>(i);
-                found = true;
+            if (s_Data->TextureSlots[i] == textureID) {
+                textureSlot = (float)i;
                 break;
             }
         }
-        if (!found) {
+
+        // If the texture isn't found, load it into a new slot (logic remains the same)
+        if (textureSlot == 0.0f) {
             if (s_Data->TextureSlotIndex >= MAX_TEXTURE_SLOTS) {
                 EndBatch();
                 BeginBatch();
+                s_Data->TextureSlots[1] = textureID;
+                textureSlot = 1.0f;
+                s_Data->TextureSlotIndex = 2;
+            } else {
+                textureSlot = (float)s_Data->TextureSlotIndex;
+                s_Data->TextureSlots[s_Data->TextureSlotIndex] = textureID;
+                s_Data->TextureSlotIndex++;
             }
-            texSlot = (float)s_Data->TextureSlotIndex;
-            s_Data->TextureSlots[s_Data->TextureSlotIndex++] = font.TextureID;
         }
 
-        for (int i = 0; i < 4; i++) {
-            const Math::Vec2 quadPositions[4] = {
-                {0.0f, 0.0f},
-                {1.0f, 0.0f},
-                {1.0f, 1.0f},
-                {0.0f, 1.0f}
-            };
-            Math::Vec4 transformedPos = transform * Math::Vec4(quadPositions[i].x, quadPositions[i].y, 0.0f, 1.0f);
-            s_Data->VertexBufferPtr->Position = { transformedPos.x, transformedPos.y, 0 };
-            s_Data->VertexBufferPtr->Color = color;
-            s_Data->VertexBufferPtr->TexCoord = texCoords[i];
-            s_Data->VertexBufferPtr->TexID = texSlot;
-            s_Data->VertexBufferPtr++;
-        }
+        // Submit 4 vertices using the data from the quad struct
+        // (Vertices are: Bottom-Left, Bottom-Right, Top-Right, Top-Left)
+
+        // 1. Bottom-Left: (q.x0, q.y1)
+        s_Data->VertexBufferPtr->Position = { q.x0, q.y1, 0.0f };
+        s_Data->VertexBufferPtr->Color = color;
+        s_Data->VertexBufferPtr->TexCoord = { q.s0, q.t1 };
+        s_Data->VertexBufferPtr->TexID = textureSlot;
+        s_Data->VertexBufferPtr++;
+
+        // 2. Bottom-Right: (q.x1, q.y1)
+        s_Data->VertexBufferPtr->Position = { q.x1, q.y1, 0.0f };
+        s_Data->VertexBufferPtr->Color = color;
+        s_Data->VertexBufferPtr->TexCoord = { q.s1, q.t1 };
+        s_Data->VertexBufferPtr->TexID = textureSlot;
+        s_Data->VertexBufferPtr++;
+
+        // 3. Top-Right: (q.x1, q.y0)
+        s_Data->VertexBufferPtr->Position = { q.x1, q.y0, 0.0f };
+        s_Data->VertexBufferPtr->Color = color;
+        s_Data->VertexBufferPtr->TexCoord = { q.s1, q.t0 };
+        s_Data->VertexBufferPtr->TexID = textureSlot;
+        s_Data->VertexBufferPtr++;
+
+        // 4. Top-Left: (q.x0, q.y0)
+        s_Data->VertexBufferPtr->Position = { q.x0, q.y0, 0.0f };
+        s_Data->VertexBufferPtr->Color = color;
+        s_Data->VertexBufferPtr->TexCoord = { q.s0, q.t0 };
+        s_Data->VertexBufferPtr->TexID = textureSlot;
+        s_Data->VertexBufferPtr++;
 
         s_Data->IndexCount += 6;
-
-        x += g.Advance * scale;
     }
-}
 
+
+    uint32_t Engine::Renderer::LoadFont(const std::string& fontPath, float pixelHeight) {
+        // 1. Read the font file into a buffer
+        std::ifstream file(fontPath, std::ios::binary | std::ios::ate);
+        if (!file.is_open()) return 0;
+
+        std::streamsize size = file.tellg();
+        // NOTE: fontBuffer must persist for the lifetime of the font.
+        uint8_t* fontBuffer = new uint8_t[size];
+        file.seekg(0, std::ios::beg);
+        if (!file.read((char*)fontBuffer, size)) {
+            delete[] fontBuffer;
+            return 0;
+        }
+        file.close();
+
+        // 2. Prepare the font atlas bitmap buffer (grayscale, 1 byte per pixel)
+        uint8_t* temp_bitmap = new uint8_t[FONT_ATLAS_WIDTH * FONT_ATLAS_HEIGHT];
+
+        // Add a new Font struct to our static storage
+        s_Fonts.emplace_back();
+        Font& newFont = s_Fonts.back();
+
+        // 3. Bake the font glyphs into the bitmap and calculate metrics
+        int result = stbtt_BakeFontBitmap(
+            fontBuffer,
+            0,
+            pixelHeight,
+            temp_bitmap,
+            FONT_ATLAS_WIDTH,
+            FONT_ATLAS_HEIGHT,
+            FIRST_CHAR,
+            CHAR_COUNT,
+            newFont.BakedChars
+        );
+
+        if (result <= 0) {
+            delete[] fontBuffer;
+            delete[] temp_bitmap;
+            s_Fonts.pop_back();
+            return 0; // Baking failed
+        }
+
+        // 4. Create an OpenGL texture from the bitmap
+        glGenTextures(1, &newFont.AtlasTextureID);
+        glBindTexture(GL_TEXTURE_2D, newFont.AtlasTextureID);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        // Disable byte-alignment restriction for 1-byte grayscale data
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+        // Upload the single-channel grayscale bitmap using GL_RED format
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, FONT_ATLAS_WIDTH, FONT_ATLAS_HEIGHT, 0, GL_RED, GL_UNSIGNED_BYTE, temp_bitmap);
+
+        // Swizzle: (R,G,B,A) -> (1, 1, 1, Red). This moves the grayscale coverage from GL_RED to the ALPHA channel
+        // for use in blending against the V_Color in the shader.
+        GLint swizzleMask[] = {GL_ONE, GL_ONE, GL_ONE, GL_RED};
+        glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzleMask);
+
+        // Cleanup the temporary bitmap
+        delete[] temp_bitmap;
+
+        // 5. Store final data and return ID (ID is the 1-based index)
+        newFont.Size = pixelHeight;
+        newFont.FontBuffer = fontBuffer;
+
+        return s_Fonts.size();
+    }
+
+    // --- 3. Implementation: DrawText ---
+    // Draws a string of text using a previously loaded font, positioning it starting at 'position'.
+    // --- 3. Implementation: DrawText (using stbtt_aligned_quad) ---
+    void Renderer::DrawText(uint32_t fontID, const std::string& text, const Math::Vec2& position, const Math::Vec4& color, float scale) {
+        if (!s_Data || fontID == 0 || fontID > s_Fonts.size()) {
+            return;
+        }
+
+        const Font& font = s_Fonts[fontID - 1];
+
+        float x = position.x;
+        float y = position.y;
+        float dummyY = 0.0f;
+
+        for (const char c : text) {
+            if (c >= FIRST_CHAR && c < (FIRST_CHAR + CHAR_COUNT)) {
+
+                // FIX: Declaration changed to the required type
+                stbtt_aligned_quad q;
+
+                // 1. Get quad geometry and advance x cursor
+                // This call now succeeds because the 7th argument type matches.
+                stbtt_GetBakedQuad(
+                    font.BakedChars,
+                    FONT_ATLAS_WIDTH,
+                    FONT_ATLAS_HEIGHT,
+                    c - FIRST_CHAR,
+                    &x,
+                    &dummyY,
+                    &q,             // Correct type: stbtt_aligned_quad*
+                    1
+                );
+
+                // 2. Apply scale to the relative quad offsets
+                q.x0 *= scale;
+                q.y0 *= scale;
+                q.x1 *= scale;
+                q.y1 *= scale;
+
+                // 3. Adjust Y-coordinates to the absolute baseline position
+                q.y0 += y;
+                q.y1 += y;
+
+                // 4. Submit the character quad
+                SubmitTextQuad(
+                    q,
+                    color,
+                    font.AtlasTextureID
+                );
+
+            } else if (c == '\n') {
+                // Newline handling
+                x = position.x;
+                y -= (font.Size * scale);
+            }
+        }
+    }
 
 } // namespace Engine

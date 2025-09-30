@@ -288,7 +288,8 @@ int main() {
 
     // --- 1. Load Main Font (Exo2) ---
     ImFont* exo2Font = io.Fonts->AddFontFromFileTTF("fonts/Exo2-VariableFont_wght.ttf", 18.0f);
-    if (!exo2Font) LOG_ERROR("Failed to load Exo2 font!");
+    if (!exo2Font) LOG_ERROR("Failed to load Exo2 font to Editor!");
+    uint32_t engineFont = Engine::Renderer::LoadFont("fonts/Exo2-VariableFont_wght.ttf", 18);
 
     // --- 2. Load Icon Font (IconLibs.ttf / EngineerFont) ---
     // The EngineerFont glyphs are typically in the 0xF800 to 0xF8FF range.
@@ -347,6 +348,8 @@ int main() {
         Engine::Renderer::Render(); // Binds and clears the FBO
 
         Engine::Renderer::BeginBatch(); // Start a single batch for the viewport
+
+        Engine::Renderer::DrawText(engineFont, "Test", {0,0}, {1,1,1,1});
 
         // A. Submit main scene objects first
         Engine::Update(System::SystemRole::Editor);
