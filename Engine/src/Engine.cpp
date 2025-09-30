@@ -22,6 +22,7 @@ namespace Engine {
         Engine::ECS::Component::RegisterComponent<SpriteComponent>();
         Engine::ECS::Component::RegisterComponent<CameraComponent>();
         Engine::ECS::Component::RegisterComponent<ViewportCameraTag>();
+        Engine::ECS::Component::RegisterComponent<TestObjectMoverTag>();
 
         switch (role) {
             case Network::Role::Client:

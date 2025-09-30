@@ -51,3 +51,6 @@ struct ViewportCameraTag {
 };
 // Add serialization for ViewportCameraTag (Fixes your compilation error for this type)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ViewportCameraTag, cameraSpeed)
+
+struct TestObjectMoverTag{bool move = true;};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TestObjectMoverTag, move);

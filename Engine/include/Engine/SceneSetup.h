@@ -25,20 +25,23 @@ namespace Engine {
         world->AddComponent<ViewportCameraTag>(cameraEntity, {
         });
 
-         const EntityID testSquare = world->CreateEntity();
-        world->AddComponent<TransformComponent>(testSquare, {
-            .worldPosition = {0.0f, 0.0f},
-            .worldRotation = 0.0f
-        });
-        world->AddComponent<SpriteComponent>(testSquare, {
-            .textureID = 0,
-            .size = {1,1},
-            .color = {1,1,1,1},
-            .layer = 0,
-            .sortOrder = 0
-        });
+        for (int i = 0; i < 2; i++) {
+            const EntityID testSquare = world->CreateEntity();
+            world->AddComponent<TransformComponent>(testSquare, {
+                .worldPosition = {0.0f, 0.0f},
+                .worldRotation = 0.0f
+            });
+            world->AddComponent<SpriteComponent>(testSquare, {
+                .textureID = 0,
+                .size = {1,1},
+                .color = {1,1,1,1},
+                .layer = 0,
+                .sortOrder = 0
+            });
+            //world->AddComponent<TestObjectMoverTag>(testSquare, {});
+        }
 
         ECS::Hierarchy::BuildCache(world);
-
+        LOG_INFO(("Num objects: ") + ECS::Hierarchy::GetFlattenedHierarchy().size());
     }
 }

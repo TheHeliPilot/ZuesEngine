@@ -28,9 +28,10 @@ void HierarchyOperations::DoHierarchyOperations() {
                         EditorWindows::EditorUi::selectedEntity = id;
                         //LOG_INFO("Clicked on id " + std::to_string(id.id));
                         return;
-                    }else {EditorWindows::EditorUi::selectedEntity = NULL_ENTITY_ID;}
+                    }
+                    EditorWindows::EditorUi::selectedEntity = NULL_ENTITY_ID;
                 }
-            }else {
+            } else if (id.id == EditorWindows::EditorUi::selectedEntity.id) {
 
                 if (lastMousePos.x == -1) {
                     lastMousePos = MOUSE_POS_WORLD;

@@ -172,16 +172,16 @@ void DrawEditionStuff() {
     // --- 2. Define Color Pairs (Using the suggested contrast colors) ---
 
     // Green (Success/Info)
-    const ImVec4 GREEN_UNSELECTED = ImVec4(0.460f, 0.668f, 0.460f, 0.4f);
-    const ImVec4 GREEN_SELECTED   = ImVec4(0.233f, 1.000f, 0.233f, 0.6f);
+    constexpr auto GREEN_UNSELECTED = ImVec4(0.460f, 0.668f, 0.460f, 0.4f);
+    constexpr auto GREEN_SELECTED   = ImVec4(0.233f, 1.000f, 0.233f, 0.6f);
 
     // Red (Error/Warning)
-    const ImVec4 RED_UNSELECTED   = ImVec4(0.598f, 0.460f, 0.460f, 0.4f);
-    const ImVec4 RED_SELECTED     = ImVec4(1.000f, 0.233f, 0.233f, 0.6f);
+    constexpr auto RED_UNSELECTED   = ImVec4(0.598f, 0.460f, 0.460f, 0.4f);
+    constexpr auto RED_SELECTED     = ImVec4(1.000f, 0.233f, 0.233f, 0.6f);
 
     // Blue (Accent/Primary)
-    const ImVec4 BLUE_UNSELECTED  = ImVec4(0.362f, 0.382f, 0.510f, 0.4f);
-    const ImVec4 BLUE_SELECTED    = ImVec4(0.233f, 0.260f, 1.000f, 0.6f);
+    constexpr auto BLUE_UNSELECTED  = ImVec4(0.362f, 0.382f, 0.510f, 0.4f);
+    constexpr auto BLUE_SELECTED    = ImVec4(0.233f, 0.260f, 1.000f, 0.6f);
 
 
     Engine::Math::Vec2 mousePos = Engine::Renderer::ScreenToWorld(EditorUi::GetMousePositionInWindow("Viewport"));
@@ -287,14 +287,14 @@ int main() {
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     // --- 1. Load Main Font (Exo2) ---
-    ImFont* exo2Font = io.Fonts->AddFontFromFileTTF("fonts/Exo2-VariableFont_wght.ttf", 18.0f);
+    const ImFont* exo2Font = io.Fonts->AddFontFromFileTTF("fonts/Exo2-VariableFont_wght.ttf", 18.0f);
     if (!exo2Font) LOG_ERROR("Failed to load Exo2 font to Editor!");
-    uint32_t engineFont = Engine::Renderer::LoadFont("fonts/Exo2-VariableFont_wght.ttf", 18);
+    const uint32_t engineFont = Engine::Renderer::LoadFont("fonts/Exo2-VariableFont_wght.ttf", 18);
 
     // --- 2. Load Icon Font (IconLibs.ttf / EngineerFont) ---
     // The EngineerFont glyphs are typically in the 0xF800 to 0xF8FF range.
     // Setting a broader range 0xEF80-0xF8FF to be safe.
-    static const ImWchar icons_ranges[] = { 0xE000, 0xF8FF, 0 };
+    static constexpr ImWchar icons_ranges[] = { 0xE000, 0xF8FF, 0 };
 
 
     ImFontConfig icons_config;
@@ -304,7 +304,7 @@ int main() {
 
 
     // Load and merge the icon font
-    ImFont* mergedFont = io.Fonts->AddFontFromFileTTF(
+    const ImFont* mergedFont = io.Fonts->AddFontFromFileTTF(
         "fonts/IconLibs.ttf",
         18.0f, // Size must match the size of the main font (exo2Font)
         &icons_config,

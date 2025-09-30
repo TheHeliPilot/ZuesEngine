@@ -6,6 +6,7 @@
 #include "../include/Engine/ECS/Systems/CameraSystem.h"
 #include "../include/Engine/ECS/Systems/HierarchySystem.h"
 #include "../include/Engine/ECS/Systems/RenderingSystem.h"
+#include "../include/Engine/ECS/Systems/TestObjectMoverSystem.h"
 #include "../include/Engine/ECS/Systems/ViewportCameraSystem.h"
 
 // Initialize the static World pointer (must be defined here in Core.cpp)
@@ -26,6 +27,7 @@ void Engine::Core::Init() {
     s_World->RegisterSystem(std::make_unique<CameraSystem>());
     s_World->RegisterSystem(std::make_unique<RenderingSystem>());
     s_World->RegisterSystem(std::make_unique<ViewportCameraSystem>());
+    s_World->RegisterSystem(std::make_unique<TestObjectMoverSystem>());
 
     // 3. Setup Scene/Entities (Moved from main.cpp)
     Engine::SetupSimpleScene(s_World.get(), 0);
