@@ -224,7 +224,7 @@ int main() {
     GLFWimage icon;
     icon.pixels = stbi_load("icons/ZuesLogoNoBG.png", &icon.width, &icon.height, nullptr, 4);
     if (!icon.pixels) {
-        std::cerr << "Failed to load icon: " << "icons/ZuesLogoNoBG.png" << std::endl;
+        LOG_ERROR("Failed to load icon: icons/ZuesLogoNoBG.png");
         //return -1;
     }
 
@@ -242,9 +242,6 @@ int main() {
         LOG_ERROR("Failed to open or create project at " + EditorUi::projectDir.string());
         return -1;
     }
-
-    const uint32_t textureID = Engine::Renderer::LoadTexture("assets/bucka.png");
-    LOG_INFO("Loaded texture with ID: " + std::to_string(textureID));
 
     // --- ImGui ---
     IMGUI_CHECKVERSION();

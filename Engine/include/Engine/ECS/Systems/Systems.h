@@ -7,5 +7,7 @@
 
 #include "CameraSystem.h"
 #include "RenderingSystem.h"
+#include "ViewportCameraSystem.h"
+#include "HierarchySystem.h"
 
 #endif //ENGINE_SYSTEMS_H

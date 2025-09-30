@@ -18,7 +18,7 @@ namespace Engine {
         INetwork = new Network();
 
         //ECS Component Registrations, BEFORE FIRST CALL!
-        Engine::ECS::Component::RegisterComponent<PositionComponent>();
+        Engine::ECS::Component::RegisterComponent<TransformComponent>();
         Engine::ECS::Component::RegisterComponent<SpriteComponent>();
         Engine::ECS::Component::RegisterComponent<CameraComponent>();
         Engine::ECS::Component::RegisterComponent<ViewportCameraTag>();

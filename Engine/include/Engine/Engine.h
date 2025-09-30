@@ -5,6 +5,7 @@
 #ifndef ZUESENGINE_ENGINE_H
 #define ZUESENGINE_ENGINE_H
 
+#define GLFW_INCLUDE_NONE
 #include "Log.h"
 #include "Types.h"
 #include "EngineDefines.h"

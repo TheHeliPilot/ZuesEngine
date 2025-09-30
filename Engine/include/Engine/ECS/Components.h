@@ -9,12 +9,16 @@
 // --- Core Data Structures ---
 
 // 1. Position Component
-struct PositionComponent {
-    Engine::Math::Vec2 position = {0.0f, 0.0f};
-    float rotation = 0.0f; // Angle in degrees
+struct TransformComponent {
+    Engine::Math::Vec2 worldPosition = {0.0f, 0.0f};
+    float worldRotation = 0.0f; // Angle in degrees
+    Engine::Math::Vec2 localPosition = {0.0f, 0.0f};
+    float localRotation = 0.0f; //
+
+    EntityID parent = NULL_ENTITY_ID;
 };
 // Add serialization for PositionComponent
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PositionComponent, position, rotation)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TransformComponent, worldPosition, worldRotation)
 
 
 // 2. Sprite Component

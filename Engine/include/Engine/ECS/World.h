@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <functional>
+#include <set>
 
 #include "WorldSerializationHelpers.h" // Add this at the top
 // --- Helper Structs & Archetype Definitions ---
@@ -84,6 +85,12 @@ public:
     template<typename T> void RemoveComponent(EntityID entityID);
     template<typename T> T& GetComponent(EntityID entityID);
     template<typename T> bool HasComponent(EntityID entityID) const;
+    template<typename T> void SetComponentData(EntityID entityID, const T& componentData);
+
+    std::set<EntityID> GetEntityChildren(EntityID parentID) const;
+
+    template<typename... TArgs>
+    ComponentSignature CalculateSignature() const;
 
     // === System Management API ===
     void RegisterSystem(std::unique_ptr<System> system);
@@ -94,6 +101,9 @@ public:
 
     bool SaveToJson(const std::string& filename) const;
     bool LoadFromJson(const std::string& filename);
+
+    template<class ... TArgs, class Func>
+    void ForEach(Func &&func);
 
     // === Core Iteration Mechanism (Called by SystemBase::Run) ===
     // This function performs the Archetype filtering and the inner loop execution.

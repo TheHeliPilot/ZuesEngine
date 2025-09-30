@@ -7,6 +7,8 @@
 #include <utility>
 #include <type_traits> // Make sure this is included for std::remove_pointer_t
 
+#include "Components.h"
+
 
 // ... (World::AddComponent, RemoveComponent, GetComponent, HasComponent implementations remain the same) ...
 
@@ -14,6 +16,14 @@
 // =========================================================================
 // Core Iteration Mechanism: World::QueryAndRun
 // =========================================================================
+
+template<typename... TArgs>
+ComponentSignature World::CalculateSignature() const {
+    ComponentSignature signature;
+    // TArgs are expected to be component POINTER types (e.g., TransformComponent*)
+    (signature.set(Engine::ECS::Component::GetTypeID<std::remove_pointer_t<TArgs>>()), ...);
+    return signature;
+}
 
 // Helper function to unpack the tuple of component arrays and call the user's Update function.
 // TCompPtrs... is the variadic pack of component *pointer* types (TArgs...) from SystemBase.
@@ -339,3 +349,92 @@ inline bool World::LoadFromJson(const std::string& filename) {
     }
 }
 
+// TArgs... are the component POINTER types (e.g., TransformComponent*)
+template<typename... TArgs, typename Func>
+void World::ForEach(Func&& func) {
+    // 1. Calculate the required signature based on the template arguments
+    // FIX: Added 'this->template' to correctly resolve the dependent template name 'CalculateSignature'.
+    const ComponentSignature requiredSignature = this->template CalculateSignature<TArgs...>();
+
+    // 2. Iterate over all archetypes
+    for (auto const& [sig, archetypePtr] : archetypes) {
+        // 3. Filter: Check if the archetype contains ALL required components
+        if ((sig & requiredSignature) == requiredSignature) {
+            Archetype* archetype = archetypePtr.get();
+            if (archetype->entityIDs.empty()) continue;
+
+            // 4. Gather the component arrays and EntityIDs into a tuple for fast access
+            // TArgs are the pointer types (e.g., TransformComponent*).
+            // We need a tuple of ComponentArray<T>* pointers.
+            using ComponentTuple = std::tuple<ComponentArray<std::remove_pointer_t<TArgs>>*...>;
+
+            ComponentTuple componentArrays(archetype->GetComponentArray<std::remove_pointer_t<TArgs>>()...);
+
+            // 5. Run the inner loop
+            for (size_t i = 0; i < archetype->entityIDs.size(); ++i) {
+
+                // Get the pointers to the components and the EntityID
+                // The lambda (Func) is expected to have a signature like:
+                // `(EntityID entityID, ComponentType1* c1, ComponentType2* c2, ...)`
+
+                // FIX: Implemented correct tuple expansion using a nested lambda and std::index_sequence
+                [&]<std::size_t... I>(std::index_sequence<I...>) {
+                    func(
+                        archetype->entityIDs[i],
+                        // Correct Expansion: Use the index sequence I... to get the Nth element
+                        // from the componentArrays tuple and cast its void* result correctly.
+                        static_cast<std::remove_pointer_t<std::tuple_element_t<I, std::tuple<TArgs...> > > *>(std::get<I>(componentArrays)->
+                            GetVoidPtr(i)) ...
+                    );
+                }(std::index_sequence_for<TArgs...>{});
+            }
+        }
+    }
+}
+
+template<typename T>
+void World::SetComponentData(const EntityID entityID, const T& componentData) {
+    if (!entityID.IsValid()) {
+        throw std::runtime_error("Cannot set component data for invalid entity.");
+    }
+
+    T& existingData = GetComponent<T>(entityID);
+
+    existingData = componentData;
+}
+
+inline std::set<EntityID> World::GetEntityChildren(const EntityID parentID) const {
+    std::set<EntityID> children;
+
+    // Calculate signature for TransformComponent.
+    ComponentSignature requiredSignature;
+    requiredSignature.set(Engine::ECS::Component::GetTypeID<TransformComponent>());
+
+    // Iterate over all archetypes
+    for (auto const& [sig, archetypePtr] : archetypes) {
+        // 1. Check if the archetype contains the TransformComponent
+        if ((sig & requiredSignature) == requiredSignature) {
+            Archetype* archetype = archetypePtr.get();
+            if (archetype->entityIDs.empty()) continue;
+
+            // 2. Get the TransformComponent array
+            ComponentArray<TransformComponent>* transformArray =
+                archetype->GetComponentArray<TransformComponent>();
+
+            if (!transformArray) continue;
+
+            // 3. Loop through all entities in this archetype
+            for (size_t i = 0; i < archetype->entityIDs.size(); ++i) {
+
+                // Get the entity's transform data
+
+                // 4. Check if this entity's parent matches the requested parentID
+                //    (including NULL_ENTITY_ID for roots)
+                if (const TransformComponent& transform = transformArray->data[i]; transform.parent == parentID) {
+                    children.insert(archetype->entityIDs[i]);
+                }
+            }
+        }
+    }
+    return children;
+}

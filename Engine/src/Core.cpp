@@ -3,7 +3,8 @@
 #include "../include/Engine/Renderer.h" // Needed for Renderer::Render
 #include "../include/Engine/EngineDefines.h" // Needed for ENGINE_LOG
 // Explicitly include systems for use with std::make_unique
-#include "../include/Engine/ECS/Systems/CameraSystem.h" 
+#include "../include/Engine/ECS/Systems/CameraSystem.h"
+#include "../include/Engine/ECS/Systems/HierarchySystem.h"
 #include "../include/Engine/ECS/Systems/RenderingSystem.h"
 #include "../include/Engine/ECS/Systems/ViewportCameraSystem.h"
 
@@ -21,6 +22,7 @@ void Engine::Core::Init() {
     LOG_INFO("Initializing Core Game Logic...");
 
     // 2. Register Systems (Moved from main.cpp)
+    s_World->RegisterSystem(std::make_unique<HierarchySystem>());
     s_World->RegisterSystem(std::make_unique<CameraSystem>());
     s_World->RegisterSystem(std::make_unique<RenderingSystem>());
     s_World->RegisterSystem(std::make_unique<ViewportCameraSystem>());

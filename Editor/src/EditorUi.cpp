@@ -161,7 +161,7 @@ static void DrawCustomTitleBar() {
 
         if (ImGui::ImageButton(
             id, // Unique ID
-            (ImTextureID)(intptr_t)textureID,
+            static_cast<ImTextureID>(static_cast<intptr_t>(textureID)),
             size,
             ImVec2(0, 0), ImVec2(1, 1),
             ImVec4(0,0,0,0) // bg_col (transparent)

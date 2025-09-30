@@ -43,6 +43,11 @@ add_library(Engine STATIC
         include/json/json_fwd.hpp
         src/HitTest.cpp
         include/Engine/HitTest.h
+        include/Engine/ECS/Systems/HierarchySystem.h
+        src/CameraSystem.cpp
+        src/HierarchySystem.cpp
+        src/RenderingSystem.cpp
+        src/ViewportCameraSystem.cpp
 )
 
 target_include_directories(Engine PRIVATE

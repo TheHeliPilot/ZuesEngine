@@ -10,11 +10,10 @@ namespace Engine {
     // A hypothetical function to set up the game world
     inline void SetupSimpleScene(World* world, const uint32_t textureHandle) {
 
-
         const EntityID cameraEntity = world->CreateEntity();
-        world->AddComponent<PositionComponent>(cameraEntity, {
-            .position = {0.0f, 0.0f}, // Center the camera at world origin
-            .rotation = 0.0f
+        world->AddComponent<TransformComponent>(cameraEntity, {
+            .worldPosition = {0.0f, 0.0f}, // Center the camera at world origin
+            .worldRotation = 0.0f
         });
         world->AddComponent<CameraComponent>(cameraEntity, {
             .zoom = 1.0f,
@@ -27,9 +26,9 @@ namespace Engine {
         });
 
          const EntityID testSquare = world->CreateEntity();
-        world->AddComponent<PositionComponent>(testSquare, {
-            .position = {0.0f, 0.0f},
-            .rotation = 0.0f
+        world->AddComponent<TransformComponent>(testSquare, {
+            .worldPosition = {0.0f, 0.0f},
+            .worldRotation = 0.0f
         });
         world->AddComponent<SpriteComponent>(testSquare, {
             .textureID = 0,
