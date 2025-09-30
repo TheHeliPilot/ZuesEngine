@@ -14,9 +14,6 @@ void HierarchySystem::Run(World *world, float deltaTime) {
 
         // 1. Check if the entity is a root (no parent)
         if (!childT->parent.IsValid()) {
-            // Root entity: World transform is simply its local transform
-            childT->worldPosition = childT->localPosition;
-            childT->worldRotation = childT->localRotation;
             return;
         }
 

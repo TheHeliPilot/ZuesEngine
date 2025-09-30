@@ -8,6 +8,7 @@
 #include "imgui.h"
 #include "Log.h" // For LogLevel
 #include "Math.h"
+#include "ECS/Entity.h"
 
 namespace EditorWindows
 {
@@ -16,6 +17,7 @@ namespace EditorWindows
         static std::filesystem::path projectDir;
         static Engine::Math::Vec2 viewportMousePos;
         static Engine::Math::Vec2 viewportSize;
+        static EntityID selectedEntity;
 
         static void HandleWindowResize();
 

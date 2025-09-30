@@ -26,7 +26,7 @@ extern GLFWwindow* g_MainWindow;
 using namespace EditorWindows;
 
 std::filesystem::path EditorUi::projectDir = "../../MyGameProject";
-
+EntityID EditorUi::selectedEntity = NULL_ENTITY_ID;
 Engine::Math::Vec2 EditorUi::viewportMousePos = {-1, -1};
 Engine::Math::Vec2 EditorUi::viewportSize = {-1, -1};
 static std::unordered_map<std::string, ImVec2> g_WindowPosCache;

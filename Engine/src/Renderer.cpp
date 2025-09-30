@@ -74,9 +74,9 @@ namespace Engine {
     // --- Batching Data and Constants ---
     // Moved the structs/constants from the local scope to match the private members of Renderer
     struct Vertex {
-        Vec2 Position;
-        Vec4 Color;
-        Vec2 TexCoord;
+        Math::Vec2 Position;
+        Math::Vec4 Color;
+        Math::Vec2 TexCoord;
         float TexID; // Texture slot ID (0-31)
     };
 
@@ -94,8 +94,8 @@ namespace Engine {
 
     // CRITICAL FIX 1: Change return type from Mat4 to Vec4
     // Resolves: error: could not convert 'result' from 'Engine::Vec4' ... to 'Engine::Mat4'
-    Vec4 operator*(const Mat4& transform, const Vec4& vector) {
-        Vec4 result;
+    Math::Vec4 operator*(const Math::Mat4& transform, const Math::Vec4& vector) {
+        Math::Vec4 result;
         // Standard 4x4 Matrix * 4x1 Vector multiplication (assuming column-major storage)
         // Mat4::elements[column + row * 4]
 
@@ -441,12 +441,12 @@ namespace Engine {
     }
 
     // Original SubmitQuad (now calls the new one with a default Z of 0.0f)
-    void Renderer::SubmitQuad(const Vec2& position, const float rotation, const Vec2& size, const Vec4& color, const uint32_t textureID) {
+    void Renderer::SubmitQuad(const Math::Vec2& position, const float rotation, const Math::Vec2& size, const Math::Vec4& color, const uint32_t textureID) {
         // Default to z=0.0f for standard scene objects
         SubmitQuad(position, rotation, size, color, textureID, 0.0f);
     }
 
-    void Renderer::SubmitQuad(const Vec2& position, const float rotation, const Vec2& size, const Vec4& color, const uint32_t textureID, const float z) {
+    void Renderer::SubmitQuad(const Math::Vec2& position, const float rotation, const Math::Vec2& size, const Math::Vec4& color, const uint32_t textureID, const float z) {
         if (s_Data == nullptr) return;
 
         // 1. Check if the buffer is full or if a new texture requires a draw call.
@@ -484,17 +484,17 @@ namespace Engine {
 
 
         // 2. Transform and Write 4 Vertices
-        const Mat4 transform = Mat4::Translate(position) * Mat4::Rotate(rotation) * Mat4::Scale(size);
+        const Math::Mat4 transform = Math::Mat4::Translate(position) * Math::Mat4::Rotate(rotation) * Math::Mat4::Scale(size);
 
         // Quad corners from [-0.5, -0.5] to [0.5, 0.5]
-        const Vec2 quadPositions[4] = {
+        const Math::Vec2 quadPositions[4] = {
             {-0.5f, -0.5f}, // V0: Bottom-left
             { 0.5f, -0.5f}, // V1: Bottom-right
             { 0.5f,  0.5f}, // V2: Top-right
             {-0.5f,  0.5f}  // V3: Top-left
         };
 
-        const Vec2 texCoords[4] = {
+        const Math::Vec2 texCoords[4] = {
             {0.0f, 0.0f}, // V0
             {1.0f, 0.0f}, // V1
             {1.0f, 1.0f}, // V2
@@ -503,7 +503,7 @@ namespace Engine {
 
         for (int i = 0; i < 4; ++i) {
             // Apply 2D transform, setting Z to 0.0f for the transformation matrix calculation
-            const Vec4 transformedPos = transform * Vec4(quadPositions[i].x, quadPositions[i].y, 0.0f, 1.0f);
+            const Math::Vec4 transformedPos = transform * Math::Vec4(quadPositions[i].x, quadPositions[i].y, 0.0f, 1.0f);
 
             // CRITICAL FIX: Write the full Vec3 position. Use the 'z' parameter for depth.
             // This is the key to fixing the Z-order issue.
@@ -523,7 +523,7 @@ namespace Engine {
 
     // --- Camera Management Implementation ---
 
-    void Renderer::SetCamera(const Vec2& position, const float zoom, const float halfHeight, const float rotationRadians) {
+    void Renderer::SetCamera(const Math::Vec2& position, const float zoom, const float halfHeight, const float rotationRadians) {
         if (s_Data == nullptr) return;
 
 
@@ -535,13 +535,13 @@ namespace Engine {
         const float bottom = -top;
 
         // Assuming Mat4::Orthographic uses a standard near/far plane (e.g., -1.0f, 1.0f)
-        const Mat4 projection = Mat4::Orthographic(left, right, bottom, top, -1.0f, 1.0f);
+        const Math::Mat4 projection = Math::Mat4::Orthographic(left, right, bottom, top, -1.0f, 1.0f);
 
         // 2. Calculate View Matrix (Inverse translation and rotation)
         // The view matrix moves the world opposite to the camera
-        const Mat4 translate = Mat4::Translate(position * -1.0f);
-        const Mat4 rotate = Mat4::Rotate(rotationRadians * -1.0f);
-        const Mat4 view = rotate * translate; // Apply rotation THEN translation
+        const Math::Mat4 translate = Math::Mat4::Translate(position * -1.0f);
+        const Math::Mat4 rotate = Math::Mat4::Rotate(rotationRadians * -1.0f);
+        const Math::Mat4 view = rotate * translate; // Apply rotation THEN translation
 
         // 3. Combine and Store
         s_Data->ViewProjectionMatrix = projection * view;
@@ -603,43 +603,43 @@ namespace Engine {
         }
     }
 
-    void Renderer::SetClearColor(const Vec4& color) {
+    void Renderer::SetClearColor(const Math::Vec4& color) {
         // Store the color to be used for the next glClear
         if (!s_Data) return;
         s_Data->ClearColor = color;
     }
 
-    Line Renderer::DrawLine(const Vec2& start, const Vec2& end, const Vec4& color, float thickness) {
+    Line Renderer::DrawLine(const Math::Vec2& start, const Math::Vec2& end, const Math::Vec4& color, float thickness) {
         Renderer::SubmitQuad((start + end) * 0.5f, atan2(end.y - start.y, end.x - start.x), { (end - start).Length(), thickness }, color, 0, .99f);
         return { start, end, thickness };
     }
 
-    Rect Renderer::DrawRect(const Vec2& position, const Vec2& size, const Vec4& color, const float rotationRadians) {
+    Rect Renderer::DrawRect(const Math::Vec2& position, const Math::Vec2& size, const Math::Vec4& color, const float rotationRadians) {
         Renderer::SubmitQuad(position, rotationRadians, size, color, 0, .99f);
         return { position, size, rotationRadians };
     }
 
-    Circle Renderer::DrawCircle(const Vec2& center, const float radius, const Vec4& color,
+    Circle Renderer::DrawCircle(const Math::Vec2& center, const float radius, const Math::Vec4& color,
                             const int segments, const bool outlineOnly, const float thickness) {
         const float step = 2.0f * 3.14159265f / segments;
         for (int i = 0; i < segments; i++) {
-            Vec2 p0 = center + Vec2(std::cos(i * step),     std::sin(i * step))     * radius;
-            Vec2 p1 = center + Vec2(std::cos((i + 1) * step), std::sin((i + 1) * step)) * radius;
+            Math::Vec2 p0 = center + Math::Vec2(std::cos(i * step),     std::sin(i * step))     * radius;
+            Math::Vec2 p1 = center + Math::Vec2(std::cos((i + 1) * step), std::sin((i + 1) * step)) * radius;
             DrawLine(p0, p1, color, thickness);
         }
         return { center, radius, outlineOnly, thickness };
     }
 
 
-    Arrow Renderer::DrawArrow(const Vec2& start, const Vec2& end, const Vec4& color, const float thickness) {
+    Arrow Renderer::DrawArrow(const Math::Vec2& start, const Math::Vec2& end, const Math::Vec4& color, const float thickness) {
         DrawLine(start, end, color, thickness);
 
-        const Vec2 dir = (end - start).Normalize();
-        const Vec2 perp(-dir.y, dir.x);
+        const Math::Vec2 dir = (end - start).Normalize();
+        const Math::Vec2 perp(-dir.y, dir.x);
         constexpr float headSize = 0.5f;
-        const Vec2 tip = end;
-        const Vec2 left = end - dir * headSize + perp * (headSize * 0.5f);
-        const Vec2 right = end - dir * headSize - perp * (headSize * 0.5f);
+        const Math::Vec2 tip = end;
+        const Math::Vec2 left = end - dir * headSize + perp * (headSize * 0.5f);
+        const Math::Vec2 right = end - dir * headSize - perp * (headSize * 0.5f);
 
         DrawLine(tip, left, color, thickness);
         DrawLine(tip, right, color, thickness);
@@ -649,10 +649,10 @@ namespace Engine {
     }
 
 
-    Vec2 Renderer::WorldToScreen(const Vec2& worldPos) {
+    Math::Vec2 Renderer::WorldToScreen(const Math::Vec2& worldPos) {
         if (!s_Data) return {};
 
-        Vec4 clip = s_Data->ViewProjectionMatrix * Vec4(worldPos.x, worldPos.y, 0.0f, 1.0f);
+        Math::Vec4 clip = s_Data->ViewProjectionMatrix * Math::Vec4(worldPos.x, worldPos.y, 0.0f, 1.0f);
         clip.x /= clip.w;
         clip.y /= clip.w;
 
@@ -664,7 +664,7 @@ namespace Engine {
 
     // Renderer.cpp, implementation for ScreenToWorld
 
-    Vec2 Renderer::ScreenToWorld(const Vec2& screenPos) {
+    Math::Vec2 Renderer::ScreenToWorld(const Math::Vec2& screenPos) {
         if (!s_Data) return {};
 
         // 1. Convert Screen Coordinates (Top-Left origin, Y-down) to NDC (Center origin, Y-up)
@@ -675,11 +675,11 @@ namespace Engine {
         // Y-axis: Map [0, Height] (Y-down) to [1, -1] (Y-up) - This is the standard flip
         const float ndcY = 1.0f - (2.0f * screenPos.y) / s_Data->ViewportHeight;
 
-        const Vec4 ndc(ndcX, ndcY, 0.0f, 1.0f);
+        const Math::Vec4 ndc(ndcX, ndcY, 0.0f, 1.0f);
 
         // 2. Inverse Transform
-        const Mat4 inv = s_Data->ViewProjectionMatrix.Inverted();
-        Vec4 world = inv * ndc;
+        const Math::Mat4 inv = s_Data->ViewProjectionMatrix.Inverted();
+        Math::Vec4 world = inv * ndc;
 
         // 3. Perspective Divide
         world.x /= world.w;
@@ -745,7 +745,7 @@ namespace Engine {
         return static_cast<uint32_t>(s_Fonts.size() - 1); // fontID
     }
 
-    void Renderer::DrawText(const std::string& text, const Vec2& position, const float scale, const Vec4& color, const uint32_t fontID) {
+    void Renderer::DrawText(const std::string& text, const Math::Vec2& position, const float scale, const Math::Vec4& color, const uint32_t fontID) {
     if (s_Data == nullptr) return;
     if (fontID >= s_Fonts.size()) return;
 
@@ -765,13 +765,13 @@ namespace Engine {
 
         const Glyph& g = it->second;
 
-        Vec2 glyphPos = { x + g.Bearing.x * scale, y - (g.Size.y - g.Bearing.y) * scale };
-        Vec2 glyphSize = { g.Size.x * scale, g.Size.y * scale };
+        Math::Vec2 glyphPos = { x + g.Bearing.x * scale, y - (g.Size.y - g.Bearing.y) * scale };
+        Math::Vec2 glyphSize = { g.Size.x * scale, g.Size.y * scale };
 
         // Submit quad (textured)
-        const Mat4 transform = Mat4::Translate(glyphPos) * Mat4::Scale(glyphSize);
+        const Math::Mat4 transform = Math::Mat4::Translate(glyphPos) * Math::Mat4::Scale(glyphSize);
 
-        const Vec2 texCoords[4] = {
+        const Math::Vec2 texCoords[4] = {
             {g.UV0.x, g.UV0.y},
             {g.UV1.x, g.UV0.y},
             {g.UV1.x, g.UV1.y},
@@ -797,13 +797,13 @@ namespace Engine {
         }
 
         for (int i = 0; i < 4; i++) {
-            const Vec2 quadPositions[4] = {
+            const Math::Vec2 quadPositions[4] = {
                 {0.0f, 0.0f},
                 {1.0f, 0.0f},
                 {1.0f, 1.0f},
                 {0.0f, 1.0f}
             };
-            Vec4 transformedPos = transform * Vec4(quadPositions[i].x, quadPositions[i].y, 0.0f, 1.0f);
+            Math::Vec4 transformedPos = transform * Math::Vec4(quadPositions[i].x, quadPositions[i].y, 0.0f, 1.0f);
             s_Data->VertexBufferPtr->Position = { transformedPos.x, transformedPos.y, 0 };
             s_Data->VertexBufferPtr->Color = color;
             s_Data->VertexBufferPtr->TexCoord = texCoords[i];

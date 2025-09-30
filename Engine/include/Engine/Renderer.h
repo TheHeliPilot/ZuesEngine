@@ -7,45 +7,40 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Math.h"  // <--- NEW: Include the centralized math library
+#include "Math.h"
+
 
 namespace Engine {
 
-    // Use aliases to simplify access within the Renderer namespace
-    using Vec2 = Math::Vec2;
-    using Vec3 = Math::Vec3;
-    using Vec4 = Math::Vec4;
-    using Mat4 = Math::Mat4;
-
     struct Line {
-        Vec2 start;
-        Vec2 end;
+        Math::Vec2 start;
+        Math::Vec2 end;
         float thickness;
     };
 
     struct Rect {
-        Vec2 position;
-        Vec2 size;
+        Math::Vec2 position;
+        Math::Vec2 size;
         float rotationRadians;
     };
 
     struct Circle {
-        Vec2 center;
+        Math::Vec2 center;
         float radius;
         bool outlineOnly = false;
         float thickness = 1.0f; // only used if outlineOnly = true
     };
 
     struct Arrow {
-        Vec2 start;
-        Vec2 end;
+        Math::Vec2 start;
+        Math::Vec2 end;
         float thickness;
     };
 
     struct Triangle {
-        Vec2 v0;
-        Vec2 v1;
-        Vec2 v2;
+        Math::Vec2 v0;
+        Math::Vec2 v1;
+        Math::Vec2 v2;
     };
 
     // --- Renderer Class ---
@@ -64,14 +59,14 @@ namespace Engine {
 
         // Submits a single quad to the current batch.
         static void SubmitQuad(
-            const Vec2& position,
+            const Math::Vec2& position,
             float rotationRadians, // Rotation in radians (fixed parameter name)
-            const Vec2& size,
-            const Vec4& color,
+            const Math::Vec2& size,
+            const Math::Vec4& color,
             uint32_t textureID // OpenGL texture handle (0 for pure color/white)
         );
 
-        static void SubmitQuad(const Vec2 &position, float rotation, const Vec2 &size, const Vec4 &color, uint32_t textureID,
+        static void SubmitQuad(const Math::Vec2 &position, float rotation, const Math::Vec2 &size, const Math::Vec4 &color, uint32_t textureID,
                                float z);
 
         // --- Camera Management ---
@@ -79,7 +74,7 @@ namespace Engine {
         // Fix: Added the rotationRadians parameter to the declaration.
         // Updates the camera's view-projection matrix uniform in the shader.
         // halfHeight defines the size of the view volume (e.g., 10 world units vertically).
-        static void SetCamera(const Vec2& position, float zoom, float halfHeight, float rotationRadians);
+        static void SetCamera(const Math::Vec2& position, float zoom, float halfHeight, float rotationRadians);
 
         static void SetTextureUniforms();
 
@@ -87,23 +82,23 @@ namespace Engine {
         static uint32_t GetRenderTextureID();
         static void SetViewportSize(float width, float height);
         static uint32_t LoadTexture(const std::string& filePath);
-        static void SetClearColor(const Vec4& color);
+        static void SetClearColor(const Math::Vec4& color);
 
-        static Line DrawLine(const Vec2& start, const Vec2& end, const Vec4& color, float thickness = 1.0f);
-        static Rect DrawRect(const Vec2& position, const Vec2& size, const Vec4& color, float rotationRadians = 0.0f);
-        static Circle DrawCircle(const Vec2& center, float radius, const Vec4& color, int segments = 20, bool outlineOnly = false, float thickness = 1.0f);
-        static Arrow DrawArrow(const Vec2& start, const Vec2& end, const Vec4& color, float thickness = 1.0f);
+        static Line DrawLine(const Math::Vec2& start, const Math::Vec2& end, const Math::Vec4& color, float thickness = 1.0f);
+        static Rect DrawRect(const Math::Vec2& position, const Math::Vec2& size, const Math::Vec4& color, float rotationRadians = 0.0f);
+        static Circle DrawCircle(const Math::Vec2& center, float radius, const Math::Vec4& color, int segments = 20, bool outlineOnly = false, float thickness = 1.0f);
+        static Arrow DrawArrow(const Math::Vec2& start, const Math::Vec2& end, const Math::Vec4& color, float thickness = 1.0f);
 
-        static Vec2 WorldToScreen(const Vec2 &worldPos);
-        static Vec2 ScreenToWorld(const Vec2 &screenPos);
+        static Math::Vec2 WorldToScreen(const Math::Vec2 &worldPos);
+        static Math::Vec2 ScreenToWorld(const Math::Vec2 &screenPos);
 
         // --- Font System ---
         struct Glyph {
-            Vec2 Size;      // Pixel size of glyph
-            Vec2 Bearing;   // Offset from baseline to left/top of glyph
+            Math::Vec2 Size;      // Pixel size of glyph
+            Math::Vec2 Bearing;   // Offset from baseline to left/top of glyph
             float Advance;  // Advance to next glyph
-            Vec2 UV0;       // Bottom-left texcoord
-            Vec2 UV1;       // Top-right texcoord
+            Math::Vec2 UV0;       // Bottom-left texcoord
+            Math::Vec2 UV1;       // Top-right texcoord
         };
 
         struct Font {
@@ -114,9 +109,9 @@ namespace Engine {
 
         static uint32_t LoadFont(const std::string& path, float pixelHeight);
         static void DrawText(const std::string& text,
-                             const Vec2& position,
+                             const Math::Vec2& position,
                              float scale,
-                             const Vec4& color,
+                             const Math::Vec4& color,
                              uint32_t fontID);
 
     private:
@@ -125,9 +120,9 @@ namespace Engine {
 
         // 2D Vertex Structure for Batching
         struct Vertex {
-            Vec3 Position; // Engine::Math::Vec3
-            Vec4 Color;    // Engine::Math::Vec4
-            Vec2 TexCoord; // Engine::Math::Vec2
+            Math::Vec3 Position; // Engine::Math::Vec3
+            Math::Vec4 Color;    // Engine::Math::Vec4
+            Math::Vec2 TexCoord; // Engine::Math::Vec2
             float TexID;   // Texture slot index (0.0 to 31.0)
         };
 
@@ -144,7 +139,7 @@ namespace Engine {
             // Camera/Viewport Data
             float ViewportWidth = 0.0f;
             float ViewportHeight = 0.0f;
-            Mat4 ViewProjectionMatrix; // CRITICAL FIX: Storage for the matrix calculated by SetCamera
+            Math::Mat4 ViewProjectionMatrix; // CRITICAL FIX: Storage for the matrix calculated by SetCamera
             Math::Vec4 ClearColor;
 
             uint32_t ShaderID = 0;

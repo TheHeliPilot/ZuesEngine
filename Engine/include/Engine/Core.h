@@ -16,6 +16,10 @@ namespace Engine {
         static bool SaveWorld(const std::string& filePath);
         static bool LoadWorld(const std::string& filePath);
 
+        static World* GetCurrentWorld() {
+            return s_World.get();
+        }
+
     private:
         // Core Game/ECS State: The game's world is managed here
         static std::unique_ptr<World> s_World;

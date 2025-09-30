@@ -5,6 +5,7 @@
 
 #include "ECS/World.h"
 #include "ECS/Components.h"
+#include "ECS/HierarchyOutliner.h"
 
 namespace Engine {
     // A hypothetical function to set up the game world
@@ -22,7 +23,6 @@ namespace Engine {
             .isActive = true
         });
         world->AddComponent<ViewportCameraTag>(cameraEntity, {
-
         });
 
          const EntityID testSquare = world->CreateEntity();
@@ -37,6 +37,8 @@ namespace Engine {
             .layer = 0,
             .sortOrder = 0
         });
+
+        ECS::Hierarchy::BuildCache(world);
 
     }
 }

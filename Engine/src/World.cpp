@@ -2,6 +2,9 @@
 #include <iostream>
 #include <stdexcept>
 #include <algorithm>
+
+#include "../include/Engine/Core.h"
+#include "../include/Engine/ECS/HierarchyOutliner.h"
 #include "../include/Engine/ECS/WorldSerializationHelpers.h"
 
 // NEW: Define the global component registry
@@ -36,6 +39,7 @@ EntityID World::CreateEntity() {
     entityLookup[index] = { generation, defaultArchetype, defaultArchetype->entityIDs.size() };
     defaultArchetype->entityIDs.push_back(newID);
 
+    Engine::ECS::Hierarchy::BuildCache(Engine::Core::GetCurrentWorld());
     return newID;
 }
 
@@ -78,6 +82,7 @@ void World::DestroyEntity(const EntityID entityID) {
     data.archetypePtr = nullptr;
     data.archetypeIndex = 0;
     freeIndices.push_back(index);
+    Engine::ECS::Hierarchy::BuildCache(Engine::Core::GetCurrentWorld());
 }
 
 void World::RegisterSystem(std::unique_ptr<System> system) {

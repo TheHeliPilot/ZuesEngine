@@ -16,6 +16,7 @@
 #include "ECS/Systems/Systems.h"
 #include "ProjectManager.h"
 #include "HitTest.h"
+#include "ECS/HierarchyOutliner.h"
 #include "../stb/stb_image.h"
 
 namespace Engine {

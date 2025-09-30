@@ -48,6 +48,8 @@ add_library(Engine STATIC
         src/HierarchySystem.cpp
         src/RenderingSystem.cpp
         src/ViewportCameraSystem.cpp
+        include/Engine/ECS/HierarchyOutliner.h
+        src/HierarchyOutliner.cpp
 )
 
 target_include_directories(Engine PRIVATE

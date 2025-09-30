@@ -72,7 +72,7 @@ namespace Engine {
     // --- Mouse Queries ---
 
     bool Input::IsMouseButtonPressed(const int button) {
-        return m_CurrentMouseState.contains(button) && m_CurrentMouseState.at(button);
+        return (m_CurrentMouseState.contains(button) && m_CurrentMouseState.at(button));
     }
     
     bool Input::IsMouseButtonJustPressed(const int button) {

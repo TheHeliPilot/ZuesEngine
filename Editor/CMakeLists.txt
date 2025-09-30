@@ -17,6 +17,9 @@ set(IMGUI_SRC
         include/EditorUi.h
         src/LoggerUI.cpp
         include/LoggerUI.h
+        src/HierarchyOperations.cpp
+        include/HierarchyOperations.h
+        include/EditorDefines.h
 )
 
 add_executable(Editor

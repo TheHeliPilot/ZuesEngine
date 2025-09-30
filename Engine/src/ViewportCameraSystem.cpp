@@ -1,6 +1,8 @@
 ﻿// ViewportCameraSystem.cpp
 
 #include "../include/Engine/ECS/Systems/ViewportCameraSystem.h"
+
+#include "../include/Engine/EngineDefines.h"
 #include "../include/Engine/Renderer.h"
 
 // NOTE: Including Input.h in the header was correct because it defines Engine::Input::IsKeyPressed
@@ -12,10 +14,10 @@ ViewportCameraSystem::ViewportCameraSystem() {
 
 void ViewportCameraSystem::Update(const float deltaTime, TransformComponent* pos, CameraComponent* cam, ViewportCameraTag* vc_tag) {
 
-    //ENGINE_LOG(std::to_string(deltaTime));
 
     if (Engine::Input::IsKeyPressed(GLFW_KEY_W)) {
         pos->worldPosition.y += deltaTime * vc_tag->cameraSpeed;
+        //LOG_INFO(std::to_string(pos->worldPosition.y));
     }
     if (Engine::Input::IsKeyPressed(GLFW_KEY_S)) {
         pos->worldPosition.y -= deltaTime * vc_tag->cameraSpeed;

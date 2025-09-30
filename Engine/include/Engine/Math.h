@@ -32,6 +32,10 @@ namespace Engine::Math {
             return *this;
         }
 
+        bool operator==(const Engine::Math::Vec2 & vec2) const {
+            return vec2.x == x && vec2.y == y;
+        }
+
         static Vec2 Normalized(const Vec2& v) {
             if (const float len = v.Length(); len != 0.0f) {
                 return { v.x / len, v.y / len };

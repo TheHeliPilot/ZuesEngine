@@ -13,6 +13,9 @@
 // Include for strcpy, which is needed for ImFontConfig::Name
 #include <string.h>
 
+#include "Core.h"
+#include "../include/HierarchyOperations.h"
+
 using namespace EditorWindows;
 
 // Global pointer for Input handling
@@ -151,6 +154,14 @@ void ApplyDarkMinimalTheme()
 }
 
 void DrawEditionStuff() {
+
+    if (EditorUi::selectedEntity == NULL_ENTITY_ID) {
+        HierarchyOperations::draggingStatus = HierarchyOperations::DraggingOperation::None;
+        return;
+    }
+
+    const TransformComponent selectedTransform = Engine::Core::GetCurrentWorld()->GetComponent<TransformComponent>(EditorUi::selectedEntity);
+
     // --- 1. Define Selection State (SIMULATION) ---
     // In your real code, these would be member variables or properties of the drawn objects
     static bool isArrow1Selected = false;
@@ -173,31 +184,55 @@ void DrawEditionStuff() {
     const ImVec4 BLUE_SELECTED    = ImVec4(0.233f, 0.260f, 1.000f, 0.6f);
 
 
-    Engine::Vec2 mousePos = Engine::Renderer::ScreenToWorld(EditorUi::GetMousePositionInWindow("Viewport"));
+    Engine::Math::Vec2 mousePos = Engine::Renderer::ScreenToWorld(EditorUi::GetMousePositionInWindow("Viewport"));
 
     // Arrow 1 (Green/Z-Axis)
     // Select color: If selected, use GREEN_SELECTED, otherwise GREEN_UNSELECTED.
     ImVec4 c1 = isArrow1Selected ? GREEN_SELECTED : GREEN_UNSELECTED;
-    Engine::Vec4 color1 = {c1.x, c1.y, c1.z, c1.w};
-    Engine::Arrow a1 = Engine::Renderer::DrawArrow({0,0}, {0,3}, color1, .05f);
-    isArrow1Selected = isMoveSquareSelected || Engine::HitTest::Arrow(mousePos, a1, .2f);
+    Engine::Math::Vec4 color1 = {c1.x, c1.y, c1.z, c1.w};
+    Engine::Arrow a1 = Engine::Renderer::DrawArrow(selectedTransform.worldPosition, selectedTransform.worldPosition + Engine::Math::Vec2{0,3}, color1, .05f);
+    isArrow1Selected = isMoveSquareSelected || Engine::HitTest::Arrow(mousePos, a1, .2f) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::MoveY;
 
     // Arrow 2 (Red/X-Axis)
     ImVec4 c2 = isArrow2Selected ? RED_SELECTED : RED_UNSELECTED;
-    Engine::Vec4 color2 = {c2.x, c2.y, c2.z, c2.w};
-    Engine::Arrow a2 = Engine::Renderer::DrawArrow({0,0}, {3,0}, color2, .05f);
-    isArrow2Selected = isMoveSquareSelected || Engine::HitTest::Arrow(mousePos, a2, .2f);
+    Engine::Math::Vec4 color2 = {c2.x, c2.y, c2.z, c2.w};
+    Engine::Arrow a2 = Engine::Renderer::DrawArrow(selectedTransform.worldPosition, selectedTransform.worldPosition + Engine::Math::Vec2{3,0}, color2, .05f);
+    isArrow2Selected = isMoveSquareSelected || Engine::HitTest::Arrow(mousePos, a2, .2f) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::MoveX;
 
     // Circle (Blue)
     ImVec4 c3 = isCircleSelected ? BLUE_SELECTED : BLUE_UNSELECTED;
-    Engine::Vec4 color3 = {c3.x, c3.y, c3.z, c3.w};
-    Engine::Circle c = Engine::Renderer::DrawCircle({0,0}, 3, color3, 50, true, .05f);
-    isCircleSelected = Engine::HitTest::Circle(mousePos, c, .2f);
+    Engine::Math::Vec4 color3 = {c3.x, c3.y, c3.z, c3.w};
+    Engine::Circle c = Engine::Renderer::DrawCircle(selectedTransform.worldPosition, 3, color3, 50, true, .05f);
+    isCircleSelected = Engine::HitTest::Circle(mousePos, c, .2f) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::Rotate;
 
     ImVec4 s1 = isMoveSquareSelected ? BLUE_SELECTED : BLUE_UNSELECTED;
-    Engine::Vec4 color4 = {s1.x, s1.y, s1.z, s1.w};
-    Engine::Rect r1 = Engine::Renderer::DrawRect({.5f,.5f}, {1,1}, color4, 0);
-    isMoveSquareSelected = Engine::HitTest::Rect(mousePos, r1);
+    Engine::Math::Vec4 color4 = {s1.x, s1.y, s1.z, s1.w};
+    Engine::Rect r1 = Engine::Renderer::DrawRect(selectedTransform.worldPosition + Engine::Math::Vec2{.5f,.5f}, {1,1}, color4, 0);
+    isMoveSquareSelected = Engine::HitTest::Rect(mousePos, r1) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::MoveXY;
+
+    if (Engine::Input::IsMouseButtonPressed(0)) {
+        if (HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::None) {
+            if (isArrow1Selected && isArrow2Selected) {
+                HierarchyOperations::draggingStatus = HierarchyOperations::DraggingOperation::MoveXY;
+            }
+            else if (isArrow1Selected) {
+                HierarchyOperations::draggingStatus = HierarchyOperations::DraggingOperation::MoveY;
+            }
+            else if (isArrow2Selected) {
+                HierarchyOperations::draggingStatus = HierarchyOperations::DraggingOperation::MoveX;
+            }
+            else if (isCircleSelected) {
+                HierarchyOperations::draggingStatus = HierarchyOperations::DraggingOperation::Rotate;
+            }
+
+            if (HierarchyOperations::draggingStatus != HierarchyOperations::DraggingOperation::None) {
+                HierarchyOperations::lastMousePos = mousePos;
+            }
+        }
+    }else {
+        HierarchyOperations::draggingStatus = HierarchyOperations::DraggingOperation::None;
+        HierarchyOperations::lastMousePos = {-1, -1};
+    }
 }
 
 int main() {
@@ -318,6 +353,7 @@ int main() {
 
         // B. Submit editor gizmos so they appear on top of the scene
         DrawEditionStuff();
+        HierarchyOperations::DoHierarchyOperations();
 
         Engine::Renderer::EndBatch(); // Draws everything to the FBO
 
