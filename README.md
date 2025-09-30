@@ -1,110 +1,65 @@
-# ZeusEngine
+# ZeusEngine<br><br>
 
-**ZeusEngine** is a 2D game engine and editor built with **OpenGL**.
-It features a fast renderer, an intuitive editor UI, and networking support for multiplayer games.
-
----
-
-## Features
-
-- **2D Rendering** — OpenGL-powered for high-performance graphics.
-- **Editor** — Built with ImGui for rapid development workflows.
-- **Networking** — Uses ENet for low-latency multiplayer networking.
-- **Modular Architecture** — Engine and editor are separated for flexibility.
+**ZeusEngine** is a 2D game engine and editor built with **OpenGL**.<br>
+It features a fast renderer, an intuitive editor UI, and networking support for multiplayer games.<br><br>
 
 ---
 
-## Project Structure
+## Features<br><br>
 
-ZeusEngine/
-├── Engine/ # Core engine library
-├── Editor/ # Editor application
-├── MyGameProject/ # Example game application (The actual game executable)
-
----
-
-## Build Instructions (Cross-Platform)
-
-These instructions use **CMake** to handle project generation for various operating systems.
-
-### Prerequisites
-
-- **CMake** (Installed and in your system's PATH)
-- **OpenGL** development libraries
-- A **C++ Compiler** (e.g., Visual Studio on Windows, GCC/Clang on Unix-like systems)
+- **2D Rendering** — OpenGL-powered for high-performance graphics.<br>
+- **Editor** — Built with ImGui for rapid development workflows.<br>
+- **Networking** — Uses ENet for low-latency multiplayer networking.<br>
+- **Modular Architecture** — Engine and editor are separated for flexibility.<br><br>
 
 ---
 
-### 1. Windows (Visual Studio Workflow) ⚙️
+## Project Structure<br><br>
 
-This is the standard approach for Windows, generating a Visual Studio solution file (`.sln`).
+ZeusEngine/<br>
+├── Engine/ # Core engine library<br>
+├── Editor/ # Editor application<br>
+├── MyGameProject/ # Example game application (The actual game executable)<br><br>
 
-1.  **Generate the Project Files:**
+---
+
+### Prerequisites<br><br>
+
+- **CMake** (Installed and in your system's PATH)<br>
+- **OpenGL** development libraries<br>
+- A **C++ Compiler** (e.g., Visual Studio on Windows or CLion)
+
+---
+
+### 1. Windows (Visual Studio Workflow) ⚙️<br><br>
+
+This is the standard approach for Windows, generating a Visual Studio solution file (`.sln`).<br><br>
+
+1.  **Generate the Project Files:**<br>
     * Open the **Developer Command Prompt for VS** (or a similar environment).
     * Navigate to the repository root (`ZeusEngine` folder).
     * Tell CMake to generate the Visual Studio solution (e.g., for VS 2022) in a new `build` directory:
         ```bash
         cmake -B build -G "Visual Studio 17 2022"
         ```
-        *(Adjust the generator string to match your installed Visual Studio version).*
+        *(Adjust the generator string to match your installed Visual Studio version.)*
 2.  **Build the Project:**
     * Use CMake to compile all targets in **Release** mode:
         ```bash
         cmake --build build --config Release
         ```
-3.  **Run the Editor:**
-    * The executable is located in the build output folder:
-        ```bash
-        .\build\Editor\Release\Editor.exe
-        ```
-4.  **Run Game App:**
-    * The game executable is located here:
-        ```bash
-        .\build\MyGameProject\Release\MyGameProject.exe
-        ```
 
 ---
 
-### 2. Linux / macOS (Unix Makefiles Workflow) 🐧
+## Dependencies<br><br>
 
-These instructions use the default Unix Makefiles generator.
-
-1.  **Build the Engine**
-    ```bash
-    cd Engine
-    cmake .
-    cmake --build .
-    ```
-2.  **Build the Editor**
-    ```bash
-    cd ../Editor
-    cmake .
-    cmake --build .
-    ```
-3.  **Run the Editor**
-    ```bash
-    ./Editor
-    ```
-4.  **Build & Run Game App**
-    ```bash
-    cd ../MyGameProject 
-    cmake .
-    cmake --build .
-    ./MyGameProject
-    ```
-    *(Note: The game folder is named `MyGameProject` in the repository.)*
+- OpenGL — Rendering backend<br>
+- ImGui — Editor UI library<br>
+- ENet — Networking library<br><br>
 
 ---
 
-## Dependencies
+## License<br><br>
 
-- OpenGL — Rendering backend
-- ImGui — Editor UI library
-- ENet — Networking library
-
----
-
-## License
-
-This project is licensed under a strict **Non-Commercial License**.
+This project is licensed under a strict **Non-Commercial License**.<br>
 See [LICENSE.md](./LICENSE.md) for details.
