@@ -1,7 +1,6 @@
 # ZeusEngine<br><br>
 
 **ZeusEngine** is a 2D game engine and editor built with **OpenGL**.<br>
-It features a fast renderer, an intuitive editor UI, and networking support for multiplayer games.<br><br>
 
 ---
 
