@@ -227,7 +227,7 @@ namespace Engine {
         // Define Vertex Attributes (must match the Vertex struct)
         // Position (Vec2, 8 bytes offset)
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, Position));
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, Position));
         // Color (Vec4, 16 bytes offset)
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, Color));
@@ -440,61 +440,53 @@ namespace Engine {
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind FBO
     }
 
+    // Original SubmitQuad (now calls the new one with a default Z of 0.0f)
     void Renderer::SubmitQuad(const Vec2& position, const float rotation, const Vec2& size, const Vec4& color, const uint32_t textureID) {
+        // Default to z=0.0f for standard scene objects
+        SubmitQuad(position, rotation, size, color, textureID, 0.0f);
+    }
+
+    void Renderer::SubmitQuad(const Vec2& position, const float rotation, const Vec2& size, const Vec4& color, const uint32_t textureID, const float z) {
         if (s_Data == nullptr) return;
 
-        // std::cout << "[DEBUG] SubmitQuad: Pos(" << position.x << ", " << position.y << ") Rot:" << rotation << " Size(" << size.x << ", " << size.y << ") TexID:" << textureID << std::endl; // DEBUG (Verbose)
-
         // 1. Check if the buffer is full or if a new texture requires a draw call.
-        // MaxIndices is 6 indices per quad * MaxQuads. If we don't have enough space for a new quad (6 indices), draw.
-        if (s_Data->IndexCount + 6 > MaxIndices) {
-            EndBatch();
-            BeginBatch();
-        }
+        float textureSlot = 0.0f;
 
-        // 2. Find/Assign Texture Slot:
-        float textureSlot = 0.0f; // Default to 0 (white texture/pure color)
-
+        // Find/Assign Texture Slot
         if (textureID > 0) {
             bool found = false;
-            // Search for existing slot
+            // Search for existing slot (skip slot 0, which is white)
             for (uint32_t i = 1; i < s_Data->TextureSlotIndex; i++) {
                 if (s_Data->TextureSlots[i] == textureID) {
                     textureSlot = static_cast<float>(i);
                     found = true;
-                    // std::cout << "[DEBUG] Texture ID " << textureID << " found in slot " << textureSlot << std::endl; // DEBUG (Verbose)
                     break;
                 }
             }
 
             // Assign new slot if not found
             if (!found) {
-                // If the next slot is beyond the limit, force a draw
-                if (s_Data->TextureSlotIndex >= MaxTextureSlots) {
+                if (s_Data->IndexCount + 6 > MaxIndices || s_Data->TextureSlotIndex >= MAX_TEXTURE_SLOTS) {
                     EndBatch();
-                    BeginBatch(); // This batch will start with only the white texture in slot 0
-
-                    // The new texture must now fit in the new batch, and it will be assigned to slot 1
-                    textureSlot = static_cast<float>(s_Data->TextureSlotIndex);
-                    s_Data->TextureSlots[s_Data->TextureSlotIndex] = textureID;
-                    s_Data->TextureSlotIndex++;
-
-                } else {
-                    // Assign to the next available slot
-                    textureSlot = static_cast<float>(s_Data->TextureSlotIndex);
-                    s_Data->TextureSlots[s_Data->TextureSlotIndex] = textureID;
-                    s_Data->TextureSlotIndex++;
+                    BeginBatch();
                 }
+                textureSlot = static_cast<float>(s_Data->TextureSlotIndex);
+                s_Data->TextureSlots[s_Data->TextureSlotIndex] = textureID;
+                s_Data->TextureSlotIndex++;
             }
         }
 
-        // 3. Transform and Write 4 Vertices
-        // Combine transforms: Scale * Rotate * Translate (to move the quad to world space)
-        // Order of application is Scale, then Rotate (around origin), then Translate.
-        const Mat4 transform = Mat4::Translate(position) * Mat4::Rotate(rotation) * Mat4::Scale(size);
-        // std::cout << "[DEBUG] Transform matrix created." << std::endl; // DEBUG (Verbose)
+        // Check buffer size again after texture logic (in case EndBatch/BeginBatch was called)
+        if (s_Data->IndexCount + 6 > MaxIndices) {
+            EndBatch();
+            BeginBatch();
+        }
 
-        // ERROR FIX 5: Change constexpr to const (or just define locally)
+
+        // 2. Transform and Write 4 Vertices
+        const Mat4 transform = Mat4::Translate(position) * Mat4::Rotate(rotation) * Mat4::Scale(size);
+
+        // Quad corners from [-0.5, -0.5] to [0.5, 0.5]
         const Vec2 quadPositions[4] = {
             {-0.5f, -0.5f}, // V0: Bottom-left
             { 0.5f, -0.5f}, // V1: Bottom-right
@@ -502,7 +494,6 @@ namespace Engine {
             {-0.5f,  0.5f}  // V3: Top-left
         };
 
-        // ERROR FIX 5: Change constexpr to const
         const Vec2 texCoords[4] = {
             {0.0f, 0.0f}, // V0
             {1.0f, 0.0f}, // V1
@@ -511,19 +502,22 @@ namespace Engine {
         };
 
         for (int i = 0; i < 4; ++i) {
-            // CRITICAL FIX 1 (Resolved): The call site now works because the operator returns Vec4.
+            // Apply 2D transform, setting Z to 0.0f for the transformation matrix calculation
             const Vec4 transformedPos = transform * Vec4(quadPositions[i].x, quadPositions[i].y, 0.0f, 1.0f);
 
+            // CRITICAL FIX: Write the full Vec3 position. Use the 'z' parameter for depth.
+            // This is the key to fixing the Z-order issue.
             s_Data->VertexBufferPtr->Position.x = transformedPos.x;
             s_Data->VertexBufferPtr->Position.y = transformedPos.y;
+            s_Data->VertexBufferPtr->Position.z = z; // Now correctly writes to the Vec3::z member
+
             s_Data->VertexBufferPtr->Color = color;
             s_Data->VertexBufferPtr->TexCoord = texCoords[i];
             s_Data->VertexBufferPtr->TexID = textureSlot;
             s_Data->VertexBufferPtr++;
         }
-        // std::cout << "[DEBUG] Wrote 4 vertices to VertexBufferPtr." << std::endl; // DEBUG (Verbose)
 
-        // 4. Update index count (4 vertices added, 6 indices used)
+        // 3. Update index count
         s_Data->IndexCount += 6;
     }
 
@@ -616,12 +610,12 @@ namespace Engine {
     }
 
     Line Renderer::DrawLine(const Vec2& start, const Vec2& end, const Vec4& color, float thickness) {
-        Renderer::SubmitQuad((start + end) * 0.5f, atan2(end.y - start.y, end.x - start.x), { (end - start).Length(), thickness }, color, 0);
+        Renderer::SubmitQuad((start + end) * 0.5f, atan2(end.y - start.y, end.x - start.x), { (end - start).Length(), thickness }, color, 0, .99f);
         return { start, end, thickness };
     }
 
     Rect Renderer::DrawRect(const Vec2& position, const Vec2& size, const Vec4& color, const float rotationRadians) {
-        Renderer::SubmitQuad(position, rotationRadians, size, color, 0);
+        Renderer::SubmitQuad(position, rotationRadians, size, color, 0, .99f);
         return { position, size, rotationRadians };
     }
 
@@ -810,7 +804,7 @@ namespace Engine {
                 {0.0f, 1.0f}
             };
             Vec4 transformedPos = transform * Vec4(quadPositions[i].x, quadPositions[i].y, 0.0f, 1.0f);
-            s_Data->VertexBufferPtr->Position = { transformedPos.x, transformedPos.y };
+            s_Data->VertexBufferPtr->Position = { transformedPos.x, transformedPos.y, 0 };
             s_Data->VertexBufferPtr->Color = color;
             s_Data->VertexBufferPtr->TexCoord = texCoords[i];
             s_Data->VertexBufferPtr->TexID = texSlot;

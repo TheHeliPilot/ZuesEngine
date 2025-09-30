@@ -2,28 +2,36 @@
 #include <atomic>
 #include <string>
 #include <filesystem>
+#include <mutex>
 
 namespace Engine {
+
+    // FIX 1: Define the BuildParams struct here so the compiler knows the type
+    struct BuildParams {
+        bool PlayOnFinish;
+    };
 
     // Structure to hold runtime project information
     struct Project {
         std::string Name;
         std::filesystem::path RootPath;
         std::filesystem::path ConfigFilePath;
-        // NEW: Store the absolute path to the Engine's public headers
         std::filesystem::path EngineIncludePath;
-        // Add other metadata later (e.g., startScenePath, assetDirectory)
     };
 
     class ProjectManager final {
     public:
+        // Existing static members
+        static const std::string ENGINE_INCLUDE_KEY;
+
         // Existing API
         static bool OpenOrCreate(const std::filesystem::path& projectPath);
         static Project* GetCurrent() { return s_CurrentProject; }
-        static bool BuildProject(); // synchronous version
 
-        // --- New async API ---
-        static bool BuildProjectAsync(); // starts async build
+        // FIX 2: Corrected Build function signatures to include the bool parameter
+        static bool BuildProject(bool playOnFinish = false);
+        static bool BuildProjectAsync(bool playOnFinish = false);
+        static bool IsBuilding() { return s_IsBuilding; } // Helper for checking build status
 
     private:
         static Project* s_CurrentProject;
@@ -33,9 +41,12 @@ namespace Engine {
         static bool LoadExistingProject(const std::filesystem::path& projectPath);
 
         // --- New members for async build ---
-        static void BuildProjectThread();             // the actual thread function
-        static std::atomic<bool> s_IsBuilding;       // true if a build is in progress
-        static std::mutex s_BuildMutex;              // protects starting new builds
+        static void BuildProjectThread();
+        static std::atomic<bool> s_IsBuilding;
+        static std::mutex s_BuildMutex;
+
+        // CRITICAL FIX 3: Declaration of the static member used for async parameters
+        static BuildParams s_BuildParams;
     };
 
 }

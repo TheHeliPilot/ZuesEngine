@@ -49,7 +49,21 @@ public:
 template<typename T>
 class ComponentArray : public IComponentArray {
 public:
+    // The raw data vector (must remain public for serialization helpers)
     std::vector<T> data;
+
+    // FIX 1: Add Get() method for assignment in World::AddComponent
+    T& Get(size_t index) {
+        if (index >= data.size()) {
+            throw std::out_of_range("Component index out of bounds on Get().");
+        }
+        return data[index];
+    }
+
+    // FIX 2: Add GetData() for direct pointer access by RenderingSystem
+    T* GetData() {
+        return data.data();
+    }
 
     void RemoveComponent(size_t index) override {
         // Swap-and-Pop: Copy the last element over the one being removed
@@ -69,11 +83,10 @@ public:
         data.emplace_back();
     }
 
-    T& Get(size_t index) {
-        return data[index];
-    }
-
     void* GetVoidPtr(size_t index) override {
+        if (index >= data.size()) {
+            throw std::out_of_range("Component index out of bounds.");
+        }
         return static_cast<void*>(&data[index]);
     }
 };

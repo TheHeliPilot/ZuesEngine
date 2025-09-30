@@ -13,6 +13,7 @@ namespace Engine {
 
     // Use aliases to simplify access within the Renderer namespace
     using Vec2 = Math::Vec2;
+    using Vec3 = Math::Vec3;
     using Vec4 = Math::Vec4;
     using Mat4 = Math::Mat4;
 
@@ -70,6 +71,9 @@ namespace Engine {
             uint32_t textureID // OpenGL texture handle (0 for pure color/white)
         );
 
+        static void SubmitQuad(const Vec2 &position, float rotation, const Vec2 &size, const Vec4 &color, uint32_t textureID,
+                               float z);
+
         // --- Camera Management ---
 
         // Fix: Added the rotationRadians parameter to the declaration.
@@ -121,7 +125,7 @@ namespace Engine {
 
         // 2D Vertex Structure for Batching
         struct Vertex {
-            Vec2 Position; // Engine::Math::Vec2
+            Vec3 Position; // Engine::Math::Vec3
             Vec4 Color;    // Engine::Math::Vec4
             Vec2 TexCoord; // Engine::Math::Vec2
             float TexID;   // Texture slot index (0.0 to 31.0)

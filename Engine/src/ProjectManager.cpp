@@ -6,32 +6,34 @@
 #include <cstdlib> // Required for std::system
 #include <vector>
 #include <filesystem>
-#include <string> // For std::string::find and replace
+#include <string>
 #include <thread>
+#include <atomic>
+#include <mutex> // Necessary since std::mutex is now used in the cpp
 
 namespace Engine {
-    // Initialize static members
+    // Initialize static members (All declared in the fixed header)
     Project* ProjectManager::s_CurrentProject = nullptr;
     const std::string ProjectManager::CONFIG_FILE_NAME = "project.zues";
-    const std::string ENGINE_INCLUDE_KEY = "EngineIncludePath="; // Key used in the config file
+    const std::string ProjectManager::ENGINE_INCLUDE_KEY = "EngineIncludePath=";
 
-    std::atomic<bool> Engine::ProjectManager::s_IsBuilding = false;
-    std::mutex Engine::ProjectManager::s_BuildMutex;
+    std::atomic<bool> ProjectManager::s_IsBuilding = false;
+    std::mutex ProjectManager::s_BuildMutex;
 
-    // --- Helper 1: Dynamically calculate Engine Include Path ---
+    // CRITICAL FIX 4: Initialization of the static member s_BuildParams
+    BuildParams ProjectManager::s_BuildParams;
+
+
+    // --- Helper 1: Dynamically calculate Engine Include Path --- (UNCHANGED)
     std::filesystem::path CalculateEngineIncludePath() {
         try {
             std::filesystem::path currentPath = std::filesystem::current_path();
-            // CWD -> .../Editor/cmake-build-debug
-            // ZuesEngine Root -> currentPath.parent_path().parent_path()
             std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
             std::filesystem::path engineIncludePath = zuesEngineRoot / "Engine/include/Engine";
 
             if (!std::filesystem::exists(engineIncludePath)) {
                 LOG_WARN("Warning: Calculated Engine Include Path does not exist: " + engineIncludePath.string());
             }
-
-            // Ensure the path is absolute for CMake's -D argument
             return std::filesystem::absolute(engineIncludePath);
 
         } catch (const std::exception& e) {
@@ -48,8 +50,9 @@ namespace Engine {
         std::ifstream inFile(configPath);
         std::string line;
         while (std::getline(inFile, line)) {
-            if (line.rfind(ENGINE_INCLUDE_KEY, 0) == 0) {
-                lines.push_back(ENGINE_INCLUDE_KEY + newPath.string());
+            // FIX 5: Use ProjectManager::ENGINE_INCLUDE_KEY for scope resolution
+            if (line.rfind(ProjectManager::ENGINE_INCLUDE_KEY, 0) == 0) {
+                lines.push_back(ProjectManager::ENGINE_INCLUDE_KEY + newPath.string());
                 keyFound = true;
             } else {
                 lines.push_back(line);
@@ -58,7 +61,8 @@ namespace Engine {
         inFile.close();
 
         if (!keyFound) {
-            lines.push_back(ENGINE_INCLUDE_KEY + newPath.string());
+            // FIX 6: Use ProjectManager::ENGINE_INCLUDE_KEY
+            lines.push_back(ProjectManager::ENGINE_INCLUDE_KEY + newPath.string());
         }
 
         std::ofstream outFile(configPath, std::ios::trunc);
@@ -70,7 +74,7 @@ namespace Engine {
     }
     // ---------------------------------------------------------
 
-    // --- Core Project Management Logic ---
+    // --- Core Project Management Logic --- (UNCHANGED)
 
     bool ProjectManager::OpenOrCreate(const std::filesystem::path& projectPath) {
         if (s_CurrentProject) {
@@ -106,11 +110,9 @@ namespace Engine {
         return true;
     }
 
-    // --- Project Creation (with File Generation) ---
-
     bool ProjectManager::CreateNewProject(const std::filesystem::path& projectPath) {
         try {
-            // 1. Create Directories
+            // 1. Create Directories (UNCHANGED)
             if (!std::filesystem::create_directories(projectPath) && !std::filesystem::exists(projectPath)) {
                 LOG_ERROR("Failed to create project root directory: " + projectPath.string());
                 return false;
@@ -124,8 +126,7 @@ namespace Engine {
             std::filesystem::create_directory(sourcePath);
             std::filesystem::create_directory(projectPath / "Builds");
 
-
-            // 2. Calculate Engine Path
+            // 2. Calculate Engine Path (UNCHANGED)
             std::filesystem::path currentEngineIncludePath = CalculateEngineIncludePath();
             if (currentEngineIncludePath.empty()) return false;
 
@@ -133,16 +134,14 @@ namespace Engine {
             std::filesystem::path configPath = projectPath / CONFIG_FILE_NAME;
             std::ofstream configFile(configPath);
             configFile << "Name=" << projectName << "\n";
-            configFile << ENGINE_INCLUDE_KEY << currentEngineIncludePath.string() << "\n";
+            // FIX 7: Use ProjectManager::ENGINE_INCLUDE_KEY
+            configFile << ProjectManager::ENGINE_INCLUDE_KEY << currentEngineIncludePath.string() << "\n";
             configFile.close();
 
-            // 4. Create main C++ source file (MyGameProject.cpp)
+            // 4. Create main C++ source file (UNCHANGED)
             std::filesystem::path mainCppPath = sourcePath / (projectName + ".cpp");
-
-            // --- NEW: Read C++ Template File and perform substitution ---
             std::filesystem::path currentPath = std::filesystem::current_path();
             std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
-            // Assuming the template is located in Editor/Templates/GameProject.cpp.template
             std::filesystem::path cppTemplatePath = zuesEngineRoot / "Editor/Templates/GameProject.cpp.template";
 
             if (!std::filesystem::exists(cppTemplatePath)) {
@@ -156,25 +155,21 @@ namespace Engine {
             std::string mainTemplate = buffer.str();
             templateFile.close();
 
-            // Perform String Substitution: Replace placeholder with the actual project name
             const std::string placeholder = "{{PROJECT_NAME}}";
             size_t pos = 0;
             while ((pos = mainTemplate.find(placeholder, pos)) != std::string::npos) {
                 mainTemplate.replace(pos, placeholder.length(), projectName);
-                pos += projectName.length(); // Advance past the replacement
+                pos += projectName.length();
             }
 
             std::ofstream mainCppFile(mainCppPath);
             mainCppFile << mainTemplate;
             mainCppFile.close();
-            // --- END Template Reading/Substitution ---
 
-
-            // 5. Create Project CMakeLists.txt (Content is still hardcoded as it's engine logic)
+            // 5. Create Project CMakeLists.txt (UNCHANGED)
             std::filesystem::path cmakePath = sourcePath / "CMakeLists.txt";
             std::ofstream cmakeFile(cmakePath);
 
-            // CMake Template (UNCHANGED from your last request)
             std::stringstream cmakeTemplate;
             cmakeTemplate << "# Project-specific CMakeLists.txt for " << projectName << "\n";
             cmakeTemplate << "cmake_minimum_required(VERSION 3.10)\n";
@@ -189,7 +184,6 @@ namespace Engine {
             cmakeTemplate << "# Create the executable\n";
             cmakeTemplate << "add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SOURCES})\n\n";
 
-            // --- CMake Include Directories ---
             cmakeTemplate << "# Engine headers are provided via the ENGINE_INCLUDE_DIR CMake argument.\n";
             cmakeTemplate << "if(NOT ENGINE_INCLUDE_DIR)\n";
             cmakeTemplate << "    message(FATAL_ERROR \"ENGINE_INCLUDE_DIR is not defined. The game project cannot find Engine headers.\")\n";
@@ -205,7 +199,6 @@ namespace Engine {
             cmakeTemplate << "    ${GLAD_INCLUDE_DIR}\n";
             cmakeTemplate << ")\n\n";
 
-            // --- CRITICAL LINKER FIX: Link directly to all library file paths ---
             cmakeTemplate << "# Absolute library paths provided via the ENGINE_LIBS_PATHS CMake argument.\n";
             cmakeTemplate << "if(NOT ENGINE_LIBS_PATHS)\n";
             cmakeTemplate << "    message(FATAL_ERROR \"ENGINE_LIBS_PATHS is not defined. The game project cannot find Engine library files.\")\n";
@@ -213,10 +206,10 @@ namespace Engine {
 
             cmakeTemplate << "target_link_libraries(${PROJECT_NAME} PRIVATE\n";
             cmakeTemplate << "    \"${ENGINE_LIBS_PATHS}\"\n";
-            cmakeTemplate << "    opengl32\n";    // Windows OpenGL
-            cmakeTemplate << "    Ws2_32\n";      // Windows Sockets (for ENet)
-            cmakeTemplate << "    Gdi32\n";       // Windows Graphics
-            cmakeTemplate << "    winmm\n";       // Windows Multimedia (for GLFW)
+            cmakeTemplate << "    opengl32\n";
+            cmakeTemplate << "    Ws2_32\n";
+            cmakeTemplate << "    Gdi32\n";
+            cmakeTemplate << "    winmm\n";
             cmakeTemplate << ")\n\n";
 
             cmakeTemplate << "set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}/../Builds\")\n";
@@ -224,7 +217,7 @@ namespace Engine {
             cmakeFile << cmakeTemplate.str();
             cmakeFile.close();
 
-            // 6. Instantiate the new current project object
+            // 6. Instantiate the new current project object (UNCHANGED)
             s_CurrentProject = new Project{
                 .Name = projectName,
                 .RootPath = projectPath,
@@ -241,9 +234,11 @@ namespace Engine {
         }
     }
 
-    // --- Build Logic (UNCHANGED) ---
 
-    bool ProjectManager::BuildProject() {
+    // --- Build Logic (UNCHANGED from previous fix) ---
+
+    // FIX 8: Correct signature (BuildProject(bool))
+    bool ProjectManager::BuildProject(bool playOnFinish) {
         if (!s_CurrentProject) {
             LOG_WARN("Cannot build: No project is currently loaded.");
             return false;
@@ -261,29 +256,25 @@ namespace Engine {
 
         const std::string engineIncludePath = s_CurrentProject->EngineIncludePath.string();
 
-        // --- Calculate ALL Paths ---
+        // Calculate ALL Paths (UNCHANGED)
         std::filesystem::path currentPath = std::filesystem::current_path();
         std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
         std::filesystem::path engineRoot = zuesEngineRoot / "Engine";
 
-        // 1. External Include Paths (NEW)
         std::filesystem::path glfwIncludeDir = engineRoot / "extern/glfw/include";
         std::filesystem::path gladIncludeDir = engineRoot / "extern/glad/include";
 
-        // 2. Library File Paths (CRITICAL FIXES)
         std::filesystem::path engineLib = engineRoot / "cmake-build-debug/libEngine.a";
         std::filesystem::path glfwLib = engineRoot / "extern/glfw/cmake-build-debug/src/libglfw3.a";
         std::filesystem::path gladLib = engineRoot / "extern/glad/cmake-build-debug/libglad.a";
-        std::filesystem::path enetLib = engineRoot / "extern/enet/cmake-build-debug/libenet.a"; // Fixed ENet path
+        std::filesystem::path enetLib = engineRoot / "extern/enet/cmake-build-debug/libenet.a";
 
-        // Combine ALL library file paths into a single semicolon-separated string
         const std::string engineLibPaths = engineLib.string() + ";"
                                          + glfwLib.string() + ";"
                                          + gladLib.string() + ";"
                                          + enetLib.string();
-        // -----------------------------------------------------------------------------
 
-        // 1. Create and clean the temporary build directory
+        // 1. Create and clean the temporary build directory (UNCHANGED)
         try {
             if (std::filesystem::exists(tempBuildDir)) {
                 LOG_INFO("Cleaning temporary build directory: " + tempBuildDir.string());
@@ -295,9 +286,9 @@ namespace Engine {
             return false;
         }
 
-        LOG_INFO("--- Starting Project Build: " + projectName + " ---");
+        LOG_INFO("--- Starting Project Build: " + projectName + " (Play on Finish: " + (playOnFinish ? "Yes" : "No") + ") ---");
 
-        // 2. CMake Configure Step: Pass ALL Include and Library Paths
+        // 2. CMake Configure Step (UNCHANGED)
         std::string cmakeConfigureCommand =
              "cmake -S \"" + projectSourceDir.string() + "\" -B \"" + tempBuildDir.string() + "\""
              + " -DENGINE_INCLUDE_DIR=\"" + engineIncludePath + "\""
@@ -313,7 +304,7 @@ namespace Engine {
             return false;
         }
 
-        // 3. CMake Build Step
+        // 3. CMake Build Step (UNCHANGED)
         std::string cmakeBuildCommand =
              "cmake --build \"" + tempBuildDir.string() + "\" --target " + projectName + " --config Release";
 
@@ -321,11 +312,24 @@ namespace Engine {
 
         result = std::system(cmakeBuildCommand.c_str());
 
-        const std::string buildOutPath = (projectRoot / "Builds" / (projectName + ".exe")).string();
+        const std::filesystem::path buildOutPath = projectRoot / "Builds" / (projectName + ".exe");
+        const std::string buildOutPathStr = buildOutPath.string();
 
         if (result == 0) {
             LOG_INFO("Project built successfully! 🎉");
-            LOG_INFO("Executable Location: " + buildOutPath);
+            LOG_INFO("Executable Location: " + buildOutPathStr);
+
+            // 4. Play on Finish Logic (NEW)
+            if (playOnFinish) {
+                if (std::filesystem::exists(buildOutPath)) {
+                    LOG_INFO("Starting executable: " + buildOutPathStr);
+                    std::string runCommand = "start \"\" \"" + buildOutPathStr + "\"";
+                    std::system(runCommand.c_str());
+                } else {
+                    LOG_ERROR("Could not find executable to run: " + buildOutPathStr);
+                }
+            }
+
             return true;
         } else {
             LOG_ERROR("Project build failed: Compilation step returned a non-zero exit code. Check console for CMake/Compiler errors.");
@@ -333,7 +337,8 @@ namespace Engine {
         }
     }
 
-    bool Engine::ProjectManager::BuildProjectAsync() {
+    // FIX 9: Correct signature (BuildProjectAsync(bool))
+    bool ProjectManager::BuildProjectAsync(bool playOnFinish) {
         std::lock_guard<std::mutex> lock(s_BuildMutex);
         if (s_IsBuilding) {
             LOG_WARN("Build already in progress.");
@@ -345,23 +350,27 @@ namespace Engine {
             return false;
         }
 
+        // Store the parameter for the static thread function to access
+        ProjectManager::s_BuildParams.PlayOnFinish = playOnFinish;
+
         s_IsBuilding = true;
-        std::thread(BuildProjectThread).detach(); // run build in background
+        std::thread(BuildProjectThread).detach();
         return true;
     }
 
-    void Engine::ProjectManager::BuildProjectThread() {
-        // Call the synchronous build
-        const bool success = BuildProject();
+    // FIX 10: Correct BuildProject call in thread function
+    void ProjectManager::BuildProjectThread() {
+        // Retrieve the stored parameter
+        const bool playOnFinish = ProjectManager::s_BuildParams.PlayOnFinish;
 
-        // Build is done, release the lock so another build can be started
+        // Call the synchronous build with the parameter
+        const bool success = BuildProject(playOnFinish);
+
         s_IsBuilding = false;
 
-        // Optional: log final status
         if (success)
             LOG_INFO("Asynchronous build finished successfully!");
         else
             LOG_ERROR("Asynchronous build finished with errors.");
     }
-
 }

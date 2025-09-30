@@ -9,13 +9,13 @@
 #include "Types.h"
 #include "EngineDefines.h"
 #include "Network.h"
-#include "Network.h"
 #include "EventSystem/EventSystem.h"
 #include "EventSystem/Events.h"
 #include "SceneSetup.h"
 #include "ECS/Systems/Systems.h"
 #include "ProjectManager.h"
 #include "HitTest.h"
+#include "../stb/stb_image.h"
 
 namespace Engine {
     extern EventSystem* IEventSystem;

@@ -3,15 +3,15 @@
 #include <memory>
 #include <cmath> // For converting degrees to radians if needed later
 
-#include "ECS/Components.h"
 #include "ECS/World.h"
+#include "ECS/Components.h"
 
 namespace Engine {
     // A hypothetical function to set up the game world
     inline void SetupSimpleScene(World* world, const uint32_t textureHandle) {
 
 
-        EntityID cameraEntity = world->CreateEntity();
+        const EntityID cameraEntity = world->CreateEntity();
         world->AddComponent<PositionComponent>(cameraEntity, {
             .position = {0.0f, 0.0f}, // Center the camera at world origin
             .rotation = 0.0f
@@ -35,6 +35,8 @@ namespace Engine {
             .textureID = 0,
             .size = {1,1},
             .color = {1,1,1,1},
+            .layer = 0,
+            .sortOrder = 0
         });
 
     }

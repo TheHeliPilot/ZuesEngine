@@ -9,11 +9,6 @@
 #include "Log.h" // For LogLevel
 #include "Math.h"
 
-// Forward declarations
-namespace Engine {
-    class World; // If needed later for system integration
-}
-
 namespace EditorWindows
 {
     class EditorUi final {
@@ -22,10 +17,12 @@ namespace EditorWindows
         static Engine::Math::Vec2 viewportMousePos;
         static Engine::Math::Vec2 viewportSize;
 
+        static void HandleWindowResize();
+
         static void DrawWindowUi();
 
         // NEW: Function to initiate a manual project build
-        static void BuildProject();
+        static void BuildProject(bool play);
 
         static inline Engine::Math::Vec2 FromImVec2(const ImVec2& v) {
             return { v.x, v.y };

@@ -100,7 +100,9 @@ public:
     template<typename... TArgs>
     void QueryAndRun(SystemBase<TArgs...>* system, float deltaTime);
 
-
+    const std::unordered_map<ComponentSignature, std::unique_ptr<Archetype>>& GetArchetypes() const {
+        return archetypes;
+    }
 private:
     std::vector<EntityData> entityLookup;
     std::vector<EntityIndex> freeIndices;

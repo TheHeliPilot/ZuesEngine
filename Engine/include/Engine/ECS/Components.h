@@ -22,9 +22,12 @@ struct SpriteComponent {
     uint32_t textureID = 0;
     Engine::Math::Vec2 size = {1.0f, 1.0f};
     Engine::Math::Vec4 color = {1.0f, 1.0f, 1.0f, 1.0f};
+    // NEW: Fields for Z-Ordering
+    int layer = 0;      // Primary sorting key (e.g., Background=0, Default=1, UI=2)
+    int sortOrder = 0;  // Secondary sorting key within a layer (for elements on the same layer)
 };
-// Add serialization for SpriteComponent (Fixes your compilation error for this type)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteComponent, textureID, size, color)
+// Update serialization for SpriteComponent
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteComponent, textureID, size, color, layer, sortOrder)
 
 
 // 3. Camera Component
@@ -32,9 +35,9 @@ struct CameraComponent {
     float zoom = 1.0f;
     float halfHeight = 10.0f;
     Engine::Math::Vec4 backgroundColor = {0.1f, 0.1f, 0.1f, 1.0f};
-    bool isActive = true;
+    bool isActive = false;
 };
-// Add serialization for CameraComponent (Fixes your compilation error for this type)
+// Add serialization for CameraComponent
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraComponent, zoom, halfHeight, backgroundColor, isActive)
 
 

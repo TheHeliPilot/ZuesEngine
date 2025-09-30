@@ -1,3 +1,0 @@
-C:/Users/bucka/CLionProjects/ZuesEngine/MyGameProject/TempBuild/CMakeFiles/MyGameProject.dir
-C:/Users/bucka/CLionProjects/ZuesEngine/MyGameProject/TempBuild/CMakeFiles/edit_cache.dir
-C:/Users/bucka/CLionProjects/ZuesEngine/MyGameProject/TempBuild/CMakeFiles/rebuild_cache.dir
