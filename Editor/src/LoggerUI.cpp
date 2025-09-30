@@ -2,6 +2,7 @@
 #include "imgui.h"
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include "imgui.h"
 
 
@@ -12,7 +13,14 @@ std::vector<Engine::LogEvent> infoLogs;
 std::vector<Engine::LogEvent> warningLogs;
 std::vector<Engine::LogEvent> errorLogs;
 
+bool collapsed = false;
 bool autoScroll = true;        // Auto-scroll toggle
+
+struct LogInfo
+{
+    int count = 0;
+    Engine::LogEvent event;
+};
 
 void LoggerUI::GetLogEvent(const Engine::LogEvent& event) {
     allLogs.emplace_back(event);
@@ -24,8 +32,31 @@ void LoggerUI::GetLogEvent(const Engine::LogEvent& event) {
         infoLogs.emplace_back(event);
 }
 
+std::unordered_map<std::string, LogInfo> CreateCollapsedLogsMap()
+{
+    std::unordered_map<std::string, LogInfo> collapsedLogs;
+
+    for (const auto& log : allLogs)
+    {
+        if (collapsedLogs.contains(log.message))
+        {
+            if (log.file == collapsedLogs.at(log.message).event.file && log.line == collapsedLogs.at(log.message).event.line)
+            {
+                collapsedLogs.at(log.message).count++;
+            }
+            else
+                collapsedLogs.emplace(log.message, LogInfo{1, log});
+        }
+        else
+            collapsedLogs.emplace(log.message, LogInfo{1, log});
+    }
+
+    return collapsedLogs;
+}
+
 void LoggerUI::LoggerWindow()
 {
+    LOG_INFO("BANAN");
     static bool toggleState[3] = { true, true, true }; // Info, Warning, Error
 
     ImGui::Begin("Logger");
@@ -40,6 +71,8 @@ void LoggerUI::LoggerWindow()
     }
     ImGui::SameLine();
     ImGui::Checkbox("Auto-scroll", &autoScroll);
+    ImGui::SameLine();
+    ImGui::Checkbox("Collapsed", &collapsed);
 
     // --- Toggle Buttons ---
     ImGui::SameLine(0, 50.0f);
@@ -62,64 +95,114 @@ void LoggerUI::LoggerWindow()
     ImGui::SameLine(0, 10.0f);
     DrawToggleButton("Error", errorLogs.size(), toggleState[2], HexToImVec4("#3D2F2F"));
 
-
     ImGui::Separator();
 
     // --- Body / Log Output ---
     ImGui::BeginChild("LogScrollRegion", ImVec2(0,0), true, ImGuiWindowFlags_HorizontalScrollbar);
 
     int id = 0;
-    for (const auto& log : allLogs)
+    if (!collapsed)
     {
-        if ((log.logLevel == LOGLEVEL_INFO && toggleState[0]) ||
-            (log.logLevel == LOGLEVEL_WARN && toggleState[1]) ||
-            (log.logLevel == LOGLEVEL_ERR && toggleState[2]))
+        for (const auto& log : allLogs)
         {
-            // --- Colors ---
-            ImVec4 timeColor  = ImVec4(0.85f, 0.85f, 0.85f, 1.0f); // grey timestamp
-            ImVec4 msgColor   = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);    // white message
-            ImVec4 levelColor;
-            std::string levelStr;
-            switch (log.logLevel)
+            if ((log.logLevel == LOGLEVEL_INFO && toggleState[0]) ||
+                (log.logLevel == LOGLEVEL_WARN && toggleState[1]) ||
+                (log.logLevel == LOGLEVEL_ERR && toggleState[2]))
             {
-                case LOGLEVEL_INFO:  levelColor = ImVec4(0.5f, 1.0f, 0.5f, 1.0f); levelStr = "INFO"; break;
-                case LOGLEVEL_WARN:  levelColor = ImVec4(1.0f, 0.8f, 0.3f, 1.0f); levelStr = "WARN"; break;
-                case LOGLEVEL_ERR:   levelColor = ImVec4(1.0f, 0.3f, 0.3f, 1.0f); levelStr = "ERROR"; break;
-                default: levelColor = ImVec4(1,1,1,1); levelStr = "INFO"; break;
-            }
-
-            // --- Timestamp ---
-            auto t = std::chrono::system_clock::to_time_t(log.timestamp);
-            std::tm tm = *std::localtime(&t);
-            char timeBuf[16];
-            std::strftime(timeBuf, sizeof(timeBuf), "%H:%M:%S", &tm);
-
-            // --- Clickable log line ---
-            ImGui::TextColored(timeColor, "[%s] ", timeBuf);
-            ImGui::SameLine(0, 0);
-            ImGui::TextColored(levelColor, "[%s] ", levelStr.c_str());
-            ImGui::SameLine(0, 0);
-
-            ImGui::Selectable((log.message + "###log" + std::to_string(id)).c_str(), false, 0, ImVec2(0,0));
-
-            // Only open editor on double-click
-            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) // 0 = left mouse button
-            {
-                // Example: open in VS Code
-                if (!log.file.empty())
+                // --- Colors ---
+                ImVec4 timeColor  = ImVec4(0.85f, 0.85f, 0.85f, 1.0f); // grey timestamp
+                ImVec4 levelColor;
+                std::string levelStr;
+                switch (log.logLevel)
                 {
-                    //CLION
-                    //std::string cmd = "clion --line " + std::to_string(log.line) + " \"" + log.file + "\"";
-                    //VS CODE:
-                    std::string cmd = "code -g \"" + log.file + "\":" + std::to_string(log.line);
-                    //VS
-                    //std::string cmd = "devenv /edit \"" + log.file + "\" /command \"Edit.GoTo " + std::to_string(log.line) + "\"";
-                    system(cmd.c_str());
+                    case LOGLEVEL_INFO:  levelColor = ImVec4(0.5f, 1.0f, 0.5f, 1.0f); levelStr = "INFO"; break;
+                    case LOGLEVEL_WARN:  levelColor = ImVec4(1.0f, 0.8f, 0.3f, 1.0f); levelStr = "WARN"; break;
+                    case LOGLEVEL_ERR:   levelColor = ImVec4(1.0f, 0.3f, 0.3f, 1.0f); levelStr = "ERROR"; break;
+                    default: levelColor = ImVec4(1,1,1,1); levelStr = "INFO"; break;
+                }
+
+                // --- Timestamp ---
+                auto t = std::chrono::system_clock::to_time_t(log.timestamp);
+                std::tm tm = *std::localtime(&t);
+                char timeBuf[16];
+                std::strftime(timeBuf, sizeof(timeBuf), "%H:%M:%S", &tm);
+
+                // --- Clickable log line ---
+                ImGui::TextColored(timeColor, "[%s] ", timeBuf);
+                ImGui::SameLine(0, 0);
+                ImGui::TextColored(levelColor, "[%s] ", levelStr.c_str());
+                ImGui::SameLine(0, 0);
+
+                ImGui::Selectable((log.message + "###log" + std::to_string(id)).c_str(), false, 0, ImVec2(0,0));
+
+                // Only open editor on double-click
+                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) // 0 = left mouse button
+                {
+                    // Example: open in VS Code
+                    if (!log.file.empty())
+                    {
+                        //CLION
+                        //std::string cmd = "clion --line " + std::to_string(log.line) + " \"" + log.file + "\"";
+                        //VS CODE:
+                        std::string cmd = "code -g \"" + log.file + "\":" + std::to_string(log.line);
+                        //VS
+                        //std::string cmd = "devenv /edit \"" + log.file + "\" /command \"Edit.GoTo " + std::to_string(log.line) + "\"";
+                        system(cmd.c_str());
+                    }
                 }
             }
+            id++;
         }
-        id++;
+    } else
+    {
+        std::unordered_map<std::string, LogInfo> collapsedLogs = CreateCollapsedLogsMap();
+
+        for (const auto& log : collapsedLogs)
+        {
+             if ((log.second.event.logLevel == LOGLEVEL_INFO && toggleState[0]) ||
+                (log.second.event.logLevel == LOGLEVEL_WARN && toggleState[1]) ||
+                (log.second.event.logLevel == LOGLEVEL_ERR && toggleState[2]))
+            {
+                // --- Colors ---
+                ImVec4 timeColor  = ImVec4(0.85f, 0.85f, 0.85f, 1.0f); // grey timestamp
+                ImVec4 levelColor;
+                std::string levelStr;
+                switch (log.second.event.logLevel)
+                {
+                    case LOGLEVEL_INFO:  levelColor = ImVec4(0.5f, 1.0f, 0.5f, 1.0f); levelStr = "INFO"; break;
+                    case LOGLEVEL_WARN:  levelColor = ImVec4(1.0f, 0.8f, 0.3f, 1.0f); levelStr = "WARN"; break;
+                    case LOGLEVEL_ERR:   levelColor = ImVec4(1.0f, 0.3f, 0.3f, 1.0f); levelStr = "ERROR"; break;
+                    default: levelColor = ImVec4(1,1,1,1); levelStr = "INFO"; break;
+                }
+
+                // --- Clickable log line ---
+                ImGui::TextColored(timeColor, "[%d] ", log.second.count);
+                ImGui::SameLine(0, 0);
+                ImGui::TextColored(levelColor, "[%s] ", levelStr.c_str());
+                ImGui::SameLine(0, 0);
+
+                ImGui::Selectable((log.first + "###log" + std::to_string(id)).c_str(), false, 0, ImVec2(0,0));
+
+                // Only open editor on double-click
+                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) // 0 = left mouse button
+                {
+                    // Example: open in VS Code
+                    if (!log.second.event.file.empty())
+                    {
+                        //CLION
+                        //std::string cmd = "clion --line " + std::to_string(log.line) + " \"" + log.file + "\"";
+                        //VS CODE:
+                        std::string cmd = "code -g \"" + log.second.event.file + "\":" + std::to_string(log.second.event.line);
+                        //VS
+                        //std::string cmd = "devenv /edit \"" + log.file + "\" /command \"Edit.GoTo " + std::to_string(log.line) + "\"";
+                        system(cmd.c_str());
+                    }
+                }
+            }
+            id++;
+        }
     }
+
 
     // Auto-scroll
     if (autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
