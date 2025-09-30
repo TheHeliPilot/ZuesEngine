@@ -257,9 +257,9 @@ int main() {
     glfwSwapInterval(0); // vsync
 
     GLFWimage icon;
-    icon.pixels = stbi_load("../icons/ZuesLogoNoBG.png", &icon.width, &icon.height, nullptr, 4);
+    icon.pixels = stbi_load("icons/ZuesLogoNoBG.png", &icon.width, &icon.height, nullptr, 4);
     if (!icon.pixels) {
-        LOG_ERROR("Failed to load icon: ../icons/ZuesLogoNoBG.png");
+        LOG_ERROR("Failed to load icon: icons/ZuesLogoNoBG.png");
         //return -1;
     }
 
@@ -287,9 +287,9 @@ int main() {
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     // --- 1. Load Main Font (Exo2) ---
-    ImFont* exo2Font = io.Fonts->AddFontFromFileTTF("../fonts/Exo2-VariableFont_wght.ttf", 18.0f);
+    ImFont* exo2Font = io.Fonts->AddFontFromFileTTF("fonts/Exo2-VariableFont_wght.ttf", 18.0f);
     if (!exo2Font) LOG_ERROR("Failed to load Exo2 font to Editor!");
-    uint32_t engineFont = Engine::Renderer::LoadFont("../fonts/Exo2-VariableFont_wght.ttf", 18);
+    uint32_t engineFont = Engine::Renderer::LoadFont("fonts/Exo2-VariableFont_wght.ttf", 18);
 
     // --- 2. Load Icon Font (IconLibs.ttf / EngineerFont) ---
     // The EngineerFont glyphs are typically in the 0xF800 to 0xF8FF range.
@@ -305,7 +305,7 @@ int main() {
 
     // Load and merge the icon font
     ImFont* mergedFont = io.Fonts->AddFontFromFileTTF(
-        "../fonts/IconLibs.ttf",
+        "fonts/IconLibs.ttf",
         18.0f, // Size must match the size of the main font (exo2Font)
         &icons_config,
         icons_ranges
