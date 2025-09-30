@@ -19,7 +19,6 @@ It features a fast renderer, an intuitive editor UI, and networking support for 
 ZeusEngine/<br>
 ├── Engine/      # Core engine library  
 ├── Editor/      # Editor application  
-├── GameApp/     # Example game using the engine  
 
 ---
 
