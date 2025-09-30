@@ -96,7 +96,7 @@ uint32_t LoadTextureFromFile(const char* filepath) {
     return texture_id;
 }
 // ========================================================================================
-// DRAW CUSTOM TITLE BAR - MODIFIED FOR ICONS
+// DRAW CUSTOM TITLE BAR - MODIFIED FOR ABSOLUTE CENTERING AND FIXED LEFT CLAMP
 // ========================================================================================
 static void DrawCustomTitleBar() {
     constexpr float title_bar_height = 35.0f;
@@ -264,50 +264,55 @@ static void DrawCustomTitleBar() {
         ImGui::EndMenuBar();
     }
 
-    float menu_end_x = ImGui::GetCursorPosX();
-
     // --- 3. Build and Play Buttons Control (Image + Text) ---
 
     // Define fixed widths for the two buttons
     constexpr float build_button_width = 100.0f;
     constexpr float play_button_width = 90.0f;
     constexpr float icon_text_spacing = 5.0f; // Spacing between icon and text
-
-    // FIX 2: Increased spacing between Build and Play buttons to 15.0f
     constexpr float control_spacing = 15.0f;
     const float buildControlTotalWidth = build_button_width + play_button_width + control_spacing;
 
-    // Calculate button start position (Center between menu_end_x and control_buttons_start_x)
-    float button_space_start = menu_end_x;
-    float button_space_end = control_buttons_start_x;
-    float build_start_x = button_space_start + ((button_space_end - button_space_start) / 2.0f) - (buildControlTotalWidth / 2.0f);
+    // Margin from Window Controls
+    constexpr float horizontal_margin = 10.0f;
 
-    // Keep it within bounds
-    if (build_start_x < button_space_start) build_start_x = button_space_start;
-    if (build_start_x + buildControlTotalWidth > control_buttons_start_x) {
-        build_start_x = control_buttons_start_x - buildControlTotalWidth;
-    }
+    // --- FIX V3: Absolute Centering with Fixed Left Clamp (Stable) ---
+    // This calculation relies ONLY on the window's total width (winSize.x) and fixed constants,
+    // guaranteeing stability against window movement or ImGui cursor jitter.
+
+    // 1. Calculate the ideal start X to center the block on the entire window width. (Stable)
+    float ideal_center_x = (winSize.x - buildControlTotalWidth) / 2.0f;
+
+    // 2. Define the absolute minimum start X for the buttons using a generous, fixed offset.
+    // This value is stable and prevents overlap with the Menu Bar (even if the menu bar's width calculation jitters).
+    constexpr float ABSOLUTE_MINIMUM_START_X = 450.0f;
+
+    // 3. Clamp the ideal center position: use the centered position UNLESS it overlaps the fixed minimum start point.
+    float build_start_x = std::max(ideal_center_x, ABSOLUTE_MINIMUM_START_X);
+
+    // 4. Also clamp against the right window controls (control_buttons_start_x is stable).
+    float maximum_safe_start_x = control_buttons_start_x - buildControlTotalWidth - horizontal_margin;
+    build_start_x = std::min(build_start_x, maximum_safe_start_x);
+
+    // --- END STABLE CENTERING LOGIC ---
 
     // Position the entire control block
     ImGui::SetCursorPos(ImVec2(build_start_x, 0));
 
     // Common style for the control buttons
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
-    // Use the new control_spacing
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(control_spacing, 0.0f));
 
     const float text_height = ImGui::CalcTextSize("Play").y;
 
-    // FIX 3: Calculate precise vertical positions for icon and text centering.
-    // The icon's top edge (Y start) relative to the button's top edge (Y=0)
-    const float icon_y_start = (title_bar_height - icon_size_xy) / 2.0f;
-    // The text's top edge (Y start) relative to the button's top edge (Y=0)
+    const float icon_size_xy_controls = 16.0f; // Icon size used for Build/Play
+    const float icon_y_start = (title_bar_height - icon_size_xy_controls) / 2.0f;
     const float text_y_start = (title_bar_height - text_height) / 2.0f;
 
     // --- Build Button ---
     // Calculate content width for horizontal centering inside the button
     const float build_text_width = ImGui::CalcTextSize("Build").x;
-    const float build_content_total_width = icon_size_xy + icon_text_spacing + build_text_width;
+    const float build_content_total_width = icon_size_xy_controls + icon_text_spacing + build_text_width;
     const float build_content_start_x_offset = (build_button_width - build_content_total_width) / 2.0f;
 
     // FramePadding here is used vertically to reserve the space required by the icon,
@@ -323,26 +328,24 @@ static void DrawCustomTitleBar() {
 
         // Icon Draw - Y aligned using icon_y_start
         ImGui::SetCursorScreenPos(ImVec2(button_min.x + build_content_start_x_offset, button_min.y + icon_y_start));
-        ImGui::Image((ImTextureID)(intptr_t)build_texture_id, ImVec2(icon_size_xy, icon_size_xy), ImVec2(0, 0), ImVec2(1, 1));
+        ImGui::Image((ImTextureID)(intptr_t)build_texture_id, ImVec2(icon_size_xy_controls, icon_size_xy_controls), ImVec2(0, 0), ImVec2(1, 1));
 
         // Text Draw - Y aligned using text_y_start
         ImGui::SetCursorScreenPos(ImVec2(
-            button_min.x + build_content_start_x_offset + icon_size_xy + icon_text_spacing,
+            button_min.x + build_content_start_x_offset + icon_size_xy_controls + icon_text_spacing,
             button_min.y + text_y_start
         ));
         ImGui::TextUnformatted("Build");
     }
 
     ImGui::SameLine(); // Move cursor for the next button (will use control_spacing from ItemSpacing)
-    // FIX 4: Explicitly reset the vertical cursor position to the top of the title bar (Y=0)
-    // to ensure the next button is perfectly aligned.
     ImGui::SetCursorPosY(0.0f);
 
 
     // --- Play Button ---
     // Calculate content width for horizontal centering inside the button
     const float play_text_width = ImGui::CalcTextSize("Play").x;
-    const float play_content_total_width = icon_size_xy + icon_text_spacing + play_text_width;
+    const float play_content_total_width = icon_size_xy_controls + icon_text_spacing + play_text_width;
     const float play_content_start_x_offset = (play_button_width - play_content_total_width) / 2.0f;
 
     // Use FramePadding to push the content to the center
@@ -357,11 +360,11 @@ static void DrawCustomTitleBar() {
 
         // Icon Draw - Y aligned using icon_y_start
         ImGui::SetCursorScreenPos(ImVec2(button_min.x + play_content_start_x_offset, button_min.y + icon_y_start));
-        ImGui::Image((ImTextureID)(intptr_t)play_texture_id, ImVec2(icon_size_xy, icon_size_xy), ImVec2(0, 0), ImVec2(1, 1));
+        ImGui::Image((ImTextureID)(intptr_t)play_texture_id, ImVec2(icon_size_xy_controls, icon_size_xy_controls), ImVec2(0, 0), ImVec2(1, 1));
 
         // Text Draw - Y aligned using text_y_start
         ImGui::SetCursorScreenPos(ImVec2(
-            button_min.x + play_content_start_x_offset + icon_size_xy + icon_text_spacing,
+            button_min.x + play_content_start_x_offset + icon_size_xy_controls + icon_text_spacing,
             button_min.y + text_y_start
         ));
         ImGui::TextUnformatted("Play");
@@ -369,6 +372,8 @@ static void DrawCustomTitleBar() {
 
     ImGui::PopStyleVar(2); // Pop ItemSpacing and FrameRounding
 
+    // We now fetch the cursor position after the button block for the drag region.
+    // This value is relative to the stable button position, so it should be correct.
     float build_end_x = ImGui::GetCursorPosX();
 
     // --- 4. Drag Region (Unchanged) ---
@@ -388,9 +393,9 @@ static void DrawCustomTitleBar() {
     ImGui::End(); // ##CustomTitleBar
     ImGui::PopStyleVar(2); // Pop WindowPadding, WindowBorderSize
 }
-// ========================================================================================
-// UNMODIFIED FUNCTIONS (For completeness, though they were not modified)
-// ========================================================================================
+
+
+// ... (UNMODIFIED FUNCTIONS) ...
 void EditorUi::HandleWindowResize() {
     if (glfwGetWindowAttrib(g_MainWindow, GLFW_MAXIMIZED)) {
         glfwSetCursor(g_MainWindow, glfwCreateStandardCursor(GLFW_ARROW_CURSOR));
