@@ -625,15 +625,17 @@ namespace Engine {
         return { position, size, rotationRadians };
     }
 
-    Circle Renderer::DrawCircle(const Vec2& center, const float radius, const Vec4& color, const int segments, const bool outlineOnly, const float thickness) {
+    Circle Renderer::DrawCircle(const Vec2& center, const float radius, const Vec4& color,
+                            const int segments, const bool outlineOnly, const float thickness) {
         const float step = 2.0f * 3.14159265f / segments;
         for (int i = 0; i < segments; i++) {
-            Vec2 p0 = center + Vec2(cos(i * step), sin(i * step)) * radius;
-            Vec2 p1 = center + Vec2(cos((i + 1) * step), sin((i + 1) * step)) * radius;
-            DrawLine(p0, p1, color, 0.05f);
+            Vec2 p0 = center + Vec2(std::cos(i * step),     std::sin(i * step))     * radius;
+            Vec2 p1 = center + Vec2(std::cos((i + 1) * step), std::sin((i + 1) * step)) * radius;
+            DrawLine(p0, p1, color, thickness);
         }
         return { center, radius, outlineOnly, thickness };
     }
+
 
     Arrow Renderer::DrawArrow(const Vec2& start, const Vec2& end, const Vec4& color, const float thickness) {
         DrawLine(start, end, color, thickness);
@@ -660,28 +662,39 @@ namespace Engine {
         clip.x /= clip.w;
         clip.y /= clip.w;
 
-        // Convert from NDC [-1,1] to screen space [0, viewportWidth/Height]
         float x = (clip.x * 0.5f + 0.5f) * s_Data->ViewportWidth;
         float y = (clip.y * 0.5f + 0.5f) * s_Data->ViewportHeight;
+
         return { x, y };
     }
+
+    // Renderer.cpp, implementation for ScreenToWorld
 
     Vec2 Renderer::ScreenToWorld(const Vec2& screenPos) {
         if (!s_Data) return {};
 
-        // Screen → NDC
+        // 1. Convert Screen Coordinates (Top-Left origin, Y-down) to NDC (Center origin, Y-up)
+
+        // X-axis: Map [0, Width] -> [-1, 1]
         const float ndcX = (2.0f * screenPos.x) / s_Data->ViewportWidth - 1.0f;
-        const float ndcY = (2.0f * screenPos.y) / s_Data->ViewportHeight - 1.0f;
+
+        // Y-axis: Map [0, Height] (Y-down) to [1, -1] (Y-up) - This is the standard flip
+        const float ndcY = 1.0f - (2.0f * screenPos.y) / s_Data->ViewportHeight;
+
         const Vec4 ndc(ndcX, ndcY, 0.0f, 1.0f);
 
-        // Inverse ViewProjection
+        // 2. Inverse Transform
         const Mat4 inv = s_Data->ViewProjectionMatrix.Inverted();
         Vec4 world = inv * ndc;
+
+        // 3. Perspective Divide
         world.x /= world.w;
         world.y /= world.w;
 
         return { world.x, world.y };
     }
+
+
 
     uint32_t Renderer::LoadFont(const std::string& path, float pixelHeight) {
         // Load file into memory

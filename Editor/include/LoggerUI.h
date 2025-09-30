@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include "imgui.h"
 #include "EventSystem/Events.h"
 
 namespace EditorWindows
@@ -12,6 +13,8 @@ namespace EditorWindows
     public:
         // Logger Window function
         static void LoggerWindow();
+
+        static ImVec4 HexToImVec4(const char *hex);
 
         // Event callback for the LogEvent
         static void GetLogEvent(const Engine::LogEvent& e);

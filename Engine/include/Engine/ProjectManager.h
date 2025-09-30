@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include <atomic>
 #include <string>
 #include <filesystem>
 
@@ -16,23 +17,25 @@ namespace Engine {
 
     class ProjectManager final {
     public:
-        // Attempt to open a project at the given path.
-        // Creates a new project structure and necessary files if none exists.
-        // Returns true on success, false on critical failure.
+        // Existing API
         static bool OpenOrCreate(const std::filesystem::path& projectPath);
-
-        // Accessor for the currently loaded project
         static Project* GetCurrent() { return s_CurrentProject; }
+        static bool BuildProject(); // synchronous version
 
-        // Function to execute the external build process for the current project.
-        // Outputs the executable to [ProjectRoot]/Builds.
-        static bool BuildProject();
+        // --- New async API ---
+        static bool BuildProjectAsync(); // starts async build
 
     private:
-        static Project* s_CurrentProject; // Stores the active project instance
-        static const std::string CONFIG_FILE_NAME; // Name of the file that identifies a project
+        static Project* s_CurrentProject;
+        static const std::string CONFIG_FILE_NAME;
 
         static bool CreateNewProject(const std::filesystem::path& projectPath);
         static bool LoadExistingProject(const std::filesystem::path& projectPath);
+
+        // --- New members for async build ---
+        static void BuildProjectThread();             // the actual thread function
+        static std::atomic<bool> s_IsBuilding;       // true if a build is in progress
+        static std::mutex s_BuildMutex;              // protects starting new builds
     };
+
 }

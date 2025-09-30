@@ -2,6 +2,7 @@
 #include "imgui.h"
 #include <string>
 #include <vector>
+#include "imgui.h"
 
 
 using namespace EditorWindows;
@@ -55,11 +56,12 @@ void LoggerUI::LoggerWindow()
         if (pushed) ImGui::PopStyleColor();
     };
 
-    DrawToggleButton("Info", infoLogs.size(), toggleState[0], ImVec4(0.5f, 1.0f, 0.5f, 1.0f));
+    DrawToggleButton("Info", infoLogs.size(), toggleState[0], HexToImVec4("#2F442F"));
     ImGui::SameLine(0, 10.0f);
-    DrawToggleButton("Warning", warningLogs.size(), toggleState[1], ImVec4(1.0f, 0.8f, 0.3f, 1.0f));
+    DrawToggleButton("Warning", warningLogs.size(), toggleState[1], HexToImVec4("#3F382B"));
     ImGui::SameLine(0, 10.0f);
-    DrawToggleButton("Error", errorLogs.size(), toggleState[2], ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+    DrawToggleButton("Error", errorLogs.size(), toggleState[2], HexToImVec4("#3D2F2F"));
+
 
     ImGui::Separator();
 
@@ -125,4 +127,12 @@ void LoggerUI::LoggerWindow()
 
     ImGui::EndChild();
     ImGui::End();
+}
+
+ImVec4 LoggerUI::HexToImVec4(const char* hex)
+{
+    unsigned int r, g, b;
+    if (hex[0] == '#') hex++; // skip #
+    sscanf(hex, "%02x%02x%02x", &r, &g, &b);
+    return ImVec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f); // alpha = 1
 }

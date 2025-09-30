@@ -7,12 +7,16 @@
 #include <vector>
 #include <filesystem>
 #include <string> // For std::string::find and replace
+#include <thread>
 
 namespace Engine {
     // Initialize static members
     Project* ProjectManager::s_CurrentProject = nullptr;
     const std::string ProjectManager::CONFIG_FILE_NAME = "project.zues";
     const std::string ENGINE_INCLUDE_KEY = "EngineIncludePath="; // Key used in the config file
+
+    std::atomic<bool> Engine::ProjectManager::s_IsBuilding = false;
+    std::mutex Engine::ProjectManager::s_BuildMutex;
 
     // --- Helper 1: Dynamically calculate Engine Include Path ---
     std::filesystem::path CalculateEngineIncludePath() {
@@ -108,8 +112,8 @@ namespace Engine {
         try {
             // 1. Create Directories
             if (!std::filesystem::create_directories(projectPath) && !std::filesystem::exists(projectPath)) {
-                 LOG_ERROR("Failed to create project root directory: " + projectPath.string());
-                 return false;
+                LOG_ERROR("Failed to create project root directory: " + projectPath.string());
+                return false;
             }
 
             std::string projectName = projectPath.filename().string();
@@ -156,8 +160,8 @@ namespace Engine {
             const std::string placeholder = "{{PROJECT_NAME}}";
             size_t pos = 0;
             while ((pos = mainTemplate.find(placeholder, pos)) != std::string::npos) {
-                 mainTemplate.replace(pos, placeholder.length(), projectName);
-                 pos += projectName.length(); // Advance past the replacement
+                mainTemplate.replace(pos, placeholder.length(), projectName);
+                pos += projectName.length(); // Advance past the replacement
             }
 
             std::ofstream mainCppFile(mainCppPath);
@@ -240,92 +244,124 @@ namespace Engine {
     // --- Build Logic (UNCHANGED) ---
 
     bool ProjectManager::BuildProject() {
-    if (!s_CurrentProject) {
-        LOG_WARN("Cannot build: No project is currently loaded.");
-        return false;
-    }
-
-    if (s_CurrentProject->EngineIncludePath.empty() || !std::filesystem::exists(s_CurrentProject->EngineIncludePath)) {
-        LOG_ERROR("Build failed: Engine Include Path is missing or invalid in project configuration.");
-        return false;
-    }
-
-    const std::string projectName = s_CurrentProject->Name;
-    const std::filesystem::path projectRoot = s_CurrentProject->RootPath;
-    const std::filesystem::path projectSourceDir = projectRoot / "Source";
-    const std::filesystem::path tempBuildDir = projectRoot / "TempBuild";
-
-    const std::string engineIncludePath = s_CurrentProject->EngineIncludePath.string();
-
-    // --- Calculate ALL Paths ---
-    std::filesystem::path currentPath = std::filesystem::current_path();
-    std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
-    std::filesystem::path engineRoot = zuesEngineRoot / "Engine";
-
-    // 1. External Include Paths (NEW)
-    std::filesystem::path glfwIncludeDir = engineRoot / "extern/glfw/include";
-    std::filesystem::path gladIncludeDir = engineRoot / "extern/glad/include";
-
-    // 2. Library File Paths (CRITICAL FIXES)
-    std::filesystem::path engineLib = engineRoot / "cmake-build-debug/libEngine.a";
-    std::filesystem::path glfwLib = engineRoot / "extern/glfw/cmake-build-debug/src/libglfw3.a";
-    std::filesystem::path gladLib = engineRoot / "extern/glad/cmake-build-debug/libglad.a";
-    std::filesystem::path enetLib = engineRoot / "extern/enet/cmake-build-debug/libenet.a"; // Fixed ENet path
-
-    // Combine ALL library file paths into a single semicolon-separated string
-    const std::string engineLibPaths = engineLib.string() + ";"
-                                     + glfwLib.string() + ";"
-                                     + gladLib.string() + ";"
-                                     + enetLib.string();
-    // -----------------------------------------------------------------------------
-
-    // 1. Create and clean the temporary build directory
-    try {
-        if (std::filesystem::exists(tempBuildDir)) {
-            LOG_INFO("Cleaning temporary build directory: " + tempBuildDir.string());
-            std::filesystem::remove_all(tempBuildDir);
+        if (!s_CurrentProject) {
+            LOG_WARN("Cannot build: No project is currently loaded.");
+            return false;
         }
-        std::filesystem::create_directory(tempBuildDir);
-    } catch (const std::exception& e) {
-        LOG_ERROR("Failed to set up temporary build directory: " + std::string(e.what()));
-        return false;
+
+        if (s_CurrentProject->EngineIncludePath.empty() || !std::filesystem::exists(s_CurrentProject->EngineIncludePath)) {
+            LOG_ERROR("Build failed: Engine Include Path is missing or invalid in project configuration.");
+            return false;
+        }
+
+        const std::string projectName = s_CurrentProject->Name;
+        const std::filesystem::path projectRoot = s_CurrentProject->RootPath;
+        const std::filesystem::path projectSourceDir = projectRoot / "Source";
+        const std::filesystem::path tempBuildDir = projectRoot / "TempBuild";
+
+        const std::string engineIncludePath = s_CurrentProject->EngineIncludePath.string();
+
+        // --- Calculate ALL Paths ---
+        std::filesystem::path currentPath = std::filesystem::current_path();
+        std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
+        std::filesystem::path engineRoot = zuesEngineRoot / "Engine";
+
+        // 1. External Include Paths (NEW)
+        std::filesystem::path glfwIncludeDir = engineRoot / "extern/glfw/include";
+        std::filesystem::path gladIncludeDir = engineRoot / "extern/glad/include";
+
+        // 2. Library File Paths (CRITICAL FIXES)
+        std::filesystem::path engineLib = engineRoot / "cmake-build-debug/libEngine.a";
+        std::filesystem::path glfwLib = engineRoot / "extern/glfw/cmake-build-debug/src/libglfw3.a";
+        std::filesystem::path gladLib = engineRoot / "extern/glad/cmake-build-debug/libglad.a";
+        std::filesystem::path enetLib = engineRoot / "extern/enet/cmake-build-debug/libenet.a"; // Fixed ENet path
+
+        // Combine ALL library file paths into a single semicolon-separated string
+        const std::string engineLibPaths = engineLib.string() + ";"
+                                         + glfwLib.string() + ";"
+                                         + gladLib.string() + ";"
+                                         + enetLib.string();
+        // -----------------------------------------------------------------------------
+
+        // 1. Create and clean the temporary build directory
+        try {
+            if (std::filesystem::exists(tempBuildDir)) {
+                LOG_INFO("Cleaning temporary build directory: " + tempBuildDir.string());
+                std::filesystem::remove_all(tempBuildDir);
+            }
+            std::filesystem::create_directory(tempBuildDir);
+        } catch (const std::exception& e) {
+            LOG_ERROR("Failed to set up temporary build directory: " + std::string(e.what()));
+            return false;
+        }
+
+        LOG_INFO("--- Starting Project Build: " + projectName + " ---");
+
+        // 2. CMake Configure Step: Pass ALL Include and Library Paths
+        std::string cmakeConfigureCommand =
+             "cmake -S \"" + projectSourceDir.string() + "\" -B \"" + tempBuildDir.string() + "\""
+             + " -DENGINE_INCLUDE_DIR=\"" + engineIncludePath + "\""
+             + " -DENGINE_LIBS_PATHS=\"" + engineLibPaths + "\""
+             + " -DGLFW_INCLUDE_DIR=\"" + glfwIncludeDir.string() + "\""
+             + " -DGLAD_INCLUDE_DIR=\"" + gladIncludeDir.string() + "\"";
+
+        LOG_INFO("Executing configure command: " + cmakeConfigureCommand);
+        int result = std::system(cmakeConfigureCommand.c_str());
+
+        if (result != 0) {
+            LOG_ERROR("Project build failed: CMake Configure step failed. Check console output.");
+            return false;
+        }
+
+        // 3. CMake Build Step
+        std::string cmakeBuildCommand =
+             "cmake --build \"" + tempBuildDir.string() + "\" --target " + projectName + " --config Release";
+
+        LOG_INFO("Executing build command: " + cmakeBuildCommand);
+
+        result = std::system(cmakeBuildCommand.c_str());
+
+        const std::string buildOutPath = (projectRoot / "Builds" / (projectName + ".exe")).string();
+
+        if (result == 0) {
+            LOG_INFO("Project built successfully! 🎉");
+            LOG_INFO("Executable Location: " + buildOutPath);
+            return true;
+        } else {
+            LOG_ERROR("Project build failed: Compilation step returned a non-zero exit code. Check console for CMake/Compiler errors.");
+            return false;
+        }
     }
 
-    LOG_INFO("--- Starting Project Build: " + projectName + " ---");
+    bool Engine::ProjectManager::BuildProjectAsync() {
+        std::lock_guard<std::mutex> lock(s_BuildMutex);
+        if (s_IsBuilding) {
+            LOG_WARN("Build already in progress.");
+            return false;
+        }
 
-    // 2. CMake Configure Step: Pass ALL Include and Library Paths
-    std::string cmakeConfigureCommand =
-         "cmake -S \"" + projectSourceDir.string() + "\" -B \"" + tempBuildDir.string() + "\""
-         + " -DENGINE_INCLUDE_DIR=\"" + engineIncludePath + "\""
-         + " -DENGINE_LIBS_PATHS=\"" + engineLibPaths + "\""
-         + " -DGLFW_INCLUDE_DIR=\"" + glfwIncludeDir.string() + "\""
-         + " -DGLAD_INCLUDE_DIR=\"" + gladIncludeDir.string() + "\"";
+        if (!s_CurrentProject) {
+            LOG_WARN("Cannot build: No project loaded.");
+            return false;
+        }
 
-    LOG_INFO("Executing configure command: " + cmakeConfigureCommand);
-    int result = std::system(cmakeConfigureCommand.c_str());
-
-    if (result != 0) {
-        LOG_ERROR("Project build failed: CMake Configure step failed. Check console output.");
-        return false;
-    }
-
-    // 3. CMake Build Step
-    std::string cmakeBuildCommand =
-         "cmake --build \"" + tempBuildDir.string() + "\" --target " + projectName + " --config Release";
-
-    LOG_INFO("Executing build command: " + cmakeBuildCommand);
-
-    result = std::system(cmakeBuildCommand.c_str());
-
-    const std::string buildOutPath = (projectRoot / "Builds" / (projectName + ".exe")).string();
-
-    if (result == 0) {
-        LOG_INFO("Project built successfully! 🎉");
-        LOG_INFO("Executable Location: " + buildOutPath);
+        s_IsBuilding = true;
+        std::thread(BuildProjectThread).detach(); // run build in background
         return true;
-    } else {
-        LOG_ERROR("Project build failed: Compilation step returned a non-zero exit code. Check console for CMake/Compiler errors.");
-        return false;
     }
-}
+
+    void Engine::ProjectManager::BuildProjectThread() {
+        // Call the synchronous build
+        const bool success = BuildProject();
+
+        // Build is done, release the lock so another build can be started
+        s_IsBuilding = false;
+
+        // Optional: log final status
+        if (success)
+            LOG_INFO("Asynchronous build finished successfully!");
+        else
+            LOG_ERROR("Asynchronous build finished with errors.");
+    }
+
 }
