@@ -1,0 +1,6 @@
+﻿//Required headers
+#pragma once
+#include "Engine/ECS/Component.h"
+//Add more header here
+//#include "../Math.h"
+

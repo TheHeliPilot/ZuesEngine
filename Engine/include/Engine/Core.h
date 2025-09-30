@@ -16,6 +16,16 @@ namespace Engine {
         static bool SaveWorld(const std::string& filePath);
         static bool LoadWorld(const std::string& filePath);
 
+        static bool AutoGenerateComponent(
+            const std::string& componentName,
+            const std::filesystem::path& headerDirectory
+        );
+        static bool AutoGenerateSystem(
+            const std::string& systemName,
+            const std::filesystem::path& headerDirectory,
+            const std::filesystem::path& sourceDirectory
+        );
+
         static World* GetCurrentWorld() {
             return s_World.get();
         }

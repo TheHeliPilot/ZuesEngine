@@ -6,7 +6,10 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Specify the project's main source file
-set(PROJECT_SOURCES MyGameProject.cpp)
+set(PROJECT_SOURCES MyGameProject.cpp
+        test.cpp
+        test.h
+)
 
 # Create the executable
 add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SOURCES})

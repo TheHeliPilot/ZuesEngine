@@ -29,9 +29,9 @@ namespace Engine {
     // --- Helper 1: Dynamically calculate Engine Include Path --- (UNCHANGED)
     std::filesystem::path CalculateEngineIncludePath() {
         try {
-            std::filesystem::path currentPath = std::filesystem::current_path();
-            std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
-            std::filesystem::path engineIncludePath = zuesEngineRoot / "Engine/include/Engine";
+            const std::filesystem::path currentPath = std::filesystem::current_path();
+            const std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
+            const std::filesystem::path engineIncludePath = zuesEngineRoot / "Engine/include/Engine";
 
             if (!std::filesystem::exists(engineIncludePath)) {
                 LOG_WARN("Warning: Calculated Engine Include Path does not exist: " + engineIncludePath.string());
@@ -93,10 +93,10 @@ namespace Engine {
     }
 
     bool ProjectManager::LoadExistingProject(const std::filesystem::path& projectPath) {
-        std::string projectName = projectPath.filename().string();
-        std::filesystem::path configPath = projectPath / CONFIG_FILE_NAME;
+        const std::string projectName = projectPath.filename().string();
+        const std::filesystem::path configPath = projectPath / CONFIG_FILE_NAME;
 
-        std::filesystem::path currentEngineIncludePath = CalculateEngineIncludePath();
+        const std::filesystem::path currentEngineIncludePath = CalculateEngineIncludePath();
         if (currentEngineIncludePath.empty()) return false;
 
         WriteEnginePathToConfig(configPath, currentEngineIncludePath);
@@ -120,25 +120,53 @@ namespace Engine {
 
     bool ProjectManager::CreateNewProject(const std::filesystem::path& projectPath) {
         try {
+            // --- 0. Path Setup & Calculation ---
+            std::string projectName = projectPath.filename().string();
+            std::filesystem::path sourcePath = projectPath / "Source";
+
+            std::filesystem::path currentPath = std::filesystem::current_path();
+            std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
+            std::filesystem::path engineRoot = zuesEngineRoot / "Engine";
+
+            // Calculate all paths needed for the project and CMakePresets.json
+            std::filesystem::path currentEngineIncludePath = CalculateEngineIncludePath();
+            if (currentEngineIncludePath.empty()) return false;
+
+            std::string glfwIncludePath = (engineRoot / "extern/glfw/include").string();
+            std::string gladIncludePath = (engineRoot / "extern/glad/include").string();
+            std::string engineIncludePath = currentEngineIncludePath.string();
+
+            // Combine library paths (same logic as in BuildProject)
+            std::string engineLibPaths = (
+                (engineRoot / "cmake-build-debug/libEngine.a").string() + ";" +
+                (engineRoot / "extern/glfw/cmake-build-debug/src/libglfw3.a").string() + ";" +
+                (engineRoot / "extern/glad/cmake-build-debug/libglad.a").string() + ";" +
+                (engineRoot / "extern/enet/cmake-build-debug/libenet.a").string()
+            );
+
+            // Replace Windows backslashes with forward slashes for CMake/JSON compatibility
+            auto replace_slashes = [](std::string& s) {
+                for (char& c : s) { if (c == '\\') c = '/'; }
+            };
+
+            replace_slashes(engineIncludePath);
+            replace_slashes(glfwIncludePath);
+            replace_slashes(gladIncludePath);
+            replace_slashes(engineLibPaths);
+
             // 1. Create Directories (UNCHANGED)
             if (!std::filesystem::create_directories(projectPath) && !std::filesystem::exists(projectPath)) {
                 LOG_ERROR("Failed to create project root directory: " + projectPath.string());
                 return false;
             }
 
-            std::string projectName = projectPath.filename().string();
-            std::filesystem::path sourcePath = projectPath / "Source";
-
             std::filesystem::create_directory(projectPath / "Assets");
-            std::filesystem::create_directory(projectPath / "Scenes");
+            std::filesystem::create_directory(projectPath / "Worlds");
             std::filesystem::create_directory(sourcePath);
             std::filesystem::create_directory(projectPath / "Builds");
 
-            // 2. Calculate Engine Path (UNCHANGED)
-            std::filesystem::path currentEngineIncludePath = CalculateEngineIncludePath();
-            if (currentEngineIncludePath.empty()) return false;
 
-            // 3. Create config file
+            // 3. Create config file (UNCHANGED)
             std::filesystem::path configPath = projectPath / CONFIG_FILE_NAME;
             std::ofstream configFile(configPath);
             configFile << "Name=" << projectName << "\n";
@@ -148,8 +176,6 @@ namespace Engine {
 
             // 4. Create main C++ source file (UNCHANGED)
             std::filesystem::path mainCppPath = sourcePath / (projectName + ".cpp");
-            std::filesystem::path currentPath = std::filesystem::current_path();
-            std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
             std::filesystem::path cppTemplatePath = zuesEngineRoot / "Editor/Templates/GameProject.cpp.template";
 
             if (!std::filesystem::exists(cppTemplatePath)) {
@@ -174,7 +200,7 @@ namespace Engine {
             mainCppFile << mainTemplate;
             mainCppFile.close();
 
-            // 5. Create Project CMakeLists.txt (UNCHANGED)
+            // 5. Create Project CMakeLists.txt (UNCHANGED - Source/CMakeLists.txt)
             std::filesystem::path cmakePath = sourcePath / "CMakeLists.txt";
             std::ofstream cmakeFile(cmakePath);
 
@@ -225,6 +251,22 @@ namespace Engine {
             cmakeFile << cmakeTemplate.str();
             cmakeFile.close();
 
+            // 5.5. Create Top-Level CMakeLists.txt (NEW FOR CLION)
+            std::filesystem::path rootCMakePath = projectPath / "CMakeLists.txt";
+            std::ofstream rootCmakeFile(rootCMakePath);
+
+            std::stringstream rootCmakeTemplate;
+            rootCmakeTemplate << "# Top-level CMakeLists.txt for CLion/IDE integration\n";
+            rootCmakeTemplate << "cmake_minimum_required(VERSION 3.10)\n";
+            rootCmakeTemplate << "project(" << projectName << ")\n\n";
+            rootCmakeTemplate << "# Define a default build directory for CLion if Presets are ignored\n";
+            rootCmakeTemplate << "set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/Builds)\n\n";
+            rootCmakeTemplate << "# Include the actual project source definition\n";
+            rootCmakeTemplate << "add_subdirectory(Source)\n";
+
+            rootCmakeFile << rootCmakeTemplate.str();
+            rootCmakeFile.close();
+
             // 6. Instantiate the new current project object (UNCHANGED)
             s_CurrentProject = new Project{
                 .Name = projectName,
@@ -233,7 +275,32 @@ namespace Engine {
                 .EngineIncludePath = currentEngineIncludePath
             };
 
-            LOG_INFO("New project created successfully, ready to build.");
+            // 7. Create CMakePresets.json (NEW FOR CLION)
+            std::filesystem::path presetsPath = projectPath / "CMakePresets.json";
+            std::ofstream presetsFile(presetsPath);
+
+            presetsFile << "{\n";
+            presetsFile << "  \"version\": 3,\n";
+            presetsFile << "  \"configurePresets\": [\n";
+            presetsFile << "    {\n";
+            presetsFile << "      \"name\": \"dev-config\",\n";
+            presetsFile << "      \"displayName\": \"Engine-Configured Development Build\",\n";
+            presetsFile << "      \"generator\": \"Ninja\",\n";
+            presetsFile << "      \"binaryDir\": \"${sourceDir}/Builds/cmake\",\n";
+            presetsFile << "      \"cacheVariables\": {\n";
+            presetsFile << "        \"CMAKE_BUILD_TYPE\": \"Debug\",\n";
+            presetsFile << "        \"ENGINE_INCLUDE_DIR\": \"" << engineIncludePath << "\",\n";
+            presetsFile << "        \"GLFW_INCLUDE_DIR\": \"" << glfwIncludePath << "\",\n";
+            presetsFile << "        \"GLAD_INCLUDE_DIR\": \"" << gladIncludePath << "\",\n";
+            presetsFile << "        \"ENGINE_LIBS_PATHS\": \"" << engineLibPaths << "\"\n";
+            presetsFile << "      }\n";
+            presetsFile << "    }\n";
+            presetsFile << "  ]\n";
+            presetsFile << "}\n";
+
+            presetsFile.close();
+
+            LOG_INFO("New project created successfully, ready to build and open in CLion.");
             return true;
 
         } catch (const std::exception& e) {
@@ -381,4 +448,33 @@ namespace Engine {
         else
             LOG_ERROR("Asynchronous build finished with errors.");
     }
+
+    std::filesystem::path CalculateEngineLibrariesPaths() {
+        const std::filesystem::path currentPath = std::filesystem::current_path();
+        const std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
+        const std::filesystem::path engineRoot = zuesEngineRoot / "Engine";
+
+        const std::filesystem::path engineLib = engineRoot / "cmake-build-debug/libEngine.a";
+        const std::filesystem::path glfwLib = engineRoot / "extern/glfw/cmake-build-debug/src/libglfw3.a";
+        const std::filesystem::path gladLib = engineRoot / "extern/glad/cmake-build-debug/libglad.a";
+        const std::filesystem::path enetLib = engineRoot / "extern/enet/cmake-build-debug/libenet.a";
+
+        // Replicate the semicolon-separated string format required by the Source/CMakeLists.txt
+        return engineLib.string() + ";" + glfwLib.string() + ";" + gladLib.string() + ";" + enetLib.string();
+    }
+
+    std::filesystem::path CalculateGLFWIncludePath() {
+        const std::filesystem::path currentPath = std::filesystem::current_path();
+        const std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
+        const std::filesystem::path engineRoot = zuesEngineRoot / "Engine";
+        return engineRoot / "extern/glfw/include";
+    }
+
+    std::filesystem::path CalculateGLADIncludePath() {
+        const std::filesystem::path currentPath = std::filesystem::current_path();
+        const std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
+        const std::filesystem::path engineRoot = zuesEngineRoot / "Engine";
+        return engineRoot / "extern/glad/include";
+    }
+
 }

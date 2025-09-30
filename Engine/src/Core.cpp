@@ -17,6 +17,52 @@ std::unique_ptr<World> Engine::Core::s_World = nullptr;
 // public: static void Init(uint32_t textureID);
 // public: static void Update(float deltaTime);
 
+/**
+     * @brief Reads a template file into a string.
+     * @param templatePath Path to the .template file.
+     * @return The content of the file, or an empty string on failure.
+     */
+std::string ReadTemplate(const std::filesystem::path& templatePath) {
+    std::ifstream templateFile(templatePath);
+    if (!templateFile.is_open()) {
+        LOG_ERROR("Failed to open template file: " + templatePath.string());
+        return "";
+    }
+    std::stringstream buffer;
+    buffer << templateFile.rdbuf();
+    return buffer.str();
+}
+
+/**
+ * @brief Performs simple string replacement within the content.
+ */
+void ReplaceAll(std::string& str, const std::string& from, const std::string& to) {
+    size_t start_pos = 0;
+    while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+        str.replace(start_pos, from.length(), to);
+        start_pos += to.length(); // Handles case where 'to' contains 'from'
+    }
+}
+
+/**
+ * @brief Writes content to a file.
+ */
+bool WriteFile(const std::filesystem::path& filePath, const std::string& content) {
+    // Ensure the directory exists
+    if (!std::filesystem::exists(filePath.parent_path())) {
+        std::filesystem::create_directories(filePath.parent_path());
+    }
+
+    std::ofstream file(filePath);
+    if (!file.is_open()) {
+        LOG_ERROR("Failed to open file for writing: " + filePath.string());
+        return false;
+    }
+    file << content;
+    file.close();
+    return true;
+}
+
 void Engine::Core::Init() {
     // 1. Create the ECS World instance (Moved from main.cpp)
     s_World = std::make_unique<World>();
@@ -61,4 +107,78 @@ bool Engine::Core::SaveWorld(const std::string &filePath) {
 
 bool Engine::Core::LoadWorld(const std::string &filePath) {
     return s_World->LoadFromJson(filePath);
+}
+
+bool Engine::Core::AutoGenerateComponent(
+    const std::string& componentName,
+    const std::filesystem::path& headerDirectory
+) {
+    const std::filesystem::path templatePath = "../templates/Component.h.template";
+    std::string content = ReadTemplate(templatePath);
+
+    if (content.empty()) {
+        return false;
+    }
+
+    // Replace placeholders
+    ReplaceAll(content, "[[COMPONENT_NAME]]", componentName);
+    // Include guards are not strictly needed with #pragma once, but this is here for completeness
+    // ReplaceAll(content, "[[INCLUDE_GUARD]]", ToUpperSnakeCase(componentName));
+
+    // Write the new file
+    const std::filesystem::path filePath = headerDirectory / (componentName + ".h");
+    if (WriteFile(filePath, content)) {
+        LOG_INFO("Generated Component Header: " + filePath.string());
+        return true;
+    }
+    return false;
+}
+
+// =========================================================================
+// System Generation
+// =========================================================================
+
+bool Engine::Core::AutoGenerateSystem(
+    const std::string& systemName,
+    const std::filesystem::path& headerDirectory,
+    const std::filesystem::path& sourceDirectory
+) {
+    bool success = true;
+
+    // --- 1. Generate Header (.h) ---
+    const std::filesystem::path h_templatePath = "templates/System.h.template";
+    std::string h_content = ReadTemplate(h_templatePath);
+
+    if (h_content.empty()) {
+        return false;
+    }
+
+    ReplaceAll(h_content, "[[SYSTEM_NAME]]", systemName);
+
+    const std::filesystem::path headerPath = headerDirectory / (systemName + ".h");
+    if (WriteFile(headerPath, h_content)) {
+        LOG_INFO("Generated System Header: " + headerPath.string());
+    } else {
+        success = false;
+    }
+
+    // --- 2. Generate Source (.cpp) ---
+    const std::filesystem::path cpp_templatePath = "templates/System.cpp.template";
+    std::string cpp_content = ReadTemplate(cpp_templatePath);
+
+    if (cpp_content.empty()) {
+        // Log a warning but continue if the header succeeded
+        LOG_WARN("Could not read system CPP template.");
+    } else {
+        ReplaceAll(cpp_content, "[[SYSTEM_NAME]]", systemName);
+
+        const std::filesystem::path sourcePath = sourceDirectory / (systemName + ".cpp");
+        if (WriteFile(sourcePath, cpp_content)) {
+            LOG_INFO("Generated System Source: " + sourcePath.string());
+        } else {
+            success = false;
+        }
+    }
+
+    return success;
 }
