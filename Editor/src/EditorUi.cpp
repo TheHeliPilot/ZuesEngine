@@ -10,6 +10,7 @@
 
 #include "Core.h"
 #include "imgui_internal.h"
+#include "../include/HierarchyUI.h"
 
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
@@ -542,6 +543,7 @@ void EditorUi::DrawWindowUi() {
 
 
     LoggerUI::LoggerWindow();
+    HierarchyUI::HierarchyWindow();
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0,0});
     ImGui::Begin("Viewport");

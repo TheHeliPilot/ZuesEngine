@@ -20,6 +20,8 @@ set(IMGUI_SRC
         src/HierarchyOperations.cpp
         include/HierarchyOperations.h
         include/EditorDefines.h
+        include/HierarchyUI.cpp
+        include/HierarchyUI.h
 )
 
 add_executable(Editor

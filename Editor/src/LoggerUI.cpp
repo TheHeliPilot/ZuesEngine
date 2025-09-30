@@ -54,9 +54,9 @@ std::unordered_map<std::string, LogInfo> CreateCollapsedLogsMap()
     return collapsedLogs;
 }
 
+//TODO: Nefunguje filtracia pri moc vela logoch, Keď su vypnute filtre napise to log ze filtre vypnute, farba na collapse num
 void LoggerUI::LoggerWindow()
 {
-    LOG_INFO("BANAN");
     static bool toggleState[3] = { true, true, true }; // Info, Warning, Error
 
     ImGui::Begin("Logger");
