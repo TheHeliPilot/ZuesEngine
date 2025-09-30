@@ -49,11 +49,14 @@ void Engine::Core::Shutdown() {
 }
 
 bool Engine::Core::SaveWorld(const std::string &filePath) {
-    if (!s_World) return false;
+    if (!s_World) {
+        LOG_ERROR("Cannot save, no world exists!");
+        return false;
+    }
 
     return s_World->SaveToJson(filePath+"World.json");
 }
 
 bool Engine::Core::LoadWorld(const std::string &filePath) {
-    return s_World->LoadFromJson(filePath+"World.json");
+    return s_World->LoadFromJson(filePath);
 }

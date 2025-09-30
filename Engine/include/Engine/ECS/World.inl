@@ -8,7 +8,7 @@
 #include <type_traits> // Make sure this is included for std::remove_pointer_t
 
 #include "Components.h"
-
+#include "../EngineDefines.h"
 
 // ... (World::AddComponent, RemoveComponent, GetComponent, HasComponent implementations remain the same) ...
 
@@ -279,6 +279,7 @@ inline bool World::LoadFromJson(const std::string& filename) {
     try {
         std::ifstream ifs(filename);
         if (!ifs.is_open()) {
+            LOG_ERROR("Filestream didnt open!");
             return false;
         }
 
@@ -345,6 +346,7 @@ inline bool World::LoadFromJson(const std::string& filename) {
 
         return true;
     } catch (const std::exception& e) {
+        LOG_ERROR(e.what());
         return false;
     }
 }

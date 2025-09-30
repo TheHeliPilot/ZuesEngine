@@ -11,6 +11,8 @@
 #include <atomic>
 #include <mutex> // Necessary since std::mutex is now used in the cpp
 
+#include "../include/Engine/Core.h"
+
 namespace Engine {
     // Initialize static members (All declared in the fixed header)
     Project* ProjectManager::s_CurrentProject = nullptr;
@@ -107,6 +109,12 @@ namespace Engine {
         };
 
         LOG_INFO("Project loaded successfully: " + projectName);
+        if (!Core::LoadWorld(projectPath.string() + "/Scenes/World.json")) {
+            LOG_WARN("Failed to load world at " + projectPath.string() + "/Scenes/World.json. Saving default.");
+            if (!Core::SaveWorld(projectPath.string() + "/Scenes/")) {
+                LOG_ERROR("Failed to save world!");
+            }
+        }else LOG_INFO("Loaded world " + projectPath.string() + "/Scenes/World.json");
         return true;
     }
 
