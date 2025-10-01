@@ -18,11 +18,11 @@ namespace Engine {
         INetwork = new Network();
 
         //ECS Component Registrations, BEFORE FIRST CALL!
-        Engine::ECS::Component::RegisterComponent<TransformComponent>();
-        Engine::ECS::Component::RegisterComponent<SpriteComponent>();
-        Engine::ECS::Component::RegisterComponent<CameraComponent>();
-        Engine::ECS::Component::RegisterComponent<ViewportCameraTag>();
-        Engine::ECS::Component::RegisterComponent<TestObjectMoverTag>();
+        Engine::ECS::Component::RegisterComponent<Engine::ECS::Component::TransformComponent>();
+        Engine::ECS::Component::RegisterComponent<Engine::ECS::Component::SpriteComponent>();
+        Engine::ECS::Component::RegisterComponent<Engine::ECS::Component::CameraComponent>();
+        Engine::ECS::Component::RegisterComponent<Engine::ECS::Component::ViewportCameraTag>();
+        Engine::ECS::Component::RegisterComponent<Engine::ECS::Component::TestObjectMoverTag>();
 
         switch (role) {
             case Network::Role::Client:

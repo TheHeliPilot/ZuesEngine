@@ -42,8 +42,8 @@ namespace Engine::ECS::Hierarchy {
         
         // 2. Iterate over all entities that have a TransformComponent.
         // TransformComponent contains the 'parent' EntityID, which defines the hierarchy.
-        world->ForEach<TransformComponent*>(
-            [&](EntityID entityID, TransformComponent* transformComp) {
+        world->ForEach<Engine::ECS::Component::TransformComponent*>(
+            [&](EntityID entityID, Engine::ECS::Component::TransformComponent* transformComp) {
                 if (transformComp->parent.IsValid()) {
                     // This entity has a parent, add it as a child to the parent's list.
                     s_cache.parentToChildren[transformComp->parent].push_back(entityID);

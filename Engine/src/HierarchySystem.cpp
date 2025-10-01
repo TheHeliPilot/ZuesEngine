@@ -9,8 +9,8 @@ HierarchySystem::HierarchySystem() {
 }
 
 void HierarchySystem::Run(World *world, float deltaTime) {
-    world->ForEach<TransformComponent*>(
-    [&](EntityID entityID, TransformComponent* childT) {
+    world->ForEach<Engine::ECS::Component::TransformComponent*>(
+    [&](EntityID entityID, Engine::ECS::Component::TransformComponent* childT) {
 
         // 1. Check if the entity is a root (no parent)
         if (!childT->parent.IsValid()) {
@@ -20,7 +20,7 @@ void HierarchySystem::Run(World *world, float deltaTime) {
         try {
             // 2. Get the Parent's TransformComponent (P_W, P_R) via World lookup
             // Assumes world->GetComponent<T> throws if the entity doesn't exist or lacks the component
-            const TransformComponent& parentT = world->GetComponent<TransformComponent>(childT->parent);
+            const Engine::ECS::Component::TransformComponent& parentT = world->GetComponent<Engine::ECS::Component::TransformComponent>(childT->parent);
 
             // --- World Rotation Calculation (C_R^W = P_R + C_R) ---
             // The child's world rotation is the sum of the parent's world rotation and its own local rotation.
@@ -59,6 +59,6 @@ void HierarchySystem::Run(World *world, float deltaTime) {
 }
 
 // SystemBase requires this to be defined, but the logic is in Run.
-void HierarchySystem::Update(float deltaTime, TransformComponent *) {
+void HierarchySystem::Update(float deltaTime, Engine::ECS::Component::TransformComponent *) {
     // Implementation is in Run(World*, float)
 }

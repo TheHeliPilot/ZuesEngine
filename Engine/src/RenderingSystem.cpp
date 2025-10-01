@@ -28,8 +28,8 @@ void RenderingSystem::Run(World* world, const float deltaTime) {
         // Check if this Archetype contains all the required components
         if ((archetypeSignature & requiredSignature) == requiredSignature) {
             // Get component arrays for the required types
-            auto* posArray = archetype->GetComponentArray<TransformComponent>();
-            auto* spriteArray = archetype->GetComponentArray<SpriteComponent>();
+            auto* posArray = archetype->GetComponentArray<Engine::ECS::Component::TransformComponent>();
+            auto* spriteArray = archetype->GetComponentArray<Engine::ECS::Component::SpriteComponent>();
 
             if (!posArray || !spriteArray) continue;
 
@@ -66,7 +66,7 @@ void RenderingSystem::Run(World* world, const float deltaTime) {
 }
 
 // The per-entity logic: Only submits data to the batch buffer.
-void RenderingSystem::Update(float deltaTime, TransformComponent* pos, SpriteComponent* sprite) {
+void RenderingSystem::Update(float deltaTime, Engine::ECS::Component::TransformComponent* pos, Engine::ECS::Component::SpriteComponent* sprite) {
     Engine::Renderer::SubmitQuad(
         pos->worldPosition,
         // Convert from degrees (in the component) to radians (for the Renderer)

@@ -7,16 +7,16 @@ class World; // Forward declaration
 
 // Helper struct to hold an Entity's components for sorting
 struct RenderableEntity {
-    TransformComponent* pos;
-    SpriteComponent* sprite;
+    Engine::ECS::Component::TransformComponent* pos;
+    Engine::ECS::Component::SpriteComponent* sprite;
 };
 
-class RenderingSystem : public SystemBase<TransformComponent*, SpriteComponent*> {
+class RenderingSystem : public SystemBase<Engine::ECS::Component::TransformComponent*, Engine::ECS::Component::SpriteComponent*> {
 public:
     RenderingSystem();
 
     void Run(World* world, const float deltaTime) override;
 
     // The per-entity logic: Only submits data to the batch buffer.
-    void Update(float deltaTime, TransformComponent* pos, SpriteComponent* sprite) override;
+    void Update(float deltaTime, Engine::ECS::Component::TransformComponent* pos, Engine::ECS::Component::SpriteComponent* sprite) override;
 };

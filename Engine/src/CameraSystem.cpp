@@ -9,7 +9,7 @@ CameraSystem::CameraSystem() {
 }
 
 // This system finds the active camera and tells the Renderer what the view matrix should be.
-void CameraSystem::Update(float deltaTime, TransformComponent* pos, CameraComponent* cam) {
+void CameraSystem::Update(float deltaTime, Engine::ECS::Component::TransformComponent* pos, Engine::ECS::Component::CameraComponent* cam) {
     if (cam->isActive) {
         // Set the global View-Projection matrix in the Renderer.
         // We ensure rotation is converted from degrees (in Component) to radians (for Mat4::Rotate).

@@ -50,7 +50,7 @@ add_library(Engine STATIC
         src/ViewportCameraSystem.cpp
         include/Engine/ECS/HierarchyOutliner.h
         src/HierarchyOutliner.cpp
-        include/Engine/ECS/Systems/TestObjectMoverSystem.cpp
+        src/TestObjectMoverSystem.cpp
         include/Engine/ECS/Systems/TestObjectMoverSystem.h
 )
 

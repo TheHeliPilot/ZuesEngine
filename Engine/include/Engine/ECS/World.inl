@@ -410,7 +410,7 @@ inline std::set<EntityID> World::GetEntityChildren(const EntityID parentID) cons
 
     // Calculate signature for TransformComponent.
     ComponentSignature requiredSignature;
-    requiredSignature.set(Engine::ECS::Component::GetTypeID<TransformComponent>());
+    requiredSignature.set(Engine::ECS::Component::GetTypeID<Engine::ECS::Component::TransformComponent>());
 
     // Iterate over all archetypes
     for (auto const& [sig, archetypePtr] : archetypes) {
@@ -420,8 +420,8 @@ inline std::set<EntityID> World::GetEntityChildren(const EntityID parentID) cons
             if (archetype->entityIDs.empty()) continue;
 
             // 2. Get the TransformComponent array
-            ComponentArray<TransformComponent>* transformArray =
-                archetype->GetComponentArray<TransformComponent>();
+            ComponentArray<Engine::ECS::Component::TransformComponent>* transformArray =
+                archetype->GetComponentArray<Engine::ECS::Component::TransformComponent>();
 
             if (!transformArray) continue;
 
@@ -432,7 +432,7 @@ inline std::set<EntityID> World::GetEntityChildren(const EntityID parentID) cons
 
                 // 4. Check if this entity's parent matches the requested parentID
                 //    (including NULL_ENTITY_ID for roots)
-                if (const TransformComponent& transform = transformArray->data[i]; transform.parent == parentID) {
+                if (const Engine::ECS::Component::TransformComponent& transform = transformArray->data[i]; transform.parent == parentID) {
                     children.insert(archetype->entityIDs[i]);
                 }
             }

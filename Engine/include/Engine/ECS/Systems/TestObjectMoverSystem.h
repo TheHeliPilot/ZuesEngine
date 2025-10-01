@@ -5,9 +5,9 @@
 #include "../System.h"
 #include "../Components.h"
 
-class TestObjectMoverSystem final : public SystemBase<TransformComponent*, TestObjectMoverTag*> {
+class TestObjectMoverSystem final : public SystemBase<Engine::ECS::Component::TransformComponent*, Engine::ECS::Component::TestObjectMoverTag*> {
 public:
     TestObjectMoverSystem();
 
-    void Update(const float deltaTime, TransformComponent* pos, TestObjectMoverTag* vc_tag) override;
+    void Update(const float deltaTime, Engine::ECS::Component::TransformComponent* pos, Engine::ECS::Component::TestObjectMoverTag* vc_tag) override;
 };

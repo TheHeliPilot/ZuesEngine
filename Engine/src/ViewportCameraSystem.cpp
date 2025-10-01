@@ -12,7 +12,7 @@ ViewportCameraSystem::ViewportCameraSystem() {
     role = SystemRole::Editor;
 }
 
-void ViewportCameraSystem::Update(const float deltaTime, TransformComponent* pos, CameraComponent* cam, ViewportCameraTag* vc_tag) {
+void ViewportCameraSystem::Update(const float deltaTime, Engine::ECS::Component::TransformComponent* pos, Engine::ECS::Component::CameraComponent* cam, Engine::ECS::Component::ViewportCameraTag* vc_tag) {
 
 
     if (Engine::Input::IsKeyPressed(GLFW_KEY_W)) {
