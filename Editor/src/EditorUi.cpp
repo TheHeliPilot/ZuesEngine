@@ -114,7 +114,6 @@ static void DrawCustomTitleBar() {
                                  | ImGuiWindowFlags_NoResize
                                  | ImGuiWindowFlags_NoSavedSettings
                                  | ImGuiWindowFlags_NoDocking
-                                 | ImGuiWindowFlags_NoBringToFrontOnFocus
                                  | ImGuiWindowFlags_NoScrollbar;
 
     const ImVec4 accent = ImGui::GetStyle().Colors[ImGuiCol_TitleBgActive];
@@ -253,7 +252,49 @@ static void DrawCustomTitleBar() {
     ImGui::SetCursorPosX(menu_bar_start_x);
 
     // Menu Bar
+    ImGui::SameLine();
+    if (ImGui::Button("File")) {
+        ImVec2 pos = ImGui::GetItemRectMin();
+        pos.y = ImGui::GetItemRectMax().y;
+        ImGui::SetNextWindowPos(pos);
+        ImGui::OpenPopup("file_popup");
+    }
 
+    if (ImGui::BeginPopup("file_popup")) {
+        if (ImGui::Selectable("New Project")) { /* action */ }
+        if (ImGui::Selectable("Load World"))   { /* action */ }
+        if (ImGui::Selectable("Save World"))  {  }
+        ImGui::EndPopup();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Edit")) {
+        ImVec2 pos = ImGui::GetItemRectMin();
+        pos.y = ImGui::GetItemRectMax().y;
+        ImGui::SetNextWindowPos(pos);
+        ImGui::OpenPopup("edit_popup");
+    }
+
+    if (ImGui::BeginPopup("edit_popup")) {
+        if (ImGui::Selectable("Undo")) { /* action */ }
+        if (ImGui::Selectable("Redo"))   { /* action */ }
+        ImGui::EndPopup();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("New")) {
+        ImVec2 pos = ImGui::GetItemRectMin();
+        pos.y = ImGui::GetItemRectMax().y;
+        ImGui::SetNextWindowPos(pos);
+        ImGui::OpenPopup("new_popup");
+    }
+
+    if (ImGui::BeginPopup("new_popup")) {
+        if (ImGui::Selectable("New Component")) { /* action */ }
+        if (ImGui::Selectable("New Item"))   { /* action */ }
+        if (ImGui::Selectable("New World"))   { /* action */ }
+        ImGui::EndPopup();
+    }
 
     // --- 3. Build and Play Buttons Control (Image + Text) ---
 
@@ -513,7 +554,6 @@ void EditorUi::DrawWindowUi() {
                                         | ImGuiWindowFlags_NoCollapse
                                         | ImGuiWindowFlags_NoResize
                                         | ImGuiWindowFlags_NoMove
-                                        | ImGuiWindowFlags_NoBringToFrontOnFocus
                                         | ImGuiWindowFlags_NoNavFocus
                                         | ImGuiWindowFlags_NoScrollbar;
 
