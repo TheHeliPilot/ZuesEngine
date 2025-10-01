@@ -20,7 +20,7 @@ void HierarchyOperations::DoHierarchyOperations() {
     if (Engine::Input::IsMouseButtonPressed(0)) {
         for (const auto [id, depth] : hierarchy) {
             if (id.id == 0) continue;
-            TransformComponent& transform_component = Engine::Core::GetCurrentWorld()->GetComponent<TransformComponent>(id);
+            Engine::ECS::Component::TransformComponent& transform_component = Engine::Core::GetCurrentWorld()->GetComponent<Engine::ECS::Component::TransformComponent>(id);
 
             if (draggingStatus == DraggingOperation::None) {
                 if (Engine::Input::IsMouseButtonJustPressed(0)) {

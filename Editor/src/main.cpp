@@ -160,7 +160,7 @@ void DrawEditionStuff() {
         return;
     }
 
-    const TransformComponent selectedTransform = Engine::Core::GetCurrentWorld()->GetComponent<TransformComponent>(EditorUi::selectedEntity);
+    const Engine::ECS::Component::TransformComponent selectedTransform = Engine::Core::GetCurrentWorld()->GetComponent<Engine::ECS::Component::TransformComponent>(EditorUi::selectedEntity);
 
     // --- 1. Define Selection State (SIMULATION) ---
     // In your real code, these would be member variables or properties of the drawn objects
