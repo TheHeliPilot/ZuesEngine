@@ -7,6 +7,8 @@
 #include <string>
 
 #include <chrono>
+#include <iostream>
+
 #include "Log.h"
 
 #define TIMESTAMP std::chrono::time_point<std::chrono::system_clock>
@@ -21,6 +23,7 @@
 #define LOG_ERROR(msg) engine_log(msg, LOGLEVEL_ERR, __FILE__, __LINE__)
 
 inline void engine_log(const std::string& msg, const Engine::Log::EngineLog::LogLevel level, const std::string &file, const int line) {
+    std::cout << msg << std::endl;
     Engine::Log::EngineLog::LogMessage(msg, level, file, line);
 }
 

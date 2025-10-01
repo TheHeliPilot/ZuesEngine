@@ -9,7 +9,7 @@
 namespace Engine {
     class Core {
     public:
-        static void Init();
+        static void Init(bool autoRegister);
         // Accepts deltaTime for framerate-independent updates
         static void Update(float deltaTime, System::SystemRole currentMode);
         static void Shutdown();

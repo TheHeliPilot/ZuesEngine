@@ -7,12 +7,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Specify the project's main source file
 set(PROJECT_SOURCES MyGameProject.cpp
-        test.cpp
-        test.h
+        TestSpriteMovementSystem.cpp
+        TestSpriteMovementSystem.h
+        TestTagComponent.h
 )
 
 # Create the executable
-add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SOURCES})
+# add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SOURCES})
+add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
 
 # Engine headers are provided via the ENGINE_INCLUDE_DIR CMake argument.
 if(NOT ENGINE_INCLUDE_DIR)

@@ -63,21 +63,16 @@ bool WriteFile(const std::filesystem::path& filePath, const std::string& content
     return true;
 }
 
-void Engine::Core::Init() {
+void Engine::Core::Init(bool autoRegister) {
     // 1. Create the ECS World instance (Moved from main.cpp)
     s_World = std::make_unique<World>();
     LOG_INFO("Initializing Core Game Logic...");
 
-    // 2. Register Systems (Moved from main.cpp)
-    s_World->RegisterSystem(std::make_unique<HierarchySystem>());
-    s_World->RegisterSystem(std::make_unique<CameraSystem>());
-    s_World->RegisterSystem(std::make_unique<RenderingSystem>());
-    s_World->RegisterSystem(std::make_unique<ViewportCameraSystem>());
-    s_World->RegisterSystem(std::make_unique<TestObjectMoverSystem>());
 
+    if (autoRegister)
+        RegisterSystems(s_World.get());
     // 3. Setup Scene/Entities (Moved from main.cpp)
-    Engine::SetupSimpleScene(s_World.get(), 0);
-
+    //Engine::SetupSimpleScene(s_World.get(), 0);
     s_World->UpdateSystems(0, System::SystemRole::Shared);
 
     LOG_INFO("Core Game Logic Initialized.");
@@ -170,7 +165,10 @@ bool Engine::Core::AutoGenerateSystem(
         // Log a warning but continue if the header succeeded
         LOG_WARN("Could not read system CPP template.");
     } else {
+        const std::filesystem::path headerPathLocal = std::filesystem::relative(headerDirectory, sourceDirectory);
+
         ReplaceAll(cpp_content, "[[SYSTEM_NAME]]", systemName);
+        ReplaceAll(cpp_content, "[[HEADER_PATH]]", headerPathLocal.generic_string());
 
         const std::filesystem::path sourcePath = sourceDirectory / (systemName + ".cpp");
         if (WriteFile(sourcePath, cpp_content)) {

@@ -6,6 +6,7 @@
 #define ZUESENGINE_ENGINE_H
 
 #define GLFW_INCLUDE_NONE
+#include "Core.h"
 #include "Log.h"
 #include "Types.h"
 #include "EngineDefines.h"
@@ -23,9 +24,12 @@ namespace Engine {
     extern EventSystem* IEventSystem;
     extern Network* INetwork;
 
-    void Initialize(Network::Role role, const std::string& address, const uint16_t port);
+    void Initialize(Network::Role role, const std::string& address, const uint16_t port, bool autoRegister);
     void Update(System::SystemRole currentMode);
     void Shutdown();
+
+    void RegisterComponents();
+    void RegisterSystems(World*);
 }
 
 #endif //ZUESENGINE_ENGINE_H

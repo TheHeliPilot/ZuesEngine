@@ -9,5 +9,6 @@
 #include "RenderingSystem.h"
 #include "ViewportCameraSystem.h"
 #include "HierarchySystem.h"
+#include "TestObjectMoverSystem.h"
 
 #endif //ENGINE_SYSTEMS_H

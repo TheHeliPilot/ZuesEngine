@@ -11,6 +11,8 @@ class System {
 public:
     enum class SystemRole { Shared, Editor, Game };
 
+    bool isActive = true;
+
     virtual ~System() = default;
     virtual void Run(World* world, float deltaTime) = 0; // The base execution function
     ComponentSignature signature;
@@ -34,6 +36,5 @@ public:
     // It receives pointers to the component data for iteration.
     virtual void Update(float deltaTime, TArgs... components) = 0;
 
-    // DECLARATION ONLY: Definition will be in World.inl
     void Run(World* world, float deltaTime) override;
 };

@@ -46,11 +46,15 @@ namespace Engine::ECS::Component {
 
 
     // TAGS
+    struct MainCameraTag {
+        bool bullshit = true;
+    };
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MainCameraTag, bullshit)
+
     struct ViewportCameraTag {
         float cameraSpeed = 5;
     };
-    // Add serialization for ViewportCameraTag (Fixes your compilation error for this type)
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ViewportCameraTag, cameraSpeed)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ViewportCameraTag, cameraSpeed);
 
     struct TestObjectMoverTag{bool move = true;};
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TestObjectMoverTag, move);

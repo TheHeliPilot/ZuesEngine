@@ -270,8 +270,9 @@ int main() {
         return -1;
     }
 
-    Engine::Initialize(Engine::Network::Role::Host, "0.0.0.0", 7777);
+    Engine::Initialize(Engine::Network::Role::Host, "0.0.0.0", 7777, true);
     Engine::IEventSystem->Subscribe<Engine::LogEvent>(LoggerUI::GetLogEvent);
+    Engine::SpawnViewportCamera(Engine::Core::GetCurrentWorld());
 
     if (!Engine::ProjectManager::OpenOrCreate(EditorUi::projectDir)) {
         LOG_ERROR("Failed to open or create project at " + EditorUi::projectDir.string());
