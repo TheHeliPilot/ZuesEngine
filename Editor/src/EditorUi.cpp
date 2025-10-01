@@ -253,17 +253,7 @@ static void DrawCustomTitleBar() {
     ImGui::SetCursorPosX(menu_bar_start_x);
 
     // Menu Bar
-    if(ImGui::BeginMenuBar()) {
-        ImGui::PushStyleColor(ImGuiCol_Header, ImGui::GetStyle().Colors[ImGuiCol_Text]);
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered]);
 
-        if(ImGui::BeginMenu("File")) { /* ... */ ImGui::EndMenu(); }
-        if(ImGui::BeginMenu("Edit")) { /* ... */ ImGui::EndMenu(); }
-        if(ImGui::BeginMenu("Add")) { /* ... */ ImGui::EndMenu(); }
-
-        ImGui::PopStyleColor(2);
-        ImGui::EndMenuBar();
-    }
 
     // --- 3. Build and Play Buttons Control (Image + Text) ---
 

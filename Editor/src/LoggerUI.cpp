@@ -42,6 +42,7 @@ std::unordered_map<std::string, LogInfo> CreateCollapsedLogsMap()
         {
             if (log.file == collapsedLogs.at(log.message).event.file && log.line == collapsedLogs.at(log.message).event.line)
             {
+
                 collapsedLogs.at(log.message).count++;
             }
             else
@@ -60,6 +61,19 @@ void LoggerUI::LoggerWindow()
     static bool toggleState[3] = { true, true, true }; // Info, Warning, Error
 
     ImGui::Begin("Logger");
+    ImGui::ShowDemoWindow();
+
+    if (ImGui::Button("File"))
+        ImGui::OpenPopup("file_popup");
+    ImGui::SameLine();
+    if (ImGui::BeginPopup("file_popup"))
+    {
+        ImGui::SeparatorText("File");
+        ImGui::Selectable("New Project");
+        ImGui::Selectable("New World");
+        ImGui::Selectable("Save World");
+        ImGui::EndPopup();
+    }
 
     // --- Header ---
     if (ImGui::Button("Clear"))
