@@ -36,6 +36,15 @@ namespace Engine::Math {
             return vec2.x == x && vec2.y == y;
         }
 
+        Vec2 &operator+=(const Math::Vec2 & vec2) {
+            // Add the components of the input vector (vec2) to the current vector (*this)
+            this->x += vec2.x;
+            this->y += vec2.y;
+
+            // Return a reference to the modified current object
+            return *this;
+        }
+
         static Vec2 Normalized(const Vec2& v) {
             if (const float len = v.Length(); len != 0.0f) {
                 return { v.x / len, v.y / len };

@@ -39,17 +39,17 @@ void HierarchyOperations::DoHierarchyOperations() {
 
                 switch (draggingStatus) {
                     case DraggingOperation::MoveX:
-                        transform_component.worldPosition.x += MOUSE_POS_WORLD.x - lastMousePos.x;
+                        transform_component.localPosition.x += MOUSE_POS_WORLD.x - lastMousePos.x;
                         break;
                     case DraggingOperation::MoveY:
-                        transform_component.worldPosition.y += MOUSE_POS_WORLD.y - lastMousePos.y;
+                        transform_component.localPosition.y += MOUSE_POS_WORLD.y - lastMousePos.y;
                         break;
                     case DraggingOperation::MoveXY:
-                        transform_component.worldPosition.x += MOUSE_POS_WORLD.x - lastMousePos.x;
-                        transform_component.worldPosition.y += MOUSE_POS_WORLD.y - lastMousePos.y;
+                        transform_component.localPosition.x += MOUSE_POS_WORLD.x - lastMousePos.x;
+                        transform_component.localPosition.y += MOUSE_POS_WORLD.y - lastMousePos.y;
                         break;
                     case DraggingOperation::Rotate:
-                        transform_component.worldRotation -= (MOUSE_POS_WORLD.x - lastMousePos.x) * 5;
+                        transform_component.localRotation -= (MOUSE_POS_WORLD.x - lastMousePos.x) * 5;
                         break;
                     case DraggingOperation::ScaleX:
                         break;
