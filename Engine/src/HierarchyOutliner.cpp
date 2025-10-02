@@ -79,7 +79,7 @@ namespace Engine::ECS::Hierarchy {
                   });
 
         // 2. Traverse from each sorted root
-        for (EntityID rootID : sortedRoots) {
+        for (const EntityID rootID : sortedRoots) {
             TraverseAndFlatten(rootID, 0, flattenedList);
         }
 
