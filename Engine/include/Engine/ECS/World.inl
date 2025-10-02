@@ -226,6 +226,10 @@ void World::RegisterComponent(const std::string& typeName) {
 }
 
 inline bool World::SaveToJson(const std::string& filename) const {
+    std::stringstream ss_start;
+    ss_start << "World Save: Starting save process to file: " << filename;
+    LOG_INFO(ss_start.str());
+
     Engine::WorldSnapshot snapshot;
 
     // Iterate over the entity lookup table to find active entities
@@ -235,9 +239,15 @@ inline bool World::SaveToJson(const std::string& filename) const {
         // Only process entities that are valid and in an archetype
         if (data.archetypePtr && data.generation == EntityID(i, data.generation).GetGeneration()) {
 
+            EntityID currentEntityID = EntityID(i, data.generation);
+            std::stringstream ss_entity;
+            ss_entity << "  Serializing Entity ID: " << currentEntityID.id
+                      << " (Index: " << i << ", Archetype Index: " << data.archetypeIndex << ")";
+            LOG_INFO(ss_entity.str());
+
             auto currentArchetype = static_cast<Archetype*>(data.archetypePtr);
             Engine::SerializedEntity se;
-            se.id = EntityID(i, data.generation);
+            se.id = currentEntityID;
 
             // 1. Collect all components for this entity
             for (const auto& pair : currentArchetype->componentArrays) {
@@ -254,6 +264,11 @@ inline bool World::SaveToJson(const std::string& filename) const {
                 sc.typeID = compID;
                 sc.data = componentData;
                 se.components.push_back(std::move(sc));
+
+                // Log the serialized component data.
+                std::stringstream ss_comp;
+                ss_comp << "    - Component ID " << compID << " serialized data: " << componentData.dump();
+                LOG_INFO(ss_comp.str());
             }
 
             snapshot.entities.push_back(std::move(se));
@@ -265,42 +280,68 @@ inline bool World::SaveToJson(const std::string& filename) const {
 
         std::ofstream ofs(filename);
         if (!ofs.is_open()) {
+            std::stringstream ss_error;
+            ss_error << "World Save: FAILED to open file for writing: " << filename;
+            LOG_ERROR(ss_error.str());
             return false;
         }
         ofs << j.dump(4);
+        std::stringstream ss_success;
+        ss_success << "World Save: SUCCESS! Snapshot written to " << filename;
+        LOG_INFO(ss_success.str());
         return true;
     } catch (const std::exception& e) {
+        std::stringstream ss_catch;
+        ss_catch << "World Save: Exception during file writing: " << e.what();
+        LOG_ERROR(ss_catch.str());
         return false;
     }
 }
 
 inline bool World::LoadFromJson(const std::string& filename) {
+    std::stringstream ss_start;
+    ss_start << "World Load: Starting load process from file: " << filename;
+    LOG_INFO(ss_start.str());
+
     try {
         std::ifstream ifs(filename);
         if (!ifs.is_open()) {
-            LOG_ERROR("Filestream didnt open!");
+            std::stringstream ss_error;
+            ss_error << "Filestream didnt open! File: " << filename;
+            LOG_ERROR(ss_error.str());
             return false;
         }
 
         json j;
         ifs >> j;
+        LOG_INFO("World Load: Successfully parsed JSON from file.");
 
         const auto [version, entities] = j.get<Engine::WorldSnapshot>();
+        std::stringstream ss_count;
+        ss_count << "World Load: WorldSnapshot has " << entities.size() << " entities.";
+        LOG_INFO(ss_count.str());
 
         // --- Clean up current world state ---
         entityLookup.clear();
         freeIndices.clear();
         archetypes.clear();
+        LOG_INFO("World Load: Cleared existing world state.");
 
         // 1. Process all entities in the snapshot
         for (const auto&[id, components] : entities) {
             // Reconstruct the entity ID/index/generation
             EntityIndex index = id.GetIndex();
             EntityGeneration generation = id.GetGeneration();
+            std::stringstream ss_entity;
+            ss_entity << "  Loading Entity ID: " << id.id << " (Target Index: " << index << ", Generation: " << generation << ")";
+            LOG_INFO(ss_entity.str());
 
             // Grow the lookup table if necessary
             if (index >= entityLookup.size()) {
                 entityLookup.resize(index + 1);
+                std::stringstream ss_resize;
+                ss_resize << "    Resizing entity lookup table to size: " << entityLookup.size();
+                LOG_INFO(ss_resize.str());
             }
 
             // 2. Determine the component signature for the target archetype
@@ -308,9 +349,13 @@ inline bool World::LoadFromJson(const std::string& filename) {
             for (const auto& sc : components) {
                 newSignature.set(sc.typeID);
             }
+            std::stringstream ss_sig;
+            ss_sig << "    Determined new Component Signature based on " << components.size() << " components.";
+            LOG_INFO(ss_sig.str());
 
             // 3. Get or create the target archetype
             Archetype* targetArchetype = GetOrCreateArchetype(newSignature);
+            LOG_INFO("    Archetype found/created for signature.");
 
             // 4. Update the entity lookup data
             EntityData& data = entityLookup[index];
@@ -318,6 +363,10 @@ inline bool World::LoadFromJson(const std::string& filename) {
             data.archetypePtr = targetArchetype;
             data.archetypeIndex = targetArchetype->entityIDs.size(); // New component index
             targetArchetype->entityIDs.push_back(id);
+            std::stringstream ss_register;
+            ss_register << "    Entity registered to Archetype. New archetype index: " << data.archetypeIndex;
+            LOG_INFO(ss_register.str());
+
 
             // 5. Populate component data
             for (const auto& sc : components) {
@@ -333,19 +382,29 @@ inline bool World::LoadFromJson(const std::string& filename) {
                 // Use the serializer's type-erased method to deserialize the JSON data
                 // and add the component to the array.
                 serializer->DeserializeAndAdd(compArrayIt->second.get(), sc.data);
+                std::stringstream ss_comp;
+                ss_comp << "      - Component ID " << sc.typeID << " Deserialized. Data: " << sc.data.dump(2);
+                LOG_INFO(ss_comp.str());
             }
         }
 
         // 6. Recalculate free indices for future entity creation
+        size_t freeCount = 0;
         for (size_t i = 0; i < entityLookup.size(); ++i) {
             if (!entityLookup[i].archetypePtr) {
                 freeIndices.push_back(i);
+                freeCount++;
             }
         }
+        std::stringstream ss_free;
+        ss_free << "World Load: Finished. Recalculated " << freeCount << " free entity indices.";
+        LOG_INFO(ss_free.str());
 
         return true;
     } catch (const std::exception& e) {
-        LOG_ERROR(e.what());
+        std::stringstream ss_catch;
+        ss_catch << "World Load: Exception during world load: " << e.what();
+        LOG_ERROR(ss_catch.str());
         return false;
     }
 }
