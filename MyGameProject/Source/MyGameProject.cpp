@@ -8,8 +8,6 @@
 #include "ECS/World.h"
 #include "Input.h"
 #include "Renderer.h" // Need access to Engine::Renderer::Render()
-#include "TestSpriteMovementSystem.h"
-#include "TestTagComponent.h"
 
 // Forward declarations of Systems are no longer needed, as they are managed by Engine::Core
 
@@ -41,57 +39,7 @@ int main() {
         return -1;
     }
 
-    Engine::Initialize(Engine::Network::Role::None, "0.0.0.0", 7777, false);
-    Engine::RegisterComponents();
-    Engine::ECS::Component::RegisterComponent<TestTag>();
-
-    Engine::RegisterSystems();
-    Engine::Core::GetCurrentWorld()->RegisterSystem(std::make_unique<TestSpriteMovementSystem>());
-
-    World* world = Engine::Core::GetCurrentWorld();
-
-    const EntityID e1 = world->CreateEntity();
-    world->AddComponent<Engine::ECS::Component::TransformComponent>(e1, {
-        .worldPosition = {0,0},
-        .worldRotation = 0,
-    });
-    world->AddComponent<Engine::ECS::Component::CameraComponent>(e1, {
-        .zoom = 1,
-        .halfHeight = 10,
-        .backgroundColor = {.2,.2,.2,1},
-        .isActive = true,
-    });
-
-    const EntityID e2 = world->CreateEntity();
-    world->AddComponent<Engine::ECS::Component::TransformComponent>(e2, {
-        .worldPosition = {0,0},
-        .worldRotation = 0,
-    });
-    world->AddComponent<Engine::ECS::Component::SpriteComponent>(e2, {
-        .textureID = 0,
-        .size = {1,1},
-        .color = {1,1,1,1},
-        .layer = 0,
-        .sortOrder = 0
-    });
-
-    const EntityID e3 = world->CreateEntity();
-    world->AddComponent<Engine::ECS::Component::TransformComponent>(e3, {
-        .worldPosition = {0,2},
-        .worldRotation = 0,
-    });
-    world->AddComponent<Engine::ECS::Component::SpriteComponent>(e3, {
-        .textureID = 0,
-        .size = {1,1},
-        .color = {0,0.3f,0.3f,1},
-        .layer = 0,
-        .sortOrder = 0
-    });
-    world->AddComponent<TestTag>(e3, {});
-
-    std::cout << "AA";
-
-    //Engine::SetupSimpleScene(Engine::Core::GetCurrentWorld(), 0);
+    Engine::Initialize(Engine::Network::Role::None, "0.0.0.0", 7777);
 
     // --- MAIN GAME LOOP (EDITOR-STYLE BLIT) ---
 

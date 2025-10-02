@@ -13,6 +13,7 @@ std::vector<Engine::LogEvent> infoLogs;
 std::vector<Engine::LogEvent> warningLogs;
 std::vector<Engine::LogEvent> errorLogs;
 
+
 bool collapsed = false;
 bool autoScroll = true;        // Auto-scroll toggle
 
@@ -55,25 +56,13 @@ std::unordered_map<std::string, LogInfo> CreateCollapsedLogsMap()
     return collapsedLogs;
 }
 
-//TODO: Nefunguje filtracia pri moc vela logoch, Keď su vypnute filtre napise to log ze filtre vypnute, farba na collapse num
+//TODO: Nefunguje filtracia pri moc vela logoch, po tom co coppy message tak button bude mat text ze copied,farba na collapse num,
 void LoggerUI::LoggerWindow()
 {
     static bool toggleState[3] = { true, true, true }; // Info, Warning, Error
+    bool noFiltersMessage = false;
 
     ImGui::Begin("Logger");
-    ImGui::ShowDemoWindow();
-
-    if (ImGui::Button("File"))
-        ImGui::OpenPopup("file_popup");
-    ImGui::SameLine();
-    if (ImGui::BeginPopup("file_popup"))
-    {
-        ImGui::SeparatorText("File");
-        ImGui::Selectable("New Project");
-        ImGui::Selectable("New World");
-        ImGui::Selectable("Save World");
-        ImGui::EndPopup();
-    }
 
     // --- Header ---
     if (ImGui::Button("Clear"))
@@ -83,6 +72,26 @@ void LoggerUI::LoggerWindow()
         warningLogs.clear();
         errorLogs.clear();
     }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Copy"))
+    {
+        std::string stringToCopy;
+
+        for (const auto& log : allLogs)
+        {
+            if ((log.logLevel == LOGLEVEL_INFO && toggleState[0]) ||
+                (log.logLevel == LOGLEVEL_WARN && toggleState[1]) ||
+                (log.logLevel == LOGLEVEL_ERR && toggleState[2]))
+            {
+                stringToCopy += log.GetMessage() + "\n";
+            }
+        }
+
+        if (stringToCopy != "")
+            ImGui::SetClipboardText(stringToCopy.c_str());
+    }
+
     ImGui::SameLine();
     ImGui::Checkbox("Auto-scroll", &autoScroll);
     ImGui::SameLine();
@@ -113,7 +122,6 @@ void LoggerUI::LoggerWindow()
 
     // --- Body / Log Output ---
     ImGui::BeginChild("LogScrollRegion", ImVec2(0,0), true, ImGuiWindowFlags_HorizontalScrollbar);
-
     int id = 0;
     if (!collapsed)
     {
@@ -123,6 +131,8 @@ void LoggerUI::LoggerWindow()
                 (log.logLevel == LOGLEVEL_WARN && toggleState[1]) ||
                 (log.logLevel == LOGLEVEL_ERR && toggleState[2]))
             {
+                noFiltersMessage = true;
+
                 // --- Colors ---
                 ImVec4 timeColor  = ImVec4(0.85f, 0.85f, 0.85f, 1.0f); // grey timestamp
                 ImVec4 levelColor;
@@ -217,6 +227,8 @@ void LoggerUI::LoggerWindow()
         }
     }
 
+    if (!noFiltersMessage && !toggleState[0] && !toggleState[1] && !toggleState[2])
+        ImGui::Text("All log filters are disabled — no messages will be shown.");
 
     // Auto-scroll
     if (autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())

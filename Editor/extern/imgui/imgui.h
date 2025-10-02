@@ -4348,6 +4348,7 @@ namespace ImGui
     //static inline ImFont*GetWindowFont()                      { return GetFont(); }                                               // OBSOLETED in 1.48
     //static inline float GetWindowFontSize()                   { return GetFontSize(); }                                           // OBSOLETED in 1.48
     //static inline void  SetScrollPosHere()                    { SetScrollHere(); }                                                // OBSOLETED in 1.42
+    void TreeNode();
 }
 
 //-- OBSOLETED in 1.92.x: ImFontAtlasCustomRect becomes ImTextureRect
