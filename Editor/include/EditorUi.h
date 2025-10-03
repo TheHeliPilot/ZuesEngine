@@ -6,9 +6,11 @@
 #include <EventSystem/Events.h>
 
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "Log.h" // For LogLevel
-#include "Math.h"
 #include "ECS/Entity.h"
+
+struct ImGuiWindow;
 
 namespace EditorWindows
 {
@@ -31,6 +33,19 @@ namespace EditorWindows
         }
 
         static Engine::Math::Vec2 GetMousePositionInWindow(const std::string &windowName);
+
+        static bool MouseInWindow(const char* windowName, ImGuiMouseButton button = ImGuiMouseButton_Left) {
+            ImGuiWindow* window = ImGui::FindWindowByName(windowName);
+            if (!window || window->Hidden)
+                return false;
+
+            ImVec2 mousePos = ImGui::GetIO().MousePos;
+            ImVec2 bottomRight = ImVec2(window->Pos.x + window->Size.x, window->Pos.y + window->Size.y);
+
+            ImRect windowRect(window->Pos, bottomRight);
+            return windowRect.Contains(mousePos);
+        }
+
     };
 }
 

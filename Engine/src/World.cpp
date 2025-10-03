@@ -170,3 +170,26 @@ Archetype* World::GetOrCreateArchetype(const ComponentSignature& signature) {
 
     return rawPtr;
 }
+
+std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> World::GetAllComponents(const EntityID entityID) const {
+    std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> result;
+
+    if (entityID.id >= entityLookup.size())
+        return result;
+
+    const EntityData& data = entityLookup[entityID.id];
+
+    if (!data.archetypePtr)
+        return result;
+
+    Archetype* archetype = static_cast<Archetype*>(data.archetypePtr);
+    size_t index = data.archetypeIndex;
+
+    for (auto& [typeID, array] : archetype->componentArrays)
+    {
+        void* compPtr = array->GetVoidPtr(index);
+        result.emplace_back(typeID, compPtr);
+    }
+
+    return result;
+}

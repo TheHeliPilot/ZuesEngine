@@ -23,7 +23,7 @@ void HierarchyOperations::DoHierarchyOperations() {
             Engine::ECS::Component::TransformComponent& transform_component = Engine::Core::GetCurrentWorld()->GetComponent<Engine::ECS::Component::TransformComponent>(id);
 
             if (draggingStatus == DraggingOperation::None) {
-                if (Engine::Input::IsMouseButtonJustPressed(0)) {
+                if (Engine::Input::IsMouseButtonJustPressed(0) && EditorWindows::EditorUi::MouseInWindow("Viewport")) {
                     if (const float dis = (MOUSE_POS_WORLD - transform_component.worldPosition).Length(); dis < 1) {
                         EditorWindows::EditorUi::selectedEntity = id;
                         //LOG_INFO("Clicked on id " + std::to_string(id.id));
@@ -37,19 +37,49 @@ void HierarchyOperations::DoHierarchyOperations() {
                     lastMousePos = MOUSE_POS_WORLD;
                 }
 
+                // Calculate world-space delta
+                Engine::Math::Vec2 worldDelta;
+                worldDelta.x = MOUSE_POS_WORLD.x - lastMousePos.x;
+                worldDelta.y = MOUSE_POS_WORLD.y - lastMousePos.y;
+
                 switch (draggingStatus) {
                     case DraggingOperation::MoveX:
-                        transform_component.localPosition.x += MOUSE_POS_WORLD.x - lastMousePos.x;
-                        break;
                     case DraggingOperation::MoveY:
-                        transform_component.localPosition.y += MOUSE_POS_WORLD.y - lastMousePos.y;
+                    case DraggingOperation::MoveXY: {
+                        // Get the parent's world rotation to convert world delta to local delta
+                        float parentWorldRotation = 0.0f;
+                        if (transform_component.parent.IsValid()) {
+                            try {
+                                const Engine::ECS::Component::TransformComponent& parentT =
+                                    Engine::Core::GetCurrentWorld()->GetComponent<Engine::ECS::Component::TransformComponent>(transform_component.parent);
+                                parentWorldRotation = parentT.worldRotation;
+                            } catch (...) {
+                                // Parent missing, treat as root (no rotation)
+                            }
+                        }
+
+                        // Convert world delta to local delta by rotating by -parentWorldRotation
+                        const float parentRotRad = -parentWorldRotation * static_cast<float>(M_PI) / 180.0f;
+                        const float cosR = std::cos(parentRotRad);
+                        const float sinR = std::sin(parentRotRad);
+
+                        Engine::Math::Vec2 localDelta;
+                        localDelta.x = (worldDelta.x * cosR) - (worldDelta.y * sinR);
+                        localDelta.y = (worldDelta.x * sinR) + (worldDelta.y * cosR);
+
+                        // Apply the appropriate axis constraints
+                        if (draggingStatus == DraggingOperation::MoveX) {
+                            transform_component.localPosition.x += localDelta.x;
+                        } else if (draggingStatus == DraggingOperation::MoveY) {
+                            transform_component.localPosition.y += localDelta.y;
+                        } else { // MoveXY
+                            transform_component.localPosition.x += localDelta.x;
+                            transform_component.localPosition.y += localDelta.y;
+                        }
                         break;
-                    case DraggingOperation::MoveXY:
-                        transform_component.localPosition.x += MOUSE_POS_WORLD.x - lastMousePos.x;
-                        transform_component.localPosition.y += MOUSE_POS_WORLD.y - lastMousePos.y;
-                        break;
+                    }
                     case DraggingOperation::Rotate:
-                        transform_component.localRotation -= (MOUSE_POS_WORLD.x - lastMousePos.x) * 5;
+                        transform_component.localRotation -= worldDelta.x * 5;
                         break;
                     case DraggingOperation::ScaleX:
                         break;

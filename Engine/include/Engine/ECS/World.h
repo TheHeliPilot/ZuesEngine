@@ -87,6 +87,8 @@ public:
     template<typename T> bool HasComponent(EntityID entityID) const;
     template<typename T> void SetComponentData(EntityID entityID, const T& componentData);
 
+    std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> GetAllComponents(EntityID entityID) const;
+
     std::set<EntityID> GetEntityChildren(EntityID parentID) const;
 
     template<typename... TArgs>

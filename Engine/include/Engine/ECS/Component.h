@@ -26,6 +26,7 @@ namespace Engine::ECS::Component {
         return id;
     }
 
+
     // All components should be plain data structs.
     // NOTE: Components must be registered via World::RegisterComponent<T>() before use.
 }
