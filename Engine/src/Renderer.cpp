@@ -91,6 +91,13 @@ namespace Engine {
         float TexID; // Texture slot ID (0-31)
     };
 
+    std::array<Engine::Math::Vec4, 4> QuadVertexPositions = {
+        Engine::Math::Vec4(-0.5f, -0.5f, 0.0f, 1.0f), // Bottom-Left
+        Engine::Math::Vec4( 0.5f, -0.5f, 0.0f, 1.0f), // Bottom-Right
+        Engine::Math::Vec4( 0.5f,  0.5f, 0.0f, 1.0f), // Top-Right
+        Engine::Math::Vec4(-0.5f,  0.5f, 0.0f, 1.0f)  // Top-Left
+    };
+
     // NOTE: These constants should really be static members of Renderer for encapsulation,
     // but they are kept here to resolve the original compiler errors quickly.
     constexpr uint32_t MaxQuads = 20000;
@@ -451,19 +458,50 @@ namespace Engine {
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind FBO
     }
 
-    // Original SubmitQuad (now calls the new one with a default Z of 0.0f)
+    // In Renderer.cpp
+
+// NOTE: Ensure the rest of Renderer.cpp (includes, global definitions, Init/Shutdown/BeginBatch/EndBatch, etc.)
+// are present above this code.
+
+// --- Submission Overloads ---
+
+// Original Simple SubmitQuad (now calls the detailed one with defaults)
+    // In Renderer.cpp
+
+// NOTE: Ensure the rest of Renderer.cpp (includes, global definitions, Init/Shutdown/BeginBatch/EndBatch, etc.)
+// are present above this code.
+
+// --- Submission Overloads ---
+
+    // In Renderer.cpp
+
+// NOTE: This file is incomplete and assumes the rest of Renderer.cpp (includes, global definitions,
+// Init/Shutdown/BeginBatch/EndBatch, and the RendererData struct definition) are present above this code.
+
+// --- Submission Overloads ---
+
+    // Original Simple SubmitQuad (now calls the detailed one with defaults)
     void Renderer::SubmitQuad(const Math::Vec2& position, const float rotation, const Math::Vec2& size, const Math::Vec4& color, const uint32_t textureID) {
-        // Default to z=0.0f for standard scene objects
-        SubmitQuad(position, rotation, size, color, textureID, 0.0f);
+        // Default to z=0.0f and use the entire texture UVs {0, 0, 1, 1}
+        // This calls the detailed worker function below.
+        SubmitQuad(position, rotation, size, color, textureID, 0.0f, { 0.0f, 0.0f, 1.0f, 1.0f });
     }
 
-    void Renderer::SubmitQuad(const Math::Vec2& position, const float rotation, const Math::Vec2& size, const Math::Vec4& color, const uint32_t textureID, const float z) {
+    // Detailed Quad Submission (The worker function: Includes Z-depth and UV Rect for texture cutting)
+    void Renderer::SubmitQuad(
+        const Math::Vec2& position,
+        const float rotation,
+        const Math::Vec2& size,
+        const Math::Vec4& color,
+        const uint32_t textureID,
+        const float z,
+        const Math::Vec4& textureUVRect // { u0, v0, u1, v1 }
+    ) {
         if (s_Data == nullptr) return;
 
-        // 1. Check if the buffer is full or if a new texture requires a draw call.
-        float textureSlot = 0.0f;
+        // --- 1. Texture Slot Logic (Finding/Assigning) ---
+        float textureSlot = 0.0f; // Slot 0.0f is reserved for the white texture
 
-        // Find/Assign Texture Slot
         if (textureID > 0) {
             bool found = false;
             // Search for existing slot (skip slot 0, which is white)
@@ -477,6 +515,8 @@ namespace Engine {
 
             // Assign new slot if not found
             if (!found) {
+                // If we run out of slots OR indices, flush the batch
+                // MaxIndices is assumed to be defined globally in Renderer.cpp or a config file.
                 if (s_Data->IndexCount + 6 > MaxIndices || s_Data->TextureSlotIndex >= MAX_TEXTURE_SLOTS) {
                     EndBatch();
                     BeginBatch();
@@ -488,16 +528,23 @@ namespace Engine {
         }
 
         // Check buffer size again after texture logic (in case EndBatch/BeginBatch was called)
+        // MaxIndices is assumed to be defined globally.
         if (s_Data->IndexCount + 6 > MaxIndices) {
             EndBatch();
             BeginBatch();
         }
 
 
-        // 2. Transform and Write 4 Vertices
-        const Math::Mat4 transform = Math::Mat4::Translate(position) * Math::Mat4::Rotate(rotation) * Math::Mat4::Scale(size);
+        // --- 2. Calculate Transform and Define Local Data ---
 
-        // Quad corners from [-0.5, -0.5] to [0.5, 0.5]
+        // Create the Model Matrix (Translation * Rotation * Scale)
+        // FIX: Explicitly construct Math::Vec3 to avoid ambiguous overload resolution with Math::Vec2
+        // FIX: Use Math::Mat4::Rotate(angle) instead of Math::Mat4::RotateZ(angle)
+        const Math::Mat4 transform = Math::Mat4::Translate(Math::Vec2(position.x, position.y))
+                                   * Math::Mat4::Rotate(rotation) // Assumes this performs 2D (Z-axis) rotation
+                                   * Math::Mat4::Scale(Math::Vec2(size.x, size.y));
+
+        // Local positions of the quad corners (centered at 0,0, unit size)
         const Math::Vec2 quadPositions[4] = {
             {-0.5f, -0.5f}, // V0: Bottom-left
             { 0.5f, -0.5f}, // V1: Bottom-right
@@ -505,35 +552,43 @@ namespace Engine {
             {-0.5f,  0.5f}  // V3: Top-left
         };
 
-        const Math::Vec2 texCoords[4] = {
-            {0.0f, 0.0f}, // V0
-            {1.0f, 0.0f}, // V1
-            {1.0f, 1.0f}, // V2
-            {0.0f, 1.0f}  // V3
+        // Calculate the UV coordinates from the input rect {u_min, v_min, u_max, v_max}
+        const float u0 = textureUVRect.x; // Min U
+        const float v0 = textureUVRect.y; // Min V
+        const float u1 = textureUVRect.z; // Max U
+        const float v1 = textureUVRect.w; // Max V
+
+        // Map the new UVs to the vertices based on winding order (0:BL, 1:BR, 2:TR, 3:TL)
+        const Math::Vec2 QuadTexCoords[4] = {
+            {u0, v0}, // V0: Bottom-left
+            {u1, v0}, // V1: Bottom-right
+            {u1, v1}, // V2: Top-right
+            {u0, v1}  // V3: Top-left
         };
 
+        // --- 3. Write 4 Vertices to the Buffer ---
         for (int i = 0; i < 4; ++i) {
-            // Apply 2D transform, setting Z to 0.0f for the transformation matrix calculation
+            // Apply 2D transform (using a dummy z=0.0f for the 4x4 multiplication)
+            // CRITICAL: The Z component of the world position is set to 0.0f for the transform,
+            // but the final vertex Z is set using the input 'z' parameter for depth.
             const Math::Vec4 transformedPos = transform * Math::Vec4(quadPositions[i].x, quadPositions[i].y, 0.0f, 1.0f);
 
-            // CRITICAL FIX: Write the full Vec3 position. Use the 'z' parameter for depth.
-            // This is the key to fixing the Z-order issue.
+            // Write the Position (using the input 'z' parameter for depth)
             s_Data->VertexBufferPtr->Position.x = transformedPos.x;
             s_Data->VertexBufferPtr->Position.y = transformedPos.y;
-            s_Data->VertexBufferPtr->Position.z = z; // Now correctly writes to the Vec3::z member
+            s_Data->VertexBufferPtr->Position.z = z; // Z depth comes from the function parameter
 
             s_Data->VertexBufferPtr->Color = color;
-            s_Data->VertexBufferPtr->TexCoord = texCoords[i];
+            s_Data->VertexBufferPtr->TexCoord = QuadTexCoords[i];
             s_Data->VertexBufferPtr->TexID = textureSlot;
             s_Data->VertexBufferPtr++;
         }
 
-        // 3. Update index count
+        // Increment the index count (6 indices per quad)
         s_Data->IndexCount += 6;
     }
 
     // --- Camera Management Implementation ---
-
     void Renderer::SetCamera(const Math::Vec2& position, const float zoom, const float halfHeight, const float rotationRadians) {
         if (s_Data == nullptr) return;
 

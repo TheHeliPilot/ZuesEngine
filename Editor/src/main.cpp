@@ -386,7 +386,7 @@ int main() {
         glfwSwapBuffers(window);
     }
 
-    Engine::Core::SaveWorld(Engine::ProjectManager::GetCurrent()->RootPath.string() + "/Scenes/");
+    Engine::Core::SaveWorld(Engine::ProjectManager::GetCurrent()->RootPath.string() + "/Worlds/");
 
     Engine::Shutdown();
     ImGui_ImplOpenGL3_Shutdown();

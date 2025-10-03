@@ -52,6 +52,8 @@ add_library(Engine STATIC
         src/HierarchyOutliner.cpp
         src/TestObjectMoverSystem.cpp
         include/Engine/ECS/Systems/TestObjectMoverSystem.h
+        src/TextureManager.cpp
+        include/Engine/TextureManager.h
 )
 
 target_include_directories(Engine PRIVATE

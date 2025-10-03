@@ -24,6 +24,10 @@ set(IMGUI_SRC
         include/HierarchyUI.h
         include/InspectorUI.h
         src/InspectorUI.cpp
+        src/TextureCutterUI.cpp
+        include/TextureCutterUI.h
+        src/AssetBrowserUI.cpp
+        include/AssetBrowserUI.h
 )
 
 add_executable(Editor

@@ -10,8 +10,10 @@
 
 #include "Core.h"
 #include "imgui_internal.h"
+#include "../include/AssetBrowserUI.h"
 #include "../include/HierarchyUI.h"
 #include "../include/InspectorUI.h"
+#include "../include/TextureCutterUI.h"
 
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
@@ -570,12 +572,12 @@ void EditorUi::DrawWindowUi() {
         ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
         ImGui::DockSpace(dockspace_id, ImVec2(0,0), dockspace_flags);
     }
-
-
-
+    
     LoggerUI::LoggerWindow();
     HierarchyUI::HierarchyWindow();
     InspectorUI::InspectorWindow();
+    AssetBrowserUI::AssetBrowserWindow();
+    TextureCutterUI::TextureCutterWindow();
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0,0});
     ImGui::Begin("Viewport");

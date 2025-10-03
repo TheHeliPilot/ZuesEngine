@@ -39,7 +39,8 @@ namespace Engine {
         Math::Vec2 center;
         float radius;
         bool outlineOnly = false;
-        float thickness = 1.0f; // only used if outlineOnly = true
+        float thickness = 1.0f;
+        Math::Vec4 color = {1.0f, 1.0f, 1.0f, 1.0f};
     };
 
     struct Arrow {
@@ -83,17 +84,30 @@ namespace Engine {
         static void BeginBatch();
         static void EndBatch();
 
-        // Submits a single quad to the current batch.
+        // 1. Simple Quad Submission (calls the detailed version with z=0.0f and full UVs)
         static void SubmitQuad(
             const Math::Vec2& position,
-            float rotationRadians, // Rotation in radians (fixed parameter name)
+            const float rotation,
             const Math::Vec2& size,
             const Math::Vec4& color,
-            uint32_t textureID // OpenGL texture handle (0 for pure color/white)
+            const uint32_t textureID
         );
 
-        static void SubmitQuad(const Math::Vec2 &position, float rotation, const Math::Vec2 &size, const Math::Vec4 &color, uint32_t textureID,
-                               float z);
+        // 2. Detailed Quad Submission (The worker function: Includes Z-depth and UV Rect for texture cutting)
+        static void SubmitQuad(
+            const Math::Vec2& position,
+            const float rotation,
+            const Math::Vec2& size,
+            const Math::Vec4& color,
+            const uint32_t textureID,
+            const float z,
+            // The UV rectangle for the sub-texture: { u_min, v_min, u_max, v_max }
+            const Math::Vec4& textureUVRect = { 0.0f, 0.0f, 1.0f, 1.0f } // Default is the whole texture
+        );
+
+        static void SubmitLine(const Line& line, const Math::Vec4& color, const float z);
+        static void SubmitRect(const Rect& rect, const Math::Vec4& color, const float z);
+        static void SubmitCircle(const Circle& circle, const Math::Vec4& color, const float z);
 
         // --- Camera Management ---
         static void SetCamera(const Math::Vec2& position, float zoom, float halfHeight, float rotationRadians);
@@ -127,7 +141,7 @@ namespace Engine {
         static std::vector<Font> s_Fonts; // Static storage for loaded fonts (ID is index + 1)
 
         // Internal helper to submit text quads directly to the vertex buffer
-        // Now compiles because stbtt_quad is forward-declared
+        // NOTE: The stbtt_aligned_quad type is used here, matching the stb_truetype function
         static void SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& color, uint32_t textureID);
 
 
