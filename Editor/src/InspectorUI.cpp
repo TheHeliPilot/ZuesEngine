@@ -40,7 +40,7 @@ void InspectorUI::InspectorWindow() {
 
     for (auto& [typeID, compPtr] : components) {
         try {
-            auto* serializer = registry.GetSerializer(typeID);
+            const auto* serializer = registry.GetSerializer(typeID);
             const std::string& compName = registry.GetTypeName(typeID);
 
             nlohmann::json j = serializer->SerializeFromPointer(compPtr);
@@ -174,7 +174,7 @@ bool InspectorUI::DrawJsonField(const char* label, nlohmann::json& value) {
                 };
 
                 std::string keyLower = lbl;
-                std::transform(keyLower.begin(), keyLower.end(), keyLower.begin(), ::tolower);
+                std::ranges::transform(keyLower, keyLower.begin(), ::tolower);
 
                 if (keyLower.find("color") != std::string::npos || keyLower.find("colour") != std::string::npos) {
                     if (ImGui::ColorEdit4(label, arr)) {
