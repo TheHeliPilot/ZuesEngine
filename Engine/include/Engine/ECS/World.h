@@ -71,15 +71,21 @@ public:
     template<typename T> void SetComponentData(EntityID entityID, const T& componentData);
 
     void AddComponentByType(EntityID entityID, Engine::ECS::Component::TypeID typeID);
-    bool HasComponent(EntityID entityID, Engine::ECS::Component::TypeID typeID) const;
 
     // NEW: Inspector API
     std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> GetAllComponents(EntityID entityID) const;
+
+    std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> GetAllComponents(EntityID entityID);
+
     const Engine::ComponentRegistry& GetComponentRegistry() const {
         return componentSerializationRegistry;
     }
 
     std::set<EntityID> GetEntityChildren(EntityID parentID) const;
+
+    void RemoveComponentByType(EntityID entityID, Engine::ECS::Component::TypeID typeID);
+
+    bool HasComponent(EntityID entityID, Engine::ECS::Component::TypeID typeID) const;
 
     template<typename... TArgs>
     ComponentSignature CalculateSignature() const;

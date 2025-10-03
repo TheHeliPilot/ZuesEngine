@@ -6,6 +6,9 @@
 
 using namespace EditorWindows;
 
+// Track which component was right-clicked
+static int selectedComponentTypeID = -1;
+
 void InspectorUI::InspectorWindow() {
     const EntityID e = EditorUi::selectedEntity;
 
@@ -29,7 +32,6 @@ void InspectorUI::InspectorWindow() {
 
     const auto& registry = world->GetComponentRegistry();
 
-    // Get all components on this entity
     auto components = world->GetAllComponents(e);
 
     if (components.empty()) {
@@ -41,14 +43,16 @@ void InspectorUI::InspectorWindow() {
             auto* serializer = registry.GetSerializer(typeID);
             const std::string& compName = registry.GetTypeName(typeID);
 
-            // Serialize component to JSON
             nlohmann::json j = serializer->SerializeFromPointer(compPtr);
 
-            // Draw the component editor
-            if (DrawJsonComponentEditor(compName.c_str(), j)) {
-                // User modified something - deserialize back
+            ImGui::PushID(typeID);
+
+            // Draw the component editor and check for right-click
+            if (DrawJsonComponentEditor(compName.c_str(), j, typeID)) {
                 serializer->DeserializeIntoPointer(compPtr, j);
             }
+
+            ImGui::PopID();
 
         } catch (const std::exception& ex) {
             ImGui::Text("Error inspecting component: %s", ex.what());
@@ -65,7 +69,6 @@ void InspectorUI::InspectorWindow() {
         for (const auto& [typeID, serializer] : registry.GetAllSerializers()) {
             const std::string& compName = registry.GetTypeName(typeID);
 
-            // Skip if entity already has it
             if (world->HasComponent(e, typeID))
                 continue;
 
@@ -77,14 +80,29 @@ void InspectorUI::InspectorWindow() {
         ImGui::EndPopup();
     }
 
-
     ImGui::End();
 }
 
-bool InspectorUI::DrawJsonComponentEditor(const char* name, nlohmann::json& j) {
+bool InspectorUI::DrawJsonComponentEditor(const char* name, nlohmann::json& j, int componentTypeID) {
     bool changed = false;
 
-    if (ImGui::CollapsingHeader(name, ImGuiTreeNodeFlags_DefaultOpen)) {
+    // Draw the collapsing header
+    bool headerOpen = ImGui::CollapsingHeader(name, ImGuiTreeNodeFlags_DefaultOpen);
+
+    // Check for right-click on the header - use BeginPopupContextItem for automatic popup handling
+    if (ImGui::BeginPopupContextItem()) {
+        selectedComponentTypeID = componentTypeID;
+        if (ImGui::MenuItem("Remove Component")) {
+            World* world = Engine::Core::GetCurrentWorld();
+            if (world && EditorUi::selectedEntity.IsValid()) {
+                world->RemoveComponentByType(EditorUi::selectedEntity, componentTypeID);
+            }
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (headerOpen) {
         ImGui::PushID(name);
         ImGui::Indent();
 

@@ -9,7 +9,7 @@ namespace EditorWindows {
         static void InspectorWindow();
 
     private:
-        static bool DrawJsonComponentEditor(const char* name, nlohmann::json& j);
+        static bool DrawJsonComponentEditor(const char* name, nlohmann::json& j, int componentTypeID);
         static bool DrawJsonField(const char* label, nlohmann::json& value);
     };
 }
