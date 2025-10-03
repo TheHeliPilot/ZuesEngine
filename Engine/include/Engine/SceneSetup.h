@@ -96,6 +96,7 @@ namespace Engine {
             .size = {1.5f, 1.5f},
             .color = {1.0f, 1.0f, 0.0f, 1.0f}, // Yellow
         });
+        world->AddComponent<ECS::Component::MainCameraTag>(parent2, {});
 
         // --- Child Entity 2.1 ---
         const EntityID child2_1 = world->CreateEntity();

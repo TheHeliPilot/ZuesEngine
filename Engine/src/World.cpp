@@ -171,24 +171,25 @@ Archetype* World::GetOrCreateArchetype(const ComponentSignature& signature) {
     return rawPtr;
 }
 
-std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> World::GetAllComponents(const EntityID entityID) const {
+// Add to your existing World.cpp file
+
+std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> World::GetAllComponents(EntityID entityID) const {
     std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> result;
 
-    if (entityID.id >= entityLookup.size())
+    EntityIndex index = entityID.GetIndex();
+    if (index >= entityLookup.size() ||
+        entityLookup[index].generation != entityID.GetGeneration() ||
+        !entityLookup[index].archetypePtr) {
         return result;
+        }
 
-    const EntityData& data = entityLookup[entityID.id];
+    const EntityData& data = entityLookup[index];
+    const Archetype* archetype = static_cast<Archetype*>(data.archetypePtr);
 
-    if (!data.archetypePtr)
-        return result;
-
-    Archetype* archetype = static_cast<Archetype*>(data.archetypePtr);
-    size_t index = data.archetypeIndex;
-
-    for (auto& [typeID, array] : archetype->componentArrays)
-    {
-        void* compPtr = array->GetVoidPtr(index);
-        result.emplace_back(typeID, compPtr);
+    // Iterate through all component arrays in this archetype
+    for (const auto& [typeID, componentArray] : archetype->componentArrays) {
+        void* componentPtr = componentArray->GetVoidPtr(data.archetypeIndex);
+        result.emplace_back(typeID, componentPtr);
     }
 
     return result;

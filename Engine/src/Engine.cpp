@@ -17,9 +17,7 @@ namespace Engine {
         IEventSystem = new EventSystem();
         INetwork = new Network();
 
-        if (autoRegister) {
-            RegisterComponents();
-        }
+        Core::Init(autoRegister);
 
         switch (role) {
             case Network::Role::Client:
@@ -37,11 +35,9 @@ namespace Engine {
                 break;
         }
 
-        Core::Init(autoRegister);
-
         if (!glfwInit()) {
             LOG_ERROR("Failed to initialize GLFW");
-        }else {
+        } else {
             Renderer::Init();
         }
     }
@@ -64,12 +60,27 @@ namespace Engine {
     }
 
     void RegisterComponents() {
-        Engine::ECS::Component::RegisterComponent<Engine::ECS::Component::TransformComponent>();
-        Engine::ECS::Component::RegisterComponent<Engine::ECS::Component::SpriteComponent>();
-        Engine::ECS::Component::RegisterComponent<Engine::ECS::Component::CameraComponent>();
-        Engine::ECS::Component::RegisterComponent<Engine::ECS::Component::MainCameraTag>();
-        Engine::ECS::Component::RegisterComponent<Engine::ECS::Component::ViewportCameraTag>();
-        Engine::ECS::Component::RegisterComponent<Engine::ECS::Component::TestObjectMoverTag>();
+        World* world = Core::GetCurrentWorld();
+        if (!world) {
+            LOG_ERROR("Cannot register components: No active world!");
+            return;
+        }
+
+        // Register engine components with human-readable names
+        Engine::ECS::Component::RegisterComponent<ECS::Component::TransformComponent>();
+        world->RegisterComponent<Engine::ECS::Component::TransformComponent>("Transform");
+        Engine::ECS::Component::RegisterComponent<ECS::Component::SpriteComponent>();
+        world->RegisterComponent<Engine::ECS::Component::SpriteComponent>("Sprite");
+        Engine::ECS::Component::RegisterComponent<ECS::Component::CameraComponent>();
+        world->RegisterComponent<Engine::ECS::Component::CameraComponent>("Camera");
+        Engine::ECS::Component::RegisterComponent<ECS::Component::MainCameraTag>();
+        world->RegisterComponent<Engine::ECS::Component::MainCameraTag>("Main Camera Tag");
+        Engine::ECS::Component::RegisterComponent<ECS::Component::ViewportCameraTag>();
+        world->RegisterComponent<Engine::ECS::Component::ViewportCameraTag>("Viewport Camera");
+        Engine::ECS::Component::RegisterComponent<ECS::Component::TestObjectMoverTag>();
+        world->RegisterComponent<Engine::ECS::Component::TestObjectMoverTag>("Test Mover");
+
+        LOG_INFO("Engine components registered successfully");
     }
 
     void RegisterSystems(World* s_World) {

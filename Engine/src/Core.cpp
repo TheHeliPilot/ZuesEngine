@@ -68,9 +68,10 @@ void Engine::Core::Init(bool autoRegister) {
     s_World = std::make_unique<World>();
     LOG_INFO("Initializing Core Game Logic...");
 
-
-    if (autoRegister)
+    if (autoRegister) {
+        RegisterComponents();
         RegisterSystems(s_World.get());
+    }
     // 3. Setup Scene/Entities (Moved from main.cpp)
     //Engine::SetupSimpleScene(s_World.get(), 0);
     s_World->UpdateSystems(0, System::SystemRole::Shared);

@@ -1,11 +1,9 @@
-﻿// C:/.../Engine/include/Engine/ECS/WorldSerializationHelpers.h
-
-#pragma once
+﻿#pragma once
 
 #include "../../json/json.hpp"
 #include "Component.h"
 #include "Entity.h"
-#include "ECSConfig.h" // Needed for ComponentSignature (used indirectly via Component.h)
+#include "ECSConfig.h"
 
 #include <tuple>
 #include <string>
@@ -16,27 +14,20 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <type_traits> // CRITICAL: For std::is_empty_v and std::enable_if_t
+#include <type_traits>
 
-#include "../Math.h" // CRITICAL: Needed for Math::Vec2 and Math::Vec4 definitions
+#include "../Math.h"
 
 using json = nlohmann::json;
 
 namespace Engine::Math {
-    // Assuming Vec2 has public members x and y
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Vec2, x, y)
-
-    // Assuming Vec4 has public members x, y, z, and w
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Vec3, x, y, z)
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Vec4, x, y, z, w)
 }
 
 namespace Engine {
 
-    // ----------------------------------------------------------------------
-    // --- 1. JSON ADL Overloads for Custom Component Member Types (Fix) ---
-    // ----------------------------------------------------------------------
-
-    // Assuming Math::Vec2 has public float x, y members
     inline void to_json(json& j, const Math::Vec2& v) {
         j = {{"x", v.x}, {"y", v.y}};
     }
@@ -46,7 +37,6 @@ namespace Engine {
         v.y = j.at("y").get<float>();
     }
 
-    // Assuming Math::Vec4 has public float x, y, z, w members
     inline void to_json(json& j, const Math::Vec4& v) {
         j = {{"x", v.x}, {"y", v.y}, {"z", v.z}, {"w", v.w}};
     }
@@ -58,26 +48,12 @@ namespace Engine {
         v.w = j.at("w").get<float>();
     }
 
-    // ----------------------------------------------------------------------
-    // --- 2. Type Trait for Automatic Empty Tag Detection (Automation) ---
-    // ----------------------------------------------------------------------
-
     template <typename T>
-    struct is_empty_tag : std::integral_constant<bool,
-        // std::is_empty_v is the correct, standard way to detect a tag component.
-        std::is_empty_v<T>
-    > {};
+    struct is_empty_tag : std::integral_constant<bool, std::is_empty_v<T>> {};
 
-
-    // ----------------------------------------------------------------------
-    // --- 3. Generic Helper Implementations (Reflection Logic) ---
-    // ----------------------------------------------------------------------
-
-    // Helper function to serialize any data component struct T into a JSON object.
     template <typename T, std::size_t... Is>
     json ComponentToJsonImpl(const T& component, std::index_sequence<Is...>) {
         json j;
-        // The const reference here is correct for serialization.
         const auto& tup = std::tie(component);
         ((j["m" + std::to_string(Is)] = std::get<Is>(tup)), ...);
         return j;
@@ -89,54 +65,34 @@ namespace Engine {
         ((j.at("m" + std::to_string(Is)).get_to(std::get<Is>(tup))), ...);
     }
 
-
-    // ----------------------------------------------------------------------
-    // --- 4. Component Serialization Interface (SFINAE Dispatcher) ---
-    // ----------------------------------------------------------------------
-
-    // A. ComponentToJson: Empty Tag Implementation
     template <typename T>
     std::enable_if_t<is_empty_tag<T>::value, json>
     ComponentToJson(const T& component) {
         return json::object();
     }
 
-    // B. ComponentToJson: Data Component (Reflection) Implementation
     template <typename T>
     std::enable_if_t<!is_empty_tag<T>::value, json>
     ComponentToJson(const T& component) {
-        // Data component: dispatch to reflection implementation
         constexpr size_t N = std::tuple_size_v<decltype(std::tie(component))>;
         return ComponentToJsonImpl(component, std::make_index_sequence<N>{});
     }
 
-    // C. ComponentFromJson: Empty Tag Implementation
     template <typename T>
     std::enable_if_t<is_empty_tag<T>::value, void>
-    ComponentFromJson(T& component, const json& j) {
-        // Tag component: do nothing (it's already default-constructed)
-    }
+    ComponentFromJson(T& component, const json& j) {}
 
-    // D. ComponentFromJson: Data Component (Reflection) Implementation
     template <typename T>
     std::enable_if_t<!is_empty_tag<T>::value, void>
     ComponentFromJson(T& component, const json& j) {
-        // Data component: dispatch to reflection implementation
         constexpr size_t N = std::tuple_size_v<decltype(std::tie(component))>;
         ComponentFromJsonImpl(component, j, std::make_index_sequence<N>{});
     }
-
-
-    // ----------------------------------------------------------------------
-    // --- 5. Serialization Data Structure Definitions (UNCHANGED) ---
-    // ----------------------------------------------------------------------
 
     struct SerializedComponent {
         Engine::ECS::Component::TypeID typeID;
         json data;
     };
-
-    // ... [SerializedEntity and WorldSnapshot structs and their to_json/from_json definitions] ...
 
     struct SerializedEntity {
         EntityID id;
@@ -147,9 +103,6 @@ namespace Engine {
         int version = 1;
         std::vector<SerializedEntity> entities;
     };
-
-    // nlohmann::json ADL Serialization Overloads for Engine types (EntityID, Serialized...)
-    // ... [All inline to_json/from_json definitions for Engine::EntityID, SerializedComponent, SerializedEntity, WorldSnapshot] ...
 
     inline void to_json(json& j, const EntityID& id) { j = id.id; }
     inline void from_json(const json& j, EntityID& id) { id.id = j.get<uint64_t>(); }
@@ -186,16 +139,19 @@ namespace Engine {
         j.at("entities").get_to(ws.entities);
     }
 
-
-    // ----------------------------------------------------------------------
-    // --- 6. Component Registration Helper Types (THE REGISTRY) (UNCHANGED) ---
-    // ----------------------------------------------------------------------
+    // ======================================================================
+    // COMPONENT SERIALIZER INTERFACE (WITH INSPECTOR SUPPORT)
+    // ======================================================================
 
     struct IComponentSerializer {
         virtual ~IComponentSerializer() = default;
         virtual std::unique_ptr<IComponentArray> CreateComponentArray() const = 0;
         virtual void DeserializeAndAdd(IComponentArray* array, const json& data) const = 0;
         virtual json SerializeComponent(IComponentArray* array, size_t index) const = 0;
+
+        // NEW: Inspector methods
+        virtual json SerializeFromPointer(void* componentPtr) const = 0;
+        virtual void DeserializeIntoPointer(void* componentPtr, const json& data) const = 0;
     };
 
     template <typename T>
@@ -203,14 +159,12 @@ namespace Engine {
         static_assert(std::is_default_constructible_v<T>, "ECS Component must be default constructible for serialization.");
 
         std::unique_ptr<IComponentArray> CreateComponentArray() const override {
-            // Assumes ComponentArray<T> is defined in Component.h
             return std::make_unique<ComponentArray<T>>();
         }
 
         void DeserializeAndAdd(IComponentArray* array, const json& data) const override {
             ComponentArray<T>* specificArray = static_cast<ComponentArray<T>*>(array);
-            T component{}; // Default construct
-            // Dispatch to the correct ComponentFromJson (Tag or Data)
+            T component{};
             ComponentFromJson(component, data);
             specificArray->data.push_back(std::move(component));
         }
@@ -218,20 +172,32 @@ namespace Engine {
         json SerializeComponent(IComponentArray* array, size_t index) const override {
             const ComponentArray<T>* specificArray = static_cast<const ComponentArray<T>*>(array);
             const T& component = specificArray->data.at(index);
-            // Dispatch to the correct ComponentToJson (Tag or Data)
             return ComponentToJson(component);
+        }
+
+        // NEW: Inspector methods
+        json SerializeFromPointer(void* componentPtr) const override {
+            const T* component = static_cast<const T*>(componentPtr);
+            return ComponentToJson(*component);
+        }
+
+        void DeserializeIntoPointer(void* componentPtr, const json& data) const override {
+            T* component = static_cast<T*>(componentPtr);
+            ComponentFromJson(*component, data);
         }
     };
 
     struct ComponentRegistry {
         std::map<Engine::ECS::Component::TypeID, std::unique_ptr<IComponentSerializer>> serializers;
+        std::map<Engine::ECS::Component::TypeID, std::string> typeNames;
 
         template<typename T>
         void RegisterComponent(const std::string& typeName) {
             Engine::ECS::Component::TypeID id = Engine::ECS::Component::GetTypeID<T>();
             if (serializers.find(id) != serializers.end()) return;
-            // The ComponentSerializer<T> now correctly handles tags and data components
+
             serializers[id] = std::make_unique<ComponentSerializer<T>>();
+            typeNames[id] = typeName;
         }
 
         IComponentSerializer* GetSerializer(const Engine::ECS::Component::TypeID id) const {
@@ -241,5 +207,16 @@ namespace Engine {
             }
             return it->second.get();
         }
+
+        const std::string& GetTypeName(Engine::ECS::Component::TypeID id) const {
+            static std::string unknown = "Unknown Component";
+            auto it = typeNames.find(id);
+            return (it != typeNames.end()) ? it->second : unknown;
+        }
+
+        const std::map<Engine::ECS::Component::TypeID, std::unique_ptr<IComponentSerializer>>& GetAllSerializers() const {
+            return serializers;
+        }
     };
+
 } // namespace Engine
