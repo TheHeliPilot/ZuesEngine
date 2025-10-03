@@ -572,7 +572,7 @@ void EditorUi::DrawWindowUi() {
         ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
         ImGui::DockSpace(dockspace_id, ImVec2(0,0), dockspace_flags);
     }
-    
+
     LoggerUI::LoggerWindow();
     HierarchyUI::HierarchyWindow();
     InspectorUI::InspectorWindow();
