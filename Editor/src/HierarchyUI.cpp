@@ -6,6 +6,7 @@
 
 #include "Core.h"
 #include "imgui.h"
+#include "../include/EditorUi.h"
 #include "ECS/Component.h"
 #include "ECS/HierarchyOutliner.h"
 
@@ -85,7 +86,7 @@ void HierarchyUI::HierarchyWindow()
    Engine::ECS::Hierarchy::BuildCache(Engine::Core::GetCurrentWorld());
    GenerateHierarchyItems();
 
-   if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered())
+   if (EditorUi::MouseInWindow("Hierarchy") && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered())
       ImGui::OpenPopup("hierarchy_right_click");
 
    if (ImGui::BeginPopup("hierarchy_right_click")) {
@@ -93,8 +94,8 @@ void HierarchyUI::HierarchyWindow()
       if (ImGui::Selectable("Create Sprite")) { /* action */ }
       ImGui::EndPopup();
    }
-
-   if (ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+   //EditorUi::MouseInWindow("Hierarchy") pridane aby sa to neotvaralo mimo hierarchie
+   if (EditorUi::MouseInWindow("Hierarchy") && ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
       ImGui::OpenPopup("hierarchy_right_click_item");
 
    if (ImGui::BeginPopup("hierarchy_right_click_item"))

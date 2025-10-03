@@ -70,6 +70,9 @@ public:
     template<typename T> bool HasComponent(EntityID entityID) const;
     template<typename T> void SetComponentData(EntityID entityID, const T& componentData);
 
+    void AddComponentByType(EntityID entityID, Engine::ECS::Component::TypeID typeID);
+    bool HasComponent(EntityID entityID, Engine::ECS::Component::TypeID typeID) const;
+
     // NEW: Inspector API
     std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> GetAllComponents(EntityID entityID) const;
     const Engine::ComponentRegistry& GetComponentRegistry() const {

@@ -165,7 +165,11 @@ namespace Engine {
         void DeserializeAndAdd(IComponentArray* array, const json& data) const override {
             ComponentArray<T>* specificArray = static_cast<ComponentArray<T>*>(array);
             T component{};
-            ComponentFromJson(component, data);
+
+            if (!data.empty()) {
+                ComponentFromJson(component, data);
+            }
+
             specificArray->data.push_back(std::move(component));
         }
 

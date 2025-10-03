@@ -17,7 +17,7 @@ void InspectorUI::InspectorWindow() {
         return;
     }
 
-    const World* world = Engine::Core::GetCurrentWorld();
+    World* world = Engine::Core::GetCurrentWorld();
     if (!world) {
         ImGui::Text("No active world");
         ImGui::End();
@@ -34,8 +34,6 @@ void InspectorUI::InspectorWindow() {
 
     if (components.empty()) {
         ImGui::Text("No components");
-        ImGui::End();
-        return;
     }
 
     for (auto& [typeID, compPtr] : components) {
@@ -56,6 +54,29 @@ void InspectorUI::InspectorWindow() {
             ImGui::Text("Error inspecting component: %s", ex.what());
         }
     }
+
+    ImGui::Separator();
+
+    if (ImGui::Button("Add Component")) {
+        ImGui::OpenPopup("AddComponentPopup");
+    }
+
+    if (ImGui::BeginPopup("AddComponentPopup")) {
+        for (const auto& [typeID, serializer] : registry.GetAllSerializers()) {
+            const std::string& compName = registry.GetTypeName(typeID);
+
+            // Skip if entity already has it
+            if (world->HasComponent(e, typeID))
+                continue;
+
+            if (ImGui::MenuItem(compName.c_str())) {
+                world->AddComponentByType(e, typeID);
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        ImGui::EndPopup();
+    }
+
 
     ImGui::End();
 }

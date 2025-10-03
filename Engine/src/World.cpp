@@ -173,6 +173,43 @@ Archetype* World::GetOrCreateArchetype(const ComponentSignature& signature) {
 
 // Add to your existing World.cpp file
 
+bool World::HasComponent(EntityID entityID, Engine::ECS::Component::TypeID typeID) const {
+    if (entityID.id >= entityLookup.size()) return false;
+
+    const EntityData& data = entityLookup[entityID.id];
+    if (!data.archetypePtr) return false;
+
+    const Archetype* archetype = static_cast<const Archetype*>(data.archetypePtr);
+    return archetype->signature.test(typeID);
+}
+
+void World::AddComponentByType(EntityID entityID, Engine::ECS::Component::TypeID typeID) {
+    if (entityID.id >= entityLookup.size())
+        throw std::runtime_error("Invalid EntityID");
+
+    EntityData& data = entityLookup[entityID.id];
+    Archetype* currentArchetype = static_cast<Archetype*>(data.archetypePtr);
+
+    // Build new signature by adding this type
+    ComponentSignature newSig = currentArchetype ? currentArchetype->signature : ComponentSignature{};
+    newSig.set(typeID);
+
+    // Move entity into new archetype
+    Archetype* newArchetype = GetOrCreateArchetype(newSig);
+    MoveEntity(entityID, currentArchetype, newArchetype);
+
+    // Create default-constructed component instance
+    auto* serializer = componentSerializationRegistry.GetSerializer(typeID);
+    json defaultJson = json::object(); // default values
+    auto& compArray = newArchetype->componentArrays[typeID];
+
+    if (!compArray) {
+        compArray = serializer->CreateComponentArray();
+    }
+
+    serializer->DeserializeAndAdd(compArray.get(), defaultJson);
+}
+
 std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> World::GetAllComponents(EntityID entityID) const {
     std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> result;
 
