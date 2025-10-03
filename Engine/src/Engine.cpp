@@ -68,17 +68,17 @@ namespace Engine {
 
         // Register engine components with human-readable names
         Engine::ECS::Component::RegisterComponent<ECS::Component::TransformComponent>();
-        world->RegisterComponent<Engine::ECS::Component::TransformComponent>("Transform");
+        world->RegisterComponent<ECS::Component::TransformComponent>("Transform");
         Engine::ECS::Component::RegisterComponent<ECS::Component::SpriteComponent>();
-        world->RegisterComponent<Engine::ECS::Component::SpriteComponent>("Sprite");
+        world->RegisterComponent<ECS::Component::SpriteComponent>("Sprite");
         Engine::ECS::Component::RegisterComponent<ECS::Component::CameraComponent>();
-        world->RegisterComponent<Engine::ECS::Component::CameraComponent>("Camera");
+        world->RegisterComponent<ECS::Component::CameraComponent>("Camera");
         Engine::ECS::Component::RegisterComponent<ECS::Component::MainCameraTag>();
-        world->RegisterComponent<Engine::ECS::Component::MainCameraTag>("Main Camera Tag");
+        world->RegisterComponent<ECS::Component::MainCameraTag>("Main Camera Tag");
         Engine::ECS::Component::RegisterComponent<ECS::Component::ViewportCameraTag>();
-        world->RegisterComponent<Engine::ECS::Component::ViewportCameraTag>("Viewport Camera");
+        world->RegisterComponent<ECS::Component::ViewportCameraTag>("Viewport Camera");
         Engine::ECS::Component::RegisterComponent<ECS::Component::TestObjectMoverTag>();
-        world->RegisterComponent<Engine::ECS::Component::TestObjectMoverTag>("Test Mover");
+        world->RegisterComponent<ECS::Component::TestObjectMoverTag>("Test Mover");
 
         LOG_INFO("Engine components registered successfully");
     }
