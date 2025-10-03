@@ -15,9 +15,11 @@ using namespace EditorWindows;
 void GenerateHierarchyItems()
 {
    static ImGuiTreeNodeFlags base_flags =
-       ImGuiTreeNodeFlags_DrawLinesToNodes |
-       ImGuiTreeNodeFlags_DefaultOpen |
-       ImGuiTreeNodeFlags_OpenOnArrow;
+         ImGuiTreeNodeFlags_DrawLinesToNodes |
+         ImGuiTreeNodeFlags_DefaultOpen |
+         ImGuiTreeNodeFlags_OpenOnArrow |
+         ImGuiTreeNodeFlags_Framed |
+         ImGuiTreeNodeFlags_NavLeftJumpsToParent;
 
    auto hierarchyItems = Engine::ECS::Hierarchy::GetFlattenedHierarchy();
 
@@ -27,7 +29,11 @@ void GenerateHierarchyItems()
 
    for (int i = 0; i < hierarchyItems.size(); i++)
    {
+      if (hierarchyItems[i].id.id == 0)
+         continue;
+
       int level = hierarchyItems[i].depth;
+      bool selected = EditorUi::selectedEntity == hierarchyItems[i].id;
 
       // Skip children of a closed parent
       if (skipLevel >= 0 && level > skipLevel)
@@ -43,13 +49,34 @@ void GenerateHierarchyItems()
 
       bool hasChild = (i + 1 < hierarchyItems.size() && hierarchyItems[i + 1].depth > level);
 
-      ImGuiTreeNodeFlags node_flags = base_flags;
+      ImGuiTreeNodeFlags node_flags = base_flags | (selected ? ImGuiTreeNodeFlags_Selected : 0);
       if (!hasChild)
          node_flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
       // Render node
       bool open = ImGui::TreeNodeEx((void*)(intptr_t)hierarchyItems[i].id.id,
                                     node_flags, "%d", i);
+
+      if (ImGui::BeginDragDropSource())
+      {
+         ImGui::SetDragDropPayload("HIERARCHY_ITEM", "PENIS", sizeof(char) * 6);
+         ImGui::Text(("Gameobject " + std::to_string(hierarchyItems[i].id.id)).c_str());
+         ImGui::EndDragDropSource();
+      }
+
+      if (ImGui::BeginDragDropTarget())
+      {
+         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_ITEM"))
+         {
+            LOG_ERROR(static_cast<char*>(payload->Data));
+         }
+         ImGui::EndDragDropTarget();
+      }
+
+      if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+      {
+          EditorUi::selectedEntity = hierarchyItems[i].id;
+      }
 
       if (hasChild)
       {
@@ -82,9 +109,16 @@ void GenerateHierarchyItems()
 void HierarchyUI::HierarchyWindow()
 {
    ImGui::Begin("Hierarchy");
+   ImGui::ShowDemoWindow();
 
    Engine::ECS::Hierarchy::BuildCache(Engine::Core::GetCurrentWorld());
    GenerateHierarchyItems();
+
+
+
+
+
+
 
    if (EditorUi::MouseInWindow("Hierarchy") && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered())
       ImGui::OpenPopup("hierarchy_right_click");
@@ -94,6 +128,7 @@ void HierarchyUI::HierarchyWindow()
       if (ImGui::Selectable("Create Sprite")) { /* action */ }
       ImGui::EndPopup();
    }
+
    //EditorUi::MouseInWindow("Hierarchy") pridane aby sa to neotvaralo mimo hierarchie
    if (EditorUi::MouseInWindow("Hierarchy") && ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
       ImGui::OpenPopup("hierarchy_right_click_item");
