@@ -56,6 +56,7 @@ namespace Engine {
 
     void Shutdown() {
         Renderer::Shutdown();
+        TextureManager::Shutdown();
         Core::Shutdown();
     }
 

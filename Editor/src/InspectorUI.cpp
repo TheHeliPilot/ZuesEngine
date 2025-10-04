@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "../include/EditorUi.h"
 #include "ECS/World.h"
+#include "TextureManager.h"
 
 using namespace EditorWindows;
 
@@ -47,8 +48,10 @@ void InspectorUI::InspectorWindow() {
 
             ImGui::PushID(typeID);
 
-            // Draw the component editor and check for right-click
-            if (DrawJsonComponentEditor(compName.c_str(), j, typeID)) {
+            // Special handling for SpriteComponent
+            bool isSpriteComponent = (compName == "Sprite");
+
+            if (DrawJsonComponentEditor(compName.c_str(), j, typeID, isSpriteComponent)) {
                 serializer->DeserializeIntoPointer(compPtr, j);
             }
 
@@ -83,13 +86,13 @@ void InspectorUI::InspectorWindow() {
     ImGui::End();
 }
 
-bool InspectorUI::DrawJsonComponentEditor(const char* name, nlohmann::json& j, int componentTypeID) {
+bool InspectorUI::DrawJsonComponentEditor(const char* name, nlohmann::json& j, int componentTypeID, bool isSpriteComponent) {
     bool changed = false;
 
     // Draw the collapsing header
     bool headerOpen = ImGui::CollapsingHeader(name, ImGuiTreeNodeFlags_DefaultOpen);
 
-    // Check for right-click on the header - use BeginPopupContextItem for automatic popup handling
+    // Check for right-click on the header
     if (ImGui::BeginPopupContextItem()) {
         selectedComponentTypeID = componentTypeID;
         if (ImGui::MenuItem("Remove Component")) {
@@ -107,7 +110,7 @@ bool InspectorUI::DrawJsonComponentEditor(const char* name, nlohmann::json& j, i
         ImGui::Indent();
 
         for (auto& [key, value] : j.items()) {
-            changed |= DrawJsonField(key.c_str(), value);
+            changed |= DrawJsonField(key.c_str(), value, isSpriteComponent); // Pass flag here
         }
 
         ImGui::Unindent();
@@ -117,9 +120,98 @@ bool InspectorUI::DrawJsonComponentEditor(const char* name, nlohmann::json& j, i
     return changed;
 }
 
-bool InspectorUI::DrawJsonField(const char* label, nlohmann::json& value) {
+bool InspectorUI::DrawSpriteField(const char* label, nlohmann::json& spriteNameValue) {
+    bool changed = false;
+
+    ImGui::PushID(label);
+
+    // Get current sprite name
+    std::string currentSpriteName = spriteNameValue.get<std::string>();
+    if (currentSpriteName.empty()) {
+        currentSpriteName = "<None>";
+    }
+
+    // Draw the combo box
+    if (ImGui::BeginCombo(label, currentSpriteName.c_str())) {
+        // Get all available sprites
+        std::vector<std::string> allSprites = Engine::TextureManager::GetAllSpriteNames();
+
+        // Add "None" option
+        if (ImGui::Selectable("<None>", currentSpriteName.empty())) {
+            spriteNameValue = "";
+            changed = true;
+        }
+
+        // Search filter
+        static char searchBuffer[128] = "";
+        ImGui::InputTextWithHint("##search", "Search sprites...", searchBuffer, sizeof(searchBuffer));
+
+        std::string searchStr = searchBuffer;
+        std::transform(searchStr.begin(), searchStr.end(), searchStr.begin(), ::tolower);
+
+        ImGui::Separator();
+
+        // Display filtered sprite list
+        for (const auto& spriteName : allSprites) {
+            // Filter based on search
+            if (!searchStr.empty()) {
+                std::string lowerName = spriteName;
+                std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
+                if (lowerName.find(searchStr) == std::string::npos) {
+                    continue;
+                }
+            }
+
+            bool isSelected = (spriteName == currentSpriteName);
+
+            if (ImGui::Selectable(spriteName.c_str(), isSelected)) {
+                spriteNameValue = spriteName;  // Store the name, not the ID
+                changed = true;
+
+                // Clear search when item selected
+                searchBuffer[0] = '\0';
+            }
+
+            // Show texture preview on hover
+            if (ImGui::IsItemHovered()) {
+                Engine::TextureInfo info = Engine::TextureManager::GetTexture(spriteName);
+                if (info.ID != 0) {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("%s", spriteName.c_str());
+                    ImGui::Text("Size: %dx%d", info.Width, info.Height);
+                    ImGui::Text("Source: %s", info.SourceFilePath.string().c_str());
+
+                    // Optional: Show texture preview (small thumbnail)
+                    const float previewSize = 128.0f;
+                    ImGui::Image(
+                        (void*)static_cast<intptr_t>(info.ID),
+                        ImVec2(previewSize, previewSize),
+                        ImVec2(info.TextureUVRect.x, info.TextureUVRect.y + info.TextureUVRect.w),
+                        ImVec2(info.TextureUVRect.x + info.TextureUVRect.z, info.TextureUVRect.y)
+                    );
+
+                    ImGui::EndTooltip();
+                }
+            }
+        }
+
+        ImGui::EndCombo();
+    }
+
+    ImGui::PopID();
+    return changed;
+}
+
+// Update DrawJsonField signature and logic
+bool InspectorUI::DrawJsonField(const char* label, nlohmann::json& value, bool isSpriteComponent) {
     bool changed = false;
     ImGui::PushID(label);
+
+    if (isSpriteComponent && std::string(label) == "spriteName") {  // Changed from "textureID"
+        changed = DrawSpriteField(label, value);
+        ImGui::PopID();
+        return changed;
+    }
 
     if (value.is_boolean()) {
         bool v = value.get<bool>();
@@ -158,9 +250,9 @@ bool InspectorUI::DrawJsonField(const char* label, nlohmann::json& value) {
                            std::all_of(lbl.begin() + 1, lbl.end(), ::isdigit);
 
         if (isMxWrapper) {
-            // Unwrap directly (skip showing "mX")
+            // Unwrap directly (skip showing "mX") - PASS THE FLAG THROUGH
             for (auto& [key, val] : value.items()) {
-                changed |= DrawJsonField(key.c_str(), val);
+                changed |= DrawJsonField(key.c_str(), val, isSpriteComponent); // Pass flag here!
             }
         }
         else if (value.contains("x") && value.contains("y")) {
@@ -227,7 +319,7 @@ bool InspectorUI::DrawJsonField(const char* label, nlohmann::json& value) {
             // Normal nested object
             if (ImGui::TreeNode(label)) {
                 for (auto& [key, val] : value.items()) {
-                    changed |= DrawJsonField(key.c_str(), val);
+                    changed |= DrawJsonField(key.c_str(), val, isSpriteComponent); // Pass flag here!
                 }
                 ImGui::TreePop();
             }

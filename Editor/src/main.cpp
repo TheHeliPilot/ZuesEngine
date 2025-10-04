@@ -280,6 +280,8 @@ int main() {
         return -1;
     }
 
+    Engine::TextureManager::ScanAndRegisterAllSprites(EditorUi::projectDir.string());
+
     // --- ImGui ---
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();

@@ -35,15 +35,14 @@ namespace Engine::ECS::Component {
     };
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TransformComponent, worldPosition, worldRotation, localPosition, localRotation, parent)
 
-    // 2. Sprite Component
     struct SpriteComponent {
-        uint32_t textureID = 0;
+        std::string spriteName = "";  // Changed from uint32_t textureID
         Math::Vec2 size = {1.0f, 1.0f};
         Math::Vec4 color = {1.0f, 1.0f, 1.0f, 1.0f};
-        int layer = 0;      // Primary sorting key (e.g., Background=0, Default=1, UI=2)
-        int sortOrder = 0;  // Secondary sorting key within a layer (for elements on the same layer)
+        int layer = 0;
+        int sortOrder = 0;
     };
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteComponent, textureID, size, color, layer, sortOrder)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteComponent, spriteName, size, color, layer, sortOrder)
 
     // 3. Camera Component
     struct CameraComponent {

@@ -10,6 +10,7 @@
 #include "Log.h"
 #include "Types.h"
 #include "EngineDefines.h"
+#include "TextureManager.h"
 #include "Network.h"
 #include "EventSystem/EventSystem.h"
 #include "EventSystem/Events.h"

@@ -55,7 +55,7 @@ namespace Engine {
             // Note: worldScale is not in TransformComponent, so we omit it.
         });
         world->AddComponent<ECS::Component::SpriteComponent>(parent1, {
-            .textureID = textureHandle,
+            .spriteName = "",
             .size = {2.0f, 2.0f}, // Using Sprite size for visual scale
             .color = {1.0f, 0.0f, 0.0f, 1.0f}, // Red
         });
@@ -68,7 +68,7 @@ namespace Engine {
             .parent = parent1 // <-- SETTING HIERARCHY HERE
         });
         world->AddComponent<ECS::Component::SpriteComponent>(child1_1, {
-            .textureID = textureHandle,
+            .spriteName = "",
             .size = {1.0f, 1.0f},
             .color = {0.0f, 1.0f, 0.0f, 1.0f}, // Green
         });
@@ -80,7 +80,7 @@ namespace Engine {
             .parent = child1_1 // <-- SETTING HIERARCHY HERE
         });
         world->AddComponent<ECS::Component::SpriteComponent>(grandchild1_1_1, {
-            .textureID = textureHandle,
+            .spriteName = "",
             .size = {0.5f, 0.5f},
             .color = {0.0f, 0.0f, 1.0f, 1.0f}, // Blue
         });
@@ -92,7 +92,7 @@ namespace Engine {
             .worldRotation = 90.0f,
         });
         world->AddComponent<ECS::Component::SpriteComponent>(parent2, {
-            .textureID = textureHandle,
+            .spriteName = "",
             .size = {1.5f, 1.5f},
             .color = {1.0f, 1.0f, 0.0f, 1.0f}, // Yellow
         });
@@ -105,7 +105,7 @@ namespace Engine {
             .parent = parent2 // <-- SETTING HIERARCHY HERE
         });
         world->AddComponent<ECS::Component::SpriteComponent>(child2_1, {
-            .textureID = textureHandle,
+            .spriteName = "",
             .size = {0.7f, 0.7f},
             .color = {0.0f, 1.0f, 1.0f, 1.0f}, // Cyan
         });

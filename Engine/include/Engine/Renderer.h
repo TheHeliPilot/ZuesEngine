@@ -163,7 +163,7 @@ namespace Engine {
             uint32_t EditorFBO = 0;
             uint32_t ColorAttachment = 0;
             uint32_t DepthAttachment = 0;
-
+            uint32_t LastFrameVertexCount = 0;
             // Camera/Viewport Data
             float ViewportWidth = 0.0f;
             float ViewportHeight = 0.0f;

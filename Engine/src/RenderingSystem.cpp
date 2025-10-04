@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cmath> // For degrees to radians constant
 
+#include "../include/Engine/TextureManager.h"
+
 RenderingSystem::RenderingSystem() {
     role = SystemRole::Shared;
 }
@@ -65,14 +67,31 @@ void RenderingSystem::Run(World* world, const float deltaTime) {
     // 4. EndBatch is deferred to outside the systems (e.g., main.cpp)
 }
 
-// The per-entity logic: Only submits data to the batch buffer.
 void RenderingSystem::Update(float deltaTime, Engine::ECS::Component::TransformComponent* pos, Engine::ECS::Component::SpriteComponent* sprite) {
+    // Skip rendering if fully transparent
+    if (sprite->color.w <= 0.0f ||sprite->spriteName == "") {
+        return;
+    }
+
+    uint32_t textureID = 0;
+    Engine::Math::Vec4 uvRect = {0.0f, 0.0f, 1.0f, 1.0f};
+
+    if (!sprite->spriteName.empty()) {
+        Engine::TextureInfo texInfo = Engine::TextureManager::GetTexture(sprite->spriteName);
+
+        if (texInfo.ID != 0) {
+            textureID = texInfo.ID;
+            uvRect = texInfo.TextureUVRect;
+        }
+    }
+
     Engine::Renderer::SubmitQuad(
         pos->worldPosition,
-        // Convert from degrees (in the component) to radians (for the Renderer)
-        pos->worldRotation * Engine::Math::DEGREES_TO_RADIANS,
+        0,
         sprite->size,
         sprite->color,
-        sprite->textureID
+        textureID,
+        0.0f,
+        uvRect
     );
 }

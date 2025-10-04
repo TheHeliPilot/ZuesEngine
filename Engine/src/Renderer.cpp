@@ -2,6 +2,7 @@
 // Created by bucka on 9/26/2025.
 //
 
+#include "../include/Engine/Engine.h"
 #include "../include/Engine/Renderer.h"
 
 #include <array>
@@ -14,22 +15,23 @@
 #include "../include/stb/stb_truetype.h"
 
 #define STB_IMAGE_IMPLEMENTATION
+#include "../include/Engine/Log.h"
 #include "../include/stb/stb_image.h"
 
 // --- Default Shader Source ---
 // This is a minimal 2D shader that processes the batched vertices.
 // NOTE: u_ViewProjection and u_Textures must match the uniforms in your Renderer.Init()
 const char* VertexShaderSource = R"(
-// ... (Shader source remains the same) ...
+// Vertex Shader
 #version 330 core
-layout (location = 0) in vec4 a_Position; // x, y, z, w (z is depth, w is homogeneous component)
+layout (location = 0) in vec3 a_Position;
 layout (location = 1) in vec4 a_Color;
 layout (location = 2) in vec2 a_TexCoord;
 layout (location = 3) in float a_TexID;
 
 out vec4 v_Color;
 out vec2 v_TexCoord;
-out float v_TexID;
+flat out float v_TexID;  // <<< ADD 'flat' HERE
 
 uniform mat4 u_ViewProjection;
 
@@ -38,38 +40,25 @@ void main()
     v_Color = a_Color;
     v_TexCoord = a_TexCoord;
     v_TexID = a_TexID;
-    gl_Position = u_ViewProjection * a_Position;
+    gl_Position = u_ViewProjection * vec4(a_Position, 1.0);
 }
 )";
 
 const char* FragmentShaderSource = R"(
-// ... (Shader source remains the same) ...
+// Fragment Shader
 #version 330 core
 in vec4 v_Color;
 in vec2 v_TexCoord;
-in float v_TexID;
+flat in float v_TexID;  // <<< ADD 'flat' HERE
 
 out vec4 f_Color;
 
-uniform sampler2D u_Textures[32]; // Must match MAX_TEXTURE_SLOTS
+uniform sampler2D u_Textures[32];
 
 void main()
 {
-    // Sample the correct texture from the array based on v_TexID
-    // Since we applied GL_TEXTURE_SWIZZLE_RGBA, all components hold the opacity value.
-    float opacity = texture(u_Textures[int(v_TexID)], v_TexCoord).a;
-
-    // 🔑 FIX:
-    // 1. Start with the desired text color (v_Color).
-    f_Color = v_Color;
-
-    // 2. ONLY modulate the final alpha channel using the opacity from the texture atlas.
-    f_Color.a *= opacity;
-
-    // Optional: discard fragments that are completely transparent (can improve performance)
-    // if (f_Color.a < 0.01) {
-    //     discard;
-    // }
+    vec4 texColor = texture(u_Textures[int(v_TexID)], v_TexCoord);
+    f_Color = texColor * v_Color;
 }
 )";
 
@@ -81,15 +70,6 @@ namespace Engine {
     // --- Math Constants (Used internally) ---
     constexpr float PI = 3.14159265359f;
     constexpr float DEGREES_TO_RADIANS = PI / 180.0f;
-
-    // --- Batching Data and Constants ---
-    // Moved the structs/constants from the local scope to match the private members of Renderer
-    struct Vertex {
-        Math::Vec2 Position;
-        Math::Vec4 Color;
-        Math::Vec2 TexCoord;
-        float TexID; // Texture slot ID (0-31)
-    };
 
     std::array<Engine::Math::Vec4, 4> QuadVertexPositions = {
         Engine::Math::Vec4(-0.5f, -0.5f, 0.0f, 1.0f), // Bottom-Left
@@ -225,7 +205,7 @@ namespace Engine {
         // OpenGL Global State
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glEnable(GL_DEPTH_TEST); // Optional for 2D, but good for z-ordering
+        //glEnable(GL_DEPTH_TEST); // Optional for 2D, but good for z-ordering
 
         // 1. Compile Shader
         // CRITICAL FIX 2: Now calls the correct signature of CompileShader.
@@ -410,52 +390,58 @@ namespace Engine {
     void Renderer::BeginBatch() {
         if (s_Data == nullptr) return;
 
+        // OPTIMIZED: Only clear the memory that was actually used in the previous frame
+        // This avoids clearing the entire 2.5MB buffer (20000 quads * 4 vertices * 32 bytes)
+        if (s_Data->LastFrameVertexCount > 0) {
+            memset(s_Data->VertexBufferBase, 0, s_Data->LastFrameVertexCount * sizeof(Vertex));
+        }
 
-        SetTextureUniforms();
-        // Reset the data for a new batch
+        // Reset batching state
         s_Data->IndexCount = 0;
         s_Data->VertexBufferPtr = s_Data->VertexBufferBase;
         s_Data->TextureSlotIndex = 1; // Keep white texture at slot 0
+
+        SetTextureUniforms();
     }
 
     void Renderer::EndBatch() {
-        // Check if there's anything to draw
         if (s_Data->IndexCount == 0) return;
 
-        // 1. Calculate the actual number of vertices written
-        const GLsizeiptr size = (uint8_t*)s_Data->VertexBufferPtr - (uint8_t*)s_Data->VertexBufferBase;
+        // Calculate vertices written
+        const uint32_t verticesWritten = s_Data->VertexBufferPtr - s_Data->VertexBufferBase;
 
-        // 2. Upload the accumulated vertex data to the GPU
+        // Store for next frame's cleanup
+        s_Data->LastFrameVertexCount = verticesWritten;
+
+        // Only upload what we actually wrote
+        const GLsizeiptr size = verticesWritten * sizeof(Vertex);
+
         glBindBuffer(GL_ARRAY_BUFFER, s_Data->QuadVBO);
         glBufferSubData(GL_ARRAY_BUFFER, 0, size, s_Data->VertexBufferBase);
 
-        // 3. Bind the shader program and upload uniforms
         glUseProgram(s_Data->ShaderID);
 
-        // --- CRITICAL FIX: UPLOAD THE VIEW-PROJECTION MATRIX ---
-        const GLint location = glGetUniformLocation(s_Data->ShaderID, "u_ViewProjection");
-        if (location != -1) {
-            // The Mat4::elements is an array of 16 floats.
-            glUniformMatrix4fv(location, 1, GL_FALSE, s_Data->ViewProjectionMatrix.elements);
+        const GLint vpLocation = glGetUniformLocation(s_Data->ShaderID, "u_ViewProjection");
+        if (vpLocation != -1) {
+            glUniformMatrix4fv(vpLocation, 1, GL_FALSE, s_Data->ViewProjectionMatrix.elements);
         }
-        // -----------------------------------------------------
 
-        // 4. Bind textures
         for (uint32_t i = 0; i < s_Data->TextureSlotIndex; i++) {
             glActiveTexture(GL_TEXTURE0 + i);
             glBindTexture(GL_TEXTURE_2D, s_Data->TextureSlots[i]);
         }
 
-        // 5. Perform the draw call (Draws quads to the currently bound FBO)
         glBindVertexArray(s_Data->QuadVAO);
+
+        // Only draw the indices we actually need
         glDrawElements(GL_TRIANGLES, s_Data->IndexCount, GL_UNSIGNED_INT, nullptr);
 
-        // 6. Reset batching state
+        // Reset state for next batch (but don't clear LastFrameVertexCount yet)
         s_Data->IndexCount = 0;
         s_Data->VertexBufferPtr = s_Data->VertexBufferBase;
+        s_Data->TextureSlotIndex = 1;
 
-        // 7. Unbind the FBO (crucial: draws are complete, return to default framebuffer)
-        glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind FBO
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     // In Renderer.cpp
@@ -489,104 +475,98 @@ namespace Engine {
 
     // Detailed Quad Submission (The worker function: Includes Z-depth and UV Rect for texture cutting)
     void Renderer::SubmitQuad(
-        const Math::Vec2& position,
-        const float rotation,
-        const Math::Vec2& size,
-        const Math::Vec4& color,
-        const uint32_t textureID,
-        const float z,
-        const Math::Vec4& textureUVRect // { u0, v0, u1, v1 }
-    ) {
-        if (s_Data == nullptr) return;
+    const Math::Vec2& position,
+    const float rotation,
+    const Math::Vec2& size,
+    const Math::Vec4& color,
+    const uint32_t textureID,
+    const float z,
+    const Math::Vec4& textureUVRect
+) {
+    if (s_Data == nullptr) return;
 
-        // --- 1. Texture Slot Logic (Finding/Assigning) ---
-        float textureSlot = 0.0f; // Slot 0.0f is reserved for the white texture
+    // --- CHECK BUFFER SPACE FIRST (BEFORE any state changes) ---
+    if (s_Data->IndexCount + 6 > MaxIndices) {
+        EndBatch();
+        BeginBatch();
+    }
 
-        if (textureID > 0) {
-            bool found = false;
-            // Search for existing slot (skip slot 0, which is white)
-            for (uint32_t i = 1; i < s_Data->TextureSlotIndex; i++) {
-                if (s_Data->TextureSlots[i] == textureID) {
-                    textureSlot = static_cast<float>(i);
-                    found = true;
-                    break;
-                }
+    // --- 1. Texture Slot Logic (Finding/Assigning) ---
+    float textureSlot = 0.0f;
+
+    if (textureID > 0) {
+        bool found = false;
+        // Search for existing slot (skip slot 0, which is white)
+        for (uint32_t i = 1; i < s_Data->TextureSlotIndex; i++) {
+            if (s_Data->TextureSlots[i] == textureID) {
+                textureSlot = static_cast<float>(i);
+                found = true;
+                break;
             }
+        }
 
-            // Assign new slot if not found
-            if (!found) {
-                // If we run out of slots OR indices, flush the batch
-                // MaxIndices is assumed to be defined globally in Renderer.cpp or a config file.
-                if (s_Data->IndexCount + 6 > MaxIndices || s_Data->TextureSlotIndex >= MAX_TEXTURE_SLOTS) {
-                    EndBatch();
-                    BeginBatch();
-                }
+        // Assign new slot if not found
+        if (!found) {
+            // If we're out of texture slots, flush
+            if (s_Data->TextureSlotIndex >= MAX_TEXTURE_SLOTS) {
+                EndBatch();
+                BeginBatch();
+                // After flush, slot 0 is white and slot 1+ are empty
+                // So assign to slot 1
+                textureSlot = 1.0f;
+                s_Data->TextureSlots[1] = textureID;
+                s_Data->TextureSlotIndex = 2;
+            } else {
+                // Normal case: assign to next available slot
                 textureSlot = static_cast<float>(s_Data->TextureSlotIndex);
                 s_Data->TextureSlots[s_Data->TextureSlotIndex] = textureID;
                 s_Data->TextureSlotIndex++;
             }
         }
-
-        // Check buffer size again after texture logic (in case EndBatch/BeginBatch was called)
-        // MaxIndices is assumed to be defined globally.
-        if (s_Data->IndexCount + 6 > MaxIndices) {
-            EndBatch();
-            BeginBatch();
-        }
-
-
-        // --- 2. Calculate Transform and Define Local Data ---
-
-        // Create the Model Matrix (Translation * Rotation * Scale)
-        // FIX: Explicitly construct Math::Vec3 to avoid ambiguous overload resolution with Math::Vec2
-        // FIX: Use Math::Mat4::Rotate(angle) instead of Math::Mat4::RotateZ(angle)
-        const Math::Mat4 transform = Math::Mat4::Translate(Math::Vec2(position.x, position.y))
-                                   * Math::Mat4::Rotate(rotation) // Assumes this performs 2D (Z-axis) rotation
-                                   * Math::Mat4::Scale(Math::Vec2(size.x, size.y));
-
-        // Local positions of the quad corners (centered at 0,0, unit size)
-        const Math::Vec2 quadPositions[4] = {
-            {-0.5f, -0.5f}, // V0: Bottom-left
-            { 0.5f, -0.5f}, // V1: Bottom-right
-            { 0.5f,  0.5f}, // V2: Top-right
-            {-0.5f,  0.5f}  // V3: Top-left
-        };
-
-        // Calculate the UV coordinates from the input rect {u_min, v_min, u_max, v_max}
-        const float u0 = textureUVRect.x; // Min U
-        const float v0 = textureUVRect.y; // Min V
-        const float u1 = textureUVRect.z; // Max U
-        const float v1 = textureUVRect.w; // Max V
-
-        // Map the new UVs to the vertices based on winding order (0:BL, 1:BR, 2:TR, 3:TL)
-        const Math::Vec2 QuadTexCoords[4] = {
-            {u0, v0}, // V0: Bottom-left
-            {u1, v0}, // V1: Bottom-right
-            {u1, v1}, // V2: Top-right
-            {u0, v1}  // V3: Top-left
-        };
-
-        // --- 3. Write 4 Vertices to the Buffer ---
-        for (int i = 0; i < 4; ++i) {
-            // Apply 2D transform (using a dummy z=0.0f for the 4x4 multiplication)
-            // CRITICAL: The Z component of the world position is set to 0.0f for the transform,
-            // but the final vertex Z is set using the input 'z' parameter for depth.
-            const Math::Vec4 transformedPos = transform * Math::Vec4(quadPositions[i].x, quadPositions[i].y, 0.0f, 1.0f);
-
-            // Write the Position (using the input 'z' parameter for depth)
-            s_Data->VertexBufferPtr->Position.x = transformedPos.x;
-            s_Data->VertexBufferPtr->Position.y = transformedPos.y;
-            s_Data->VertexBufferPtr->Position.z = z; // Z depth comes from the function parameter
-
-            s_Data->VertexBufferPtr->Color = color;
-            s_Data->VertexBufferPtr->TexCoord = QuadTexCoords[i];
-            s_Data->VertexBufferPtr->TexID = textureSlot;
-            s_Data->VertexBufferPtr++;
-        }
-
-        // Increment the index count (6 indices per quad)
-        s_Data->IndexCount += 6;
     }
+
+    // --- 2. Calculate Transform ---
+    const Math::Mat4 transform = Math::Mat4::Translate(Math::Vec2(position.x, position.y))
+                               * Math::Mat4::Rotate(rotation)
+                               * Math::Mat4::Scale(Math::Vec2(size.x, size.y));
+
+    const Math::Vec2 quadPositions[4] = {
+        {-0.5f, -0.5f}, // V0: Bottom-left
+        { 0.5f, -0.5f}, // V1: Bottom-right
+        { 0.5f,  0.5f}, // V2: Top-right
+        {-0.5f,  0.5f}  // V3: Top-left
+    };
+
+    // Calculate UV coordinates
+    const float u0 = textureUVRect.x;
+    const float v0 = textureUVRect.y;
+    const float u1 = textureUVRect.z;
+    const float v1 = textureUVRect.w;
+
+    const Math::Vec2 QuadTexCoords[4] = {
+        {u0, v0}, // V0: Bottom-left
+        {u1, v0}, // V1: Bottom-right
+        {u1, v1}, // V2: Top-right
+        {u0, v1}  // V3: Top-left
+    };
+
+    // --- 3. Write 4 Vertices to the Buffer ---
+    for (int i = 0; i < 4; ++i) {
+        const Math::Vec4 transformedPos = transform * Math::Vec4(quadPositions[i].x, quadPositions[i].y, 0.0f, 1.0f);
+
+        s_Data->VertexBufferPtr->Position.x = transformedPos.x;
+        s_Data->VertexBufferPtr->Position.y = transformedPos.y;
+        s_Data->VertexBufferPtr->Position.z = z;
+
+        s_Data->VertexBufferPtr->Color = color;
+        s_Data->VertexBufferPtr->TexCoord = QuadTexCoords[i];
+        s_Data->VertexBufferPtr->TexID = textureSlot;
+        s_Data->VertexBufferPtr++;
+    }
+
+    // Increment the index count
+    s_Data->IndexCount += 6;
+}
 
     // --- Camera Management Implementation ---
     void Renderer::SetCamera(const Math::Vec2& position, const float zoom, const float halfHeight, const float rotationRadians) {
