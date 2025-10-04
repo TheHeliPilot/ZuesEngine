@@ -69,17 +69,16 @@ void RenderingSystem::Run(World* world, const float deltaTime) {
 
 void RenderingSystem::Update(float deltaTime, Engine::ECS::Component::TransformComponent* pos, Engine::ECS::Component::SpriteComponent* sprite) {
     // Skip rendering if fully transparent
-    if (sprite->color.w <= 0.0f ||sprite->spriteName == "")  {
-        return;
+    if (sprite->color.w <= 0.0f || sprite->spriteName == "")  {
+        //TODO: FIX!!!
+        //return;
     }
 
     uint32_t textureID = 0;
     Engine::Math::Vec4 uvRect = {0.0f, 0.0f, 1.0f, 1.0f};
 
     if (!sprite->spriteName.empty()) {
-        Engine::TextureInfo texInfo = Engine::TextureManager::GetTexture(sprite->spriteName);
-
-        if (texInfo.ID != 0) {
+        if (const Engine::TextureInfo texInfo = Engine::TextureManager::GetTexture(sprite->spriteName); texInfo.ID != 0) {
             textureID = texInfo.ID;
             uvRect = texInfo.TextureUVRect;
         }

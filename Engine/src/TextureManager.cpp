@@ -15,6 +15,10 @@
 #include "../include//stb/stb_image.h"               // Required for image loading
 
 namespace Engine {
+
+    constexpr uint32_t CURRENT_META_FILE_VERSION = 2;
+
+
     // Initialize the static map storage
     std::unordered_map<std::string, TextureInfo> TextureManager::s_TextureMap;
 
@@ -72,7 +76,6 @@ namespace Engine {
         stbi_image_free(data);
 
         const std::vector<std::filesystem::path> metafilePaths = FindWildcardMetaFile(filePath, ".spriteMeta");
-        const uint32_t CURRENT_META_FILE_VERSION = 1;
 
         // Get filename without extension for default sprite name
         std::string defaultSpriteName = GetFileNameWithoutExtension(filePath);
@@ -215,7 +218,7 @@ namespace Engine {
         }
 
         // 3. Check if sprite name already exists
-        if (s_TextureMap.count(newSpriteName) > 0) {
+        if (s_TextureMap.contains(newSpriteName)) {
             LOG_ERROR("Sprite name already exists: " + newSpriteName);
             return false;
         }
@@ -224,7 +227,7 @@ namespace Engine {
         uint32_t nextNumber = GetNextMetaFileNumber(sourceTexturePath, ".spriteMeta");
 
         // 5. Create the metafile path
-        std::string metaFileName = sourceTexturePath + "." + std::to_string(nextNumber) + ".spriteMeta";
+        std::string metaFileName = newSpriteName + ".spriteMeta";
 
         // 6. Write the metafile
         std::ofstream file(metaFileName);
@@ -233,7 +236,6 @@ namespace Engine {
             return false;
         }
 
-        const uint32_t CURRENT_META_FILE_VERSION = 2;
         file << "SpriteMetaFileVersion: " << CURRENT_META_FILE_VERSION << "\n";
         file << "SpriteName: " << newSpriteName << "\n";
         file << "SourceFilePath: " << sourceTexturePath << "\n";  // ADD THIS LINE
@@ -588,7 +590,6 @@ namespace Engine {
             return info;
         }
 
-        const uint32_t CURRENT_VERSION = 1;
         std::string line;
         uint32_t version = 0;
         bool expectingUVRectValue = false;
@@ -833,25 +834,23 @@ namespace Engine {
 
         while (std::getline(inFile, line)) {
             if (line.find("Texture UV Rect:") == 0) {
+                // Keep the "Texture UV Rect:" header line
                 lines.push_back(line);
-                inUVRect = true;
-                uvLineCount = 0;
-            } else if (inUVRect && uvLineCount < 4) {
-                // Replace the old UV values with new ones
-                switch (uvLineCount) {
-                    case 0: lines.push_back(std::to_string(newUVRect.x)); break;
-                    case 1: lines.push_back(std::to_string(newUVRect.y)); break;
-                    case 2: lines.push_back(std::to_string(newUVRect.z)); break;
-                    case 3: lines.push_back(std::to_string(newUVRect.w)); break;
-                }
-                uvLineCount++;
-                if (uvLineCount == 4) {
-                    inUVRect = false;
-                }
+
+                // Skip the next 4 lines (old UVs)
+                std::string dummy;
+                for (int i = 0; i < 4 && std::getline(inFile, dummy); ++i) {}
+
+                // Write the new UVs
+                lines.push_back(std::to_string(newUVRect.x));
+                lines.push_back(std::to_string(newUVRect.y));
+                lines.push_back(std::to_string(newUVRect.z));
+                lines.push_back(std::to_string(newUVRect.w));
             } else {
                 lines.push_back(line);
             }
         }
+
         inFile.close();
 
         // 6. Write the updated metafile
