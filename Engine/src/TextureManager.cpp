@@ -15,274 +15,30 @@
 #include "../include//stb/stb_image.h"               // Required for image loading
 
 namespace Engine {
-
     // Initialize the static map storage
     std::unordered_map<std::string, TextureInfo> TextureManager::s_TextureMap;
 
     // Add these functions to your TextureManager class
 
-// Helper function to get filename without extension
-std::string TextureManager::GetFileNameWithoutExtension(const std::string& filePath) {
-    std::filesystem::path p(filePath);
-    return p.stem().string();
-}
-
-// Modified LoadTexture - now uses filename without extension as default key
-void TextureManager::LoadTexture(const std::string &filePath) {
-    // Load image data using stb_image
-    int width, height, channels;
-    stbi_set_flip_vertically_on_load(1);
-    unsigned char* data = stbi_load(filePath.c_str(), &width, &height, &channels, 0);
-
-    if (!data) {
-        LOG_ERROR("Failed to load texture file: " + filePath);
-        return;
+    // Helper function to get filename without extension
+    std::string TextureManager::GetFileNameWithoutExtension(const std::string& filePath) {
+        std::filesystem::path p(filePath);
+        return p.stem().string();
     }
 
-    // Determine OpenGL format based on channels
-    GLenum internalFormat = 0, dataFormat = 0;
-    if (channels == 4) {
-        internalFormat = GL_RGBA8;
-        dataFormat = GL_RGBA;
-    } else if (channels == 3) {
-        internalFormat = GL_RGB8;
-        dataFormat = GL_RGB;
-    } else {
-        LOG_ERROR("Unsupported texture channel count (" + std::to_string(channels) + ") for: " + filePath);
-        stbi_image_free(data);
-        return;
-    }
+    // Modified LoadTexture - now uses filename without extension as default key
+    void TextureManager::LoadTexture(const std::string &filePath) {
+        // Load image data using stb_image
+        int width, height, channels;
+        stbi_set_flip_vertically_on_load(1);
+        unsigned char* data = stbi_load(filePath.c_str(), &width, &height, &channels, 0);
 
-    // Create OpenGL texture object
-    uint32_t textureID;
-    glGenTextures(1, &textureID);
-    glBindTexture(GL_TEXTURE_2D, textureID);
-
-    // Set texture parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-    // Load the data into the texture
-    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, dataFormat, GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D);
-
-    // Unbind the texture and free the local image buffer
-    glBindTexture(GL_TEXTURE_2D, 0);
-    stbi_image_free(data);
-
-    const std::vector<std::filesystem::path> metafilePaths = FindWildcardMetaFile(filePath, ".spriteMeta");
-    const uint32_t CURRENT_META_FILE_VERSION = 1;
-
-    // Get filename without extension for default sprite name
-    std::string defaultSpriteName = GetFileNameWithoutExtension(filePath);
-
-    if (metafilePaths.empty()) {
-        // Create default metafile
-        std::string metaFileName = filePath + ".spriteMeta";
-
-        std::ofstream file(metaFileName);
-        if (!file.is_open()) {
-            LOG_ERROR("Unable to save metafile for texture: " + filePath);
-            glDeleteTextures(1, &textureID);
+        if (!data) {
+            LOG_ERROR("Failed to load texture file: " + filePath);
             return;
         }
 
-        file << "SpriteMetaFileVersion: " << CURRENT_META_FILE_VERSION << "\n";
-        file << "SpriteName: " << defaultSpriteName << "\n";
-        file << "Texture UV Rect:\n";
-        file << "0\n0\n1\n1\n";
-        file.close();
-
-        // Store in map with filename (no extension) as key
-        TextureInfo info;
-        info.ID = textureID;
-        info.Name = defaultSpriteName;
-        info.TextureUVRect = {0.0f, 0.0f, 1.0f, 1.0f};
-        info.Width = width;
-        info.Height = height;
-        info.SourceFilePath = filePath;
-        s_TextureMap[defaultSpriteName] = info;
-
-        LOG_INFO("Created default sprite: '" + defaultSpriteName + "' from " + filePath);
-    } else {
-        // Load from existing metafiles
-        for (const auto& metafilePath : metafilePaths) {
-            std::ifstream file(metafilePath);
-            if (!file.is_open()) {
-                LOG_ERROR("Unable to open metafile: " + metafilePath.string());
-                continue;
-            }
-
-            TextureInfo info;
-            std::string line;
-            uint32_t version = 0;
-            bool expectingUVRectValue = false;
-            int uvRectValuesRead = 0;
-
-            while (std::getline(file, line)) {
-                if (line.empty()) continue;
-
-                if (line.find("SpriteMetaFileVersion: ") == 0) {
-                    try {
-                        version = std::stoul(line.substr(23));
-                        if (version != CURRENT_META_FILE_VERSION) {
-                            LOG_WARN("Metafile version mismatch in " + metafilePath.string());
-                        }
-                    } catch (const std::exception& e) {
-                        LOG_ERROR("Failed to parse version in " + metafilePath.string());
-                        continue;
-                    }
-                }
-                else if (line.find("SpriteName: ") == 0) {
-                    info.Name = line.substr(12);
-                }
-                else if (line.find("Texture UV Rect:") == 0) {
-                    expectingUVRectValue = true;
-                    uvRectValuesRead = 0;
-                }
-                else if (expectingUVRectValue && uvRectValuesRead < 4) {
-                    try {
-                        float value = std::stof(line);
-                        if (uvRectValuesRead == 0) info.TextureUVRect.x = value;
-                        else if (uvRectValuesRead == 1) info.TextureUVRect.y = value;
-                        else if (uvRectValuesRead == 2) info.TextureUVRect.z = value;
-                        else if (uvRectValuesRead == 3) info.TextureUVRect.w = value;
-
-                        uvRectValuesRead++;
-                        if (uvRectValuesRead == 4) {
-                            expectingUVRectValue = false;
-                        }
-                    } catch (const std::exception& e) {
-                        LOG_ERROR("Failed to parse UV value in " + metafilePath.string());
-                    }
-                }
-            }
-
-            file.close();
-
-            if (version == 0 || uvRectValuesRead < 4) {
-                LOG_ERROR("Invalid metafile format: " + metafilePath.string());
-                continue;
-            }
-
-            // Store texture info
-            info.ID = textureID;
-            info.Width = width;
-            info.Height = height;
-            info.SourceFilePath = filePath;
-            s_TextureMap[info.Name] = info;
-        }
-    }
-
-    LOG_INFO("Texture loaded successfully: " + filePath + " (ID: " + std::to_string(textureID) + ")");
-}
-
-// NEW FUNCTION: Create a new sprite from an existing texture
-bool TextureManager::CreateSpriteFromTexture(
-    const std::string& sourceTexturePath,
-    const std::string& newSpriteName,
-    const Math::Vec4& uvRect  // x, y, width, height in [0,1] range
-) {
-    // 1. Validate UV coordinates
-    if (uvRect.x < 0.0f || uvRect.y < 0.0f ||
-        uvRect.z < 0.0f || uvRect.w < 0.0f ||
-        uvRect.x + uvRect.z > 1.0f || uvRect.y + uvRect.w > 1.0f) {
-        LOG_ERROR("Invalid UV coordinates for sprite: " + newSpriteName);
-        return false;
-    }
-
-    // 2. Find the source texture in our map to get its texture ID
-    uint32_t sourceTextureID = 0;
-    int sourceWidth = 0;
-    int sourceHeight = 0;
-
-    // Search through all loaded textures to find one with matching source path
-    bool foundSource = false;
-    for (const auto& [key, texInfo] : s_TextureMap) {
-        if (texInfo.SourceFilePath == sourceTexturePath) {
-            sourceTextureID = texInfo.ID;
-            sourceWidth = texInfo.Width;
-            sourceHeight = texInfo.Height;
-            foundSource = true;
-            break;
-        }
-    }
-
-    if (!foundSource) {
-        LOG_ERROR("Source texture not loaded: " + sourceTexturePath);
-        return false;
-    }
-
-    // 3. Check if sprite name already exists
-    if (s_TextureMap.count(newSpriteName) > 0) {
-        LOG_ERROR("Sprite name already exists: " + newSpriteName);
-        return false;
-    }
-
-    // 4. Get the next available metafile number
-    uint32_t nextNumber = GetNextMetaFileNumber(sourceTexturePath, ".spriteMeta");
-
-    // 5. Create the metafile path
-    std::string metaFileName = sourceTexturePath + "." + std::to_string(nextNumber) + ".spriteMeta";
-
-    // 6. Write the metafile
-    std::ofstream file(metaFileName);
-    if (!file.is_open()) {
-        LOG_ERROR("Unable to create metafile: " + metaFileName);
-        return false;
-    }
-
-    const uint32_t CURRENT_META_FILE_VERSION = 2;
-    file << "SpriteMetaFileVersion: " << CURRENT_META_FILE_VERSION << "\n";
-    file << "SpriteName: " << newSpriteName << "\n";
-    file << "SourceFilePath: " << sourceTexturePath << "\n";  // ADD THIS LINE
-    file << "Texture UV Rect:\n";
-    file << uvRect.x << "\n";
-    file << uvRect.y << "\n";
-    file << uvRect.z << "\n";
-    file << uvRect.w << "\n";
-    file.close();
-
-    // 7. Add the new sprite to the texture map
-    TextureInfo info;
-    info.ID = sourceTextureID;  // Share the same OpenGL texture ID
-    info.Name = newSpriteName;
-    info.TextureUVRect = uvRect;
-    info.Width = sourceWidth;
-    info.Height = sourceHeight;
-    info.SourceFilePath = sourceTexturePath;
-
-    s_TextureMap[newSpriteName] = info;
-
-    LOG_INFO("Created new sprite '" + newSpriteName + "' from " + sourceTexturePath + " (metafile: " + metaFileName + ")");
-    return true;
-}
-
-TextureInfo TextureManager::GetTexture(const std::string& textureName) {
-    auto it = s_TextureMap.find(textureName);
-    if (it == s_TextureMap.end()) {
-        if(textureName != "")
-            LOG_WARN("Texture not found: " + textureName);
-        return TextureInfo{};
-    }
-
-    // If texture ID is 0, it hasn't been loaded yet - lazy load it now
-    if (it->second.ID == 0 && !it->second.SourceFilePath.empty()) {
-        LOG_INFO("Lazy-loading texture: " + textureName);
-
-        // Load the actual OpenGL texture
-        int width, height, channels;
-        stbi_set_flip_vertically_on_load(1);
-        unsigned char* data = stbi_load(it->second.SourceFilePath.string().c_str(),
-                                       &width, &height, &channels, 0);
-
-        if (!data) {
-            LOG_ERROR("Failed to lazy-load texture: " + it->second.SourceFilePath.string());
-            return it->second;
-        }
-
+        // Determine OpenGL format based on channels
         GLenum internalFormat = 0, dataFormat = 0;
         if (channels == 4) {
             internalFormat = GL_RGBA8;
@@ -291,34 +47,277 @@ TextureInfo TextureManager::GetTexture(const std::string& textureName) {
             internalFormat = GL_RGB8;
             dataFormat = GL_RGB;
         } else {
-            LOG_ERROR("Unsupported channel count for lazy-load: " + std::to_string(channels));
+            LOG_ERROR("Unsupported texture channel count (" + std::to_string(channels) + ") for: " + filePath);
             stbi_image_free(data);
-            return it->second;
+            return;
         }
 
+        // Create OpenGL texture object
         uint32_t textureID;
         glGenTextures(1, &textureID);
         glBindTexture(GL_TEXTURE_2D, textureID);
+
+        // Set texture parameters
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0,
-                    dataFormat, GL_UNSIGNED_BYTE, data);
+
+        // Load the data into the texture
+        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, dataFormat, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
+
+        // Unbind the texture and free the local image buffer
         glBindTexture(GL_TEXTURE_2D, 0);
         stbi_image_free(data);
 
-        // Update the map entry with the loaded texture ID
-        it->second.ID = textureID;
-        it->second.Width = width;
-        it->second.Height = height;
+        const std::vector<std::filesystem::path> metafilePaths = FindWildcardMetaFile(filePath, ".spriteMeta");
+        const uint32_t CURRENT_META_FILE_VERSION = 1;
 
-        LOG_INFO("Lazy-loaded texture ID " + std::to_string(textureID) + " for: " + textureName);
+        // Get filename without extension for default sprite name
+        std::string defaultSpriteName = GetFileNameWithoutExtension(filePath);
+
+        if (metafilePaths.empty()) {
+            // Create default metafile
+            std::string metaFileName = filePath + ".spriteMeta";
+
+            std::ofstream file(metaFileName);
+            if (!file.is_open()) {
+                LOG_ERROR("Unable to save metafile for texture: " + filePath);
+                glDeleteTextures(1, &textureID);
+                return;
+            }
+
+            file << "SpriteMetaFileVersion: " << CURRENT_META_FILE_VERSION << "\n";
+            file << "SpriteName: " << defaultSpriteName << "\n";
+            file << "Texture UV Rect:\n";
+            file << "0\n0\n1\n1\n";
+            file.close();
+
+            // Store in map with filename (no extension) as key
+            TextureInfo info;
+            info.ID = textureID;
+            info.Name = defaultSpriteName;
+            info.TextureUVRect = {0.0f, 0.0f, 1.0f, 1.0f};
+            info.Width = width;
+            info.Height = height;
+            info.SourceFilePath = filePath;
+            s_TextureMap[defaultSpriteName] = info;
+
+            LOG_INFO("Created default sprite: '" + defaultSpriteName + "' from " + filePath);
+        } else {
+            // Load from existing metafiles
+            for (const auto& metafilePath : metafilePaths) {
+                std::ifstream file(metafilePath);
+                if (!file.is_open()) {
+                    LOG_ERROR("Unable to open metafile: " + metafilePath.string());
+                    continue;
+                }
+
+                TextureInfo info;
+                std::string line;
+                uint32_t version = 0;
+                bool expectingUVRectValue = false;
+                int uvRectValuesRead = 0;
+
+                while (std::getline(file, line)) {
+                    if (line.empty()) continue;
+
+                    if (line.find("SpriteMetaFileVersion: ") == 0) {
+                        try {
+                            version = std::stoul(line.substr(23));
+                            if (version != CURRENT_META_FILE_VERSION) {
+                                LOG_WARN("Metafile version mismatch in " + metafilePath.string());
+                            }
+                        } catch (const std::exception& e) {
+                            LOG_ERROR("Failed to parse version in " + metafilePath.string());
+                            continue;
+                        }
+                    }
+                    else if (line.find("SpriteName: ") == 0) {
+                        info.Name = line.substr(12);
+                    }
+                    else if (line.find("Texture UV Rect:") == 0) {
+                        expectingUVRectValue = true;
+                        uvRectValuesRead = 0;
+                    }
+                    else if (expectingUVRectValue && uvRectValuesRead < 4) {
+                        try {
+                            float value = std::stof(line);
+                            if (uvRectValuesRead == 0) info.TextureUVRect.x = value;
+                            else if (uvRectValuesRead == 1) info.TextureUVRect.y = value;
+                            else if (uvRectValuesRead == 2) info.TextureUVRect.z = value;
+                            else if (uvRectValuesRead == 3) info.TextureUVRect.w = value;
+
+                            uvRectValuesRead++;
+                            if (uvRectValuesRead == 4) {
+                                expectingUVRectValue = false;
+                            }
+                        } catch (const std::exception& e) {
+                            LOG_ERROR("Failed to parse UV value in " + metafilePath.string());
+                        }
+                    }
+                }
+
+                file.close();
+
+                if (version == 0 || uvRectValuesRead < 4) {
+                    LOG_ERROR("Invalid metafile format: " + metafilePath.string());
+                    continue;
+                }
+
+                // Store texture info
+                info.ID = textureID;
+                info.Width = width;
+                info.Height = height;
+                info.SourceFilePath = filePath;
+                s_TextureMap[info.Name] = info;
+            }
+        }
+
+        LOG_INFO("Texture loaded successfully: " + filePath + " (ID: " + std::to_string(textureID) + ")");
     }
 
-    return it->second;
-}
+    // NEW FUNCTION: Create a new sprite from an existing texture
+    bool TextureManager::CreateSpriteFromTexture(
+        const std::string& sourceTexturePath,
+        const std::string& newSpriteName,
+        const Math::Vec4& uvRect  // x, y, width, height in [0,1] range
+    ) {
+        // 1. Validate UV coordinates
+        if (uvRect.x < 0.0f || uvRect.y < 0.0f ||
+            uvRect.z < 0.0f || uvRect.w < 0.0f ||
+            uvRect.x + uvRect.z > 1.0f || uvRect.y + uvRect.w > 1.0f) {
+            LOG_ERROR("Invalid UV coordinates for sprite: " + newSpriteName);
+            return false;
+            }
+
+        // 2. Find the source texture in our map to get its texture ID
+        uint32_t sourceTextureID = 0;
+        int sourceWidth = 0;
+        int sourceHeight = 0;
+
+        // Search through all loaded textures to find one with matching source path
+        bool foundSource = false;
+        for (const auto& [key, texInfo] : s_TextureMap) {
+            if (texInfo.SourceFilePath == sourceTexturePath) {
+                sourceTextureID = texInfo.ID;
+                sourceWidth = texInfo.Width;
+                sourceHeight = texInfo.Height;
+                foundSource = true;
+                break;
+            }
+        }
+
+        if (!foundSource) {
+            LOG_ERROR("Source texture not loaded: " + sourceTexturePath);
+            return false;
+        }
+
+        // 3. Check if sprite name already exists
+        if (s_TextureMap.count(newSpriteName) > 0) {
+            LOG_ERROR("Sprite name already exists: " + newSpriteName);
+            return false;
+        }
+
+        // 4. Get the next available metafile number
+        uint32_t nextNumber = GetNextMetaFileNumber(sourceTexturePath, ".spriteMeta");
+
+        // 5. Create the metafile path
+        std::string metaFileName = sourceTexturePath + "." + std::to_string(nextNumber) + ".spriteMeta";
+
+        // 6. Write the metafile
+        std::ofstream file(metaFileName);
+        if (!file.is_open()) {
+            LOG_ERROR("Unable to create metafile: " + metaFileName);
+            return false;
+        }
+
+        const uint32_t CURRENT_META_FILE_VERSION = 2;
+        file << "SpriteMetaFileVersion: " << CURRENT_META_FILE_VERSION << "\n";
+        file << "SpriteName: " << newSpriteName << "\n";
+        file << "SourceFilePath: " << sourceTexturePath << "\n";  // ADD THIS LINE
+        file << "Texture UV Rect:\n";
+        file << uvRect.x << "\n";
+        file << uvRect.y << "\n";
+        file << uvRect.z << "\n";
+        file << uvRect.w << "\n";
+        file.close();
+
+        // 7. Add the new sprite to the texture map
+        TextureInfo info;
+        info.ID = sourceTextureID;  // Share the same OpenGL texture ID
+        info.Name = newSpriteName;
+        info.TextureUVRect = uvRect;
+        info.Width = sourceWidth;
+        info.Height = sourceHeight;
+        info.SourceFilePath = sourceTexturePath;
+
+        s_TextureMap[newSpriteName] = info;
+
+        LOG_INFO("Created new sprite '" + newSpriteName + "' from " + sourceTexturePath + " (metafile: " + metaFileName + ")");
+        return true;
+    }
+
+    TextureInfo TextureManager::GetTexture(const std::string& textureName) {
+        auto it = s_TextureMap.find(textureName);
+        if (it == s_TextureMap.end()) {
+            if(textureName != "")
+                LOG_WARN("Texture not found: " + textureName);
+            return TextureInfo{};
+        }
+
+        // If texture ID is 0, it hasn't been loaded yet - lazy load it now
+        if (it->second.ID == 0 && !it->second.SourceFilePath.empty()) {
+            LOG_INFO("Lazy-loading texture: " + textureName);
+
+            // Load the actual OpenGL texture
+            int width, height, channels;
+            stbi_set_flip_vertically_on_load(1);
+            unsigned char* data = stbi_load(it->second.SourceFilePath.string().c_str(),
+                                           &width, &height, &channels, 0);
+
+            if (!data) {
+                LOG_ERROR("Failed to lazy-load texture: " + it->second.SourceFilePath.string());
+                return it->second;
+            }
+
+            GLenum internalFormat = 0, dataFormat = 0;
+            if (channels == 4) {
+                internalFormat = GL_RGBA8;
+                dataFormat = GL_RGBA;
+            } else if (channels == 3) {
+                internalFormat = GL_RGB8;
+                dataFormat = GL_RGB;
+            } else {
+                LOG_ERROR("Unsupported channel count for lazy-load: " + std::to_string(channels));
+                stbi_image_free(data);
+                return it->second;
+            }
+
+            uint32_t textureID;
+            glGenTextures(1, &textureID);
+            glBindTexture(GL_TEXTURE_2D, textureID);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0,
+                        dataFormat, GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            stbi_image_free(data);
+
+            // Update the map entry with the loaded texture ID
+            it->second.ID = textureID;
+            it->second.Width = width;
+            it->second.Height = height;
+
+            LOG_INFO("Lazy-loaded texture ID " + std::to_string(textureID) + " for: " + textureName);
+        }
+
+        return it->second;
+    }
 
     void TextureManager::Shutdown() {
         LOG_INFO("Shutting down TextureManager. Deleting " + std::to_string(s_TextureMap.size()) + " textures.");
@@ -762,8 +761,112 @@ TextureInfo TextureManager::GetTexture(const std::string& textureName) {
         }
 
         // Sort alphabetically for better UX
-        std::sort(names.begin(), names.end());
+        std::ranges::sort(names);
 
         return names;
+    }
+
+    bool TextureManager::UpdateSpriteUVRect(const std::string& spriteName, const Math::Vec4& newUVRect) {
+        // 1. Find the sprite in the map
+        auto it = s_TextureMap.find(spriteName);
+        if (it == s_TextureMap.end()) {
+            LOG_ERROR("Sprite not found: " + spriteName);
+            return false;
+        }
+
+        // 2. Validate UV coordinates
+        if (newUVRect.x < 0.0f || newUVRect.y < 0.0f ||
+            newUVRect.z < 0.0f || newUVRect.w < 0.0f ||
+            newUVRect.x + newUVRect.z > 1.0f || newUVRect.y + newUVRect.w > 1.0f) {
+            LOG_ERROR("Invalid UV coordinates for sprite: " + spriteName);
+            return false;
+            }
+
+        // 3. Update the in-memory sprite info
+        it->second.TextureUVRect = newUVRect;
+
+        // 4. Find and update the metafile
+        std::string sourceFilePath = it->second.SourceFilePath.generic_string();
+        std::vector<std::filesystem::path> metafiles = FindWildcardMetaFile(sourceFilePath, ".spriteMeta");
+
+        // Find the specific metafile for this sprite
+        std::filesystem::path targetMetafile;
+        for (const auto& metafilePath : metafiles) {
+            std::ifstream file(metafilePath);
+            if (!file.is_open()) continue;
+
+            std::string line;
+            bool foundMatch = false;
+            while (std::getline(file, line)) {
+                if (line.starts_with("SpriteName: ")) {
+                    std::string name = line.substr(12);
+                    if (name == spriteName) {
+                        foundMatch = true;
+                        break;
+                    }
+                }
+            }
+            file.close();
+
+            if (foundMatch) {
+                targetMetafile = metafilePath;
+                break;
+            }
+        }
+
+        if (targetMetafile.empty()) {
+            LOG_ERROR("Could not find metafile for sprite: " + spriteName);
+            return false;
+        }
+
+        // 5. Read the entire metafile
+        std::ifstream inFile(targetMetafile);
+        if (!inFile.is_open()) {
+            LOG_ERROR("Cannot open metafile: " + targetMetafile.string());
+            return false;
+        }
+
+        std::vector<std::string> lines;
+        std::string line;
+        bool inUVRect = false;
+        int uvLineCount = 0;
+
+        while (std::getline(inFile, line)) {
+            if (line.find("Texture UV Rect:") == 0) {
+                lines.push_back(line);
+                inUVRect = true;
+                uvLineCount = 0;
+            } else if (inUVRect && uvLineCount < 4) {
+                // Replace the old UV values with new ones
+                switch (uvLineCount) {
+                    case 0: lines.push_back(std::to_string(newUVRect.x)); break;
+                    case 1: lines.push_back(std::to_string(newUVRect.y)); break;
+                    case 2: lines.push_back(std::to_string(newUVRect.z)); break;
+                    case 3: lines.push_back(std::to_string(newUVRect.w)); break;
+                }
+                uvLineCount++;
+                if (uvLineCount == 4) {
+                    inUVRect = false;
+                }
+            } else {
+                lines.push_back(line);
+            }
+        }
+        inFile.close();
+
+        // 6. Write the updated metafile
+        std::ofstream outFile(targetMetafile);
+        if (!outFile.is_open()) {
+            LOG_ERROR("Cannot write metafile: " + targetMetafile.string());
+            return false;
+        }
+
+        for (const auto& l : lines) {
+            outFile << l << "\n";
+        }
+        outFile.close();
+
+        LOG_INFO("Updated UV rect for sprite: " + spriteName);
+        return true;
     }
 }

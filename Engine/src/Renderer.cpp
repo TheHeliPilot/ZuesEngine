@@ -483,90 +483,89 @@ namespace Engine {
     const float z,
     const Math::Vec4& textureUVRect
 ) {
-    if (s_Data == nullptr) return;
+        if (s_Data == nullptr) return;
 
-    // --- CHECK BUFFER SPACE FIRST (BEFORE any state changes) ---
-    if (s_Data->IndexCount + 6 > MaxIndices) {
-        EndBatch();
-        BeginBatch();
-    }
+        // --- CHECK BUFFER SPACE FIRST (BEFORE any state changes) ---
+        if (s_Data->IndexCount + 6 > MaxIndices) {
+            EndBatch();
+            BeginBatch();
+        }
 
-    // --- 1. Texture Slot Logic (Finding/Assigning) ---
-    float textureSlot = 0.0f;
+        // --- 1. Texture Slot Logic (Finding/Assigning) ---
+        float textureSlot = 0.0f;
 
-    if (textureID > 0) {
-        bool found = false;
-        // Search for existing slot (skip slot 0, which is white)
-        for (uint32_t i = 1; i < s_Data->TextureSlotIndex; i++) {
-            if (s_Data->TextureSlots[i] == textureID) {
-                textureSlot = static_cast<float>(i);
-                found = true;
-                break;
+        if (textureID > 0) {
+            bool found = false;
+            // Search for existing slot (skip slot 0, which is white)
+            for (uint32_t i = 1; i < s_Data->TextureSlotIndex; i++) {
+                if (s_Data->TextureSlots[i] == textureID) {
+                    textureSlot = static_cast<float>(i);
+                    found = true;
+                    break;
+                }
+            }
+
+            // Assign new slot if not found
+            if (!found) {
+                // If we're out of texture slots, flush
+                if (s_Data->TextureSlotIndex >= MAX_TEXTURE_SLOTS) {
+                    EndBatch();
+                    BeginBatch();
+                    // After flush, slot 0 is white and slot 1+ are empty
+                    // So assign to slot 1
+                    textureSlot = 1.0f;
+                    s_Data->TextureSlots[1] = textureID;
+                    s_Data->TextureSlotIndex = 2;
+                } else {
+                    // Normal case: assign to next available slot
+                    textureSlot = static_cast<float>(s_Data->TextureSlotIndex);
+                    s_Data->TextureSlots[s_Data->TextureSlotIndex] = textureID;
+                    s_Data->TextureSlotIndex++;
+                }
             }
         }
 
-        // Assign new slot if not found
-        if (!found) {
-            // If we're out of texture slots, flush
-            if (s_Data->TextureSlotIndex >= MAX_TEXTURE_SLOTS) {
-                EndBatch();
-                BeginBatch();
-                // After flush, slot 0 is white and slot 1+ are empty
-                // So assign to slot 1
-                textureSlot = 1.0f;
-                s_Data->TextureSlots[1] = textureID;
-                s_Data->TextureSlotIndex = 2;
-            } else {
-                // Normal case: assign to next available slot
-                textureSlot = static_cast<float>(s_Data->TextureSlotIndex);
-                s_Data->TextureSlots[s_Data->TextureSlotIndex] = textureID;
-                s_Data->TextureSlotIndex++;
-            }
+        // --- 2. Calculate Transform ---
+        const Math::Mat4 transform = Math::Mat4::Translate(Math::Vec2(position.x, position.y))
+                                   * Math::Mat4::Rotate(rotation)
+                                   * Math::Mat4::Scale(Math::Vec2(size.x, size.y));
+
+        const Math::Vec2 quadPositions[4] = {
+            {-0.5f, -0.5f}, // V0: Bottom-left
+            { 0.5f, -0.5f}, // V1: Bottom-right
+            { 0.5f,  0.5f}, // V2: Top-right
+            {-0.5f,  0.5f}  // V3: Top-left
+        };
+
+        const float u0 = textureUVRect.x;
+        const float v0 = textureUVRect.y;
+        const float u1 = textureUVRect.x + textureUVRect.z;  // x + width
+        const float v1 = textureUVRect.y + textureUVRect.w;  // y + height
+
+        const Math::Vec2 QuadTexCoords[4] = {
+            {u0, v0}, // V0: Bottom-left
+            {u1, v0}, // V1: Bottom-right
+            {u1, v1}, // V2: Top-right
+            {u0, v1}  // V3: Top-left
+        };
+
+        // --- 3. Write 4 Vertices to the Buffer ---
+        for (int i = 0; i < 4; ++i) {
+            const Math::Vec4 transformedPos = transform * Math::Vec4(quadPositions[i].x, quadPositions[i].y, 0.0f, 1.0f);
+
+            s_Data->VertexBufferPtr->Position.x = transformedPos.x;
+            s_Data->VertexBufferPtr->Position.y = transformedPos.y;
+            s_Data->VertexBufferPtr->Position.z = z;
+
+            s_Data->VertexBufferPtr->Color = color;
+            s_Data->VertexBufferPtr->TexCoord = QuadTexCoords[i];
+            s_Data->VertexBufferPtr->TexID = textureSlot;
+            s_Data->VertexBufferPtr++;
         }
+
+        // Increment the index count
+        s_Data->IndexCount += 6;
     }
-
-    // --- 2. Calculate Transform ---
-    const Math::Mat4 transform = Math::Mat4::Translate(Math::Vec2(position.x, position.y))
-                               * Math::Mat4::Rotate(rotation)
-                               * Math::Mat4::Scale(Math::Vec2(size.x, size.y));
-
-    const Math::Vec2 quadPositions[4] = {
-        {-0.5f, -0.5f}, // V0: Bottom-left
-        { 0.5f, -0.5f}, // V1: Bottom-right
-        { 0.5f,  0.5f}, // V2: Top-right
-        {-0.5f,  0.5f}  // V3: Top-left
-    };
-
-    // Calculate UV coordinates
-    const float u0 = textureUVRect.x;
-    const float v0 = textureUVRect.y;
-    const float u1 = textureUVRect.z;
-    const float v1 = textureUVRect.w;
-
-    const Math::Vec2 QuadTexCoords[4] = {
-        {u0, v0}, // V0: Bottom-left
-        {u1, v0}, // V1: Bottom-right
-        {u1, v1}, // V2: Top-right
-        {u0, v1}  // V3: Top-left
-    };
-
-    // --- 3. Write 4 Vertices to the Buffer ---
-    for (int i = 0; i < 4; ++i) {
-        const Math::Vec4 transformedPos = transform * Math::Vec4(quadPositions[i].x, quadPositions[i].y, 0.0f, 1.0f);
-
-        s_Data->VertexBufferPtr->Position.x = transformedPos.x;
-        s_Data->VertexBufferPtr->Position.y = transformedPos.y;
-        s_Data->VertexBufferPtr->Position.z = z;
-
-        s_Data->VertexBufferPtr->Color = color;
-        s_Data->VertexBufferPtr->TexCoord = QuadTexCoords[i];
-        s_Data->VertexBufferPtr->TexID = textureSlot;
-        s_Data->VertexBufferPtr++;
-    }
-
-    // Increment the index count
-    s_Data->IndexCount += 6;
-}
 
     // --- Camera Management Implementation ---
     void Renderer::SetCamera(const Math::Vec2& position, const float zoom, const float halfHeight, const float rotationRadians) {

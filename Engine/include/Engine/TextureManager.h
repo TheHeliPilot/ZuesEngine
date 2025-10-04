@@ -78,6 +78,8 @@ namespace Engine {
         // Get all sprite names (useful for dropdown)
         static std::vector<std::string> GetAllSpriteNames();
 
+        static bool UpdateSpriteUVRect(const std::string &spriteName, const Math::Vec4 &newUVRect);
+
         // Helper: Update SourceFilePath in metafile
         static void UpdateSourcePathInMetafile(
             const std::filesystem::path& metafilePath,
