@@ -60,7 +60,7 @@ public:
     World() = default;
     ~World() = default;
 
-    EntityID CreateEntity();
+    EntityID CreateEntity(const char* name);
     void DestroyEntity(EntityID entityID);
 
     template<typename T> void RegisterComponent(const std::string& typeName);

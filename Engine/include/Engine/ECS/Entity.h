@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <cstdint>
 #include <functional> // For std::hash
+#include <string>
 
 // 64-bit Entity ID: 32 bits for Index, 32 bits for Generation
 using EntityIndex = uint32_t;
@@ -8,6 +9,8 @@ using EntityGeneration = uint32_t;
 
 struct EntityID {
     uint64_t id;
+    mutable const char* name;
+    inline void setName(const char* meno) const {name = meno;}
 
     // Constructor/utility to create the full ID
     EntityID(const EntityIndex index, const EntityGeneration generation)

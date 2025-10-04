@@ -10,7 +10,7 @@
 namespace Engine {
 
     inline void SpawnViewportCamera(World* world) {
-        const EntityID cameraEntity = world->CreateEntity();
+        const EntityID cameraEntity = world->CreateEntity("ViewportCamera");
         world->AddComponent<Engine::ECS::Component::TransformComponent>(cameraEntity, {
             .worldPosition = {0.0f, 0.0f}, // Center the camera at world origin
             .worldRotation = 0.0f
@@ -29,7 +29,7 @@ namespace Engine {
 
     inline void SetupSimpleScene(World* world, const uint32_t textureHandle) {
 
-        const EntityID cameraEntity = world->CreateEntity();
+        const EntityID cameraEntity = world->CreateEntity("Alfonz");
         world->AddComponent<Engine::ECS::Component::TransformComponent>(cameraEntity, {
             .worldPosition = {0.0f, 0.0f}, // Center the camera at world origin
             .worldRotation = 0.0f
@@ -49,7 +49,7 @@ namespace Engine {
     inline void SetupHierarchyTestScene(World* world, const uint32_t textureHandle) {
 
         // --- Parent Entity 1 (Root) ---
-        const EntityID parent1 = world->CreateEntity();
+        const EntityID parent1 = world->CreateEntity("Ernest");
         world->AddComponent<Engine::ECS::Component::TransformComponent>(parent1, {
             .worldPosition = {-5.0f, 5.0f},
             // Note: worldScale is not in TransformComponent, so we omit it.
@@ -61,7 +61,7 @@ namespace Engine {
         });
 
         // --- Child Entity 1.1 ---
-        const EntityID child1_1 = world->CreateEntity();
+        const EntityID child1_1 = world->CreateEntity("Bystrik");
         world->AddComponent<Engine::ECS::Component::TransformComponent>(child1_1, {
             .worldRotation = 45.0f,
             .localPosition = {3.0f, 0.0f},
@@ -74,7 +74,7 @@ namespace Engine {
         });
 
         // --- Child Entity 1.1.1 (Grandchild) ---
-        const EntityID grandchild1_1_1 = world->CreateEntity();
+        const EntityID grandchild1_1_1 = world->CreateEntity("MartinNemec");
         world->AddComponent<Engine::ECS::Component::TransformComponent>(grandchild1_1_1, {
             .localPosition = {0.0f, -2.0f},
             .parent = child1_1 // <-- SETTING HIERARCHY HERE
@@ -86,7 +86,7 @@ namespace Engine {
         });
 
         // --- Parent Entity 2 (Another Root) ---
-        const EntityID parent2 = world->CreateEntity();
+        const EntityID parent2 = world->CreateEntity("Sebastian");
         world->AddComponent<Engine::ECS::Component::TransformComponent>(parent2, {
             .worldPosition = {5.0f, -5.0f},
             .worldRotation = 90.0f,
@@ -99,7 +99,7 @@ namespace Engine {
         world->AddComponent<ECS::Component::MainCameraTag>(parent2, {});
 
         // --- Child Entity 2.1 ---
-        const EntityID child2_1 = world->CreateEntity();
+        const EntityID child2_1 = world->CreateEntity("PotomPoviemMeno");
         world->AddComponent<Engine::ECS::Component::TransformComponent>(child2_1, {
             .localPosition = {-1.0f, 0.0f},
             .parent = parent2 // <-- SETTING HIERARCHY HERE

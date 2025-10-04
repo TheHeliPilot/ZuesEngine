@@ -18,7 +18,6 @@ void GenerateHierarchyItems()
          ImGuiTreeNodeFlags_DrawLinesToNodes |
          ImGuiTreeNodeFlags_DefaultOpen |
          ImGuiTreeNodeFlags_OpenOnArrow |
-         ImGuiTreeNodeFlags_Framed |
          ImGuiTreeNodeFlags_NavLeftJumpsToParent;
 
    auto hierarchyItems = Engine::ECS::Hierarchy::GetFlattenedHierarchy();
@@ -55,11 +54,11 @@ void GenerateHierarchyItems()
 
       // Render node
       bool open = ImGui::TreeNodeEx((void*)(intptr_t)hierarchyItems[i].id.id,
-                                    node_flags, "%d", i);
+                                    node_flags, "%s", hierarchyItems[i].id.name);
 
       if (ImGui::BeginDragDropSource())
       {
-         ImGui::SetDragDropPayload("HIERARCHY_ITEM", "PENIS", sizeof(char) * 6);
+         ImGui::SetDragDropPayload("HIERARCHY_ITEM", &hierarchyItems[i].id, sizeof(int));
          ImGui::Text(("Gameobject " + std::to_string(hierarchyItems[i].id.id)).c_str());
          ImGui::EndDragDropSource();
       }
@@ -68,7 +67,25 @@ void GenerateHierarchyItems()
       {
          if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_ITEM"))
          {
-            LOG_ERROR(static_cast<char*>(payload->Data));
+            const auto payloadData = static_cast<EntityID*>(payload->Data);
+
+            bool canBeDropped = true;
+            EntityID currentEntity = hierarchyItems[i].id;
+            while (currentEntity != NULL_ENTITY_ID)
+            {
+               EntityID parent = Engine::Core::GetCurrentWorld()->GetComponent<Engine::ECS::Component::TransformComponent>(currentEntity).parent;
+
+               if (currentEntity.id == payloadData->id)
+                  canBeDropped = false;
+
+               currentEntity = parent;
+            }
+
+            if (canBeDropped)
+            {
+               Engine::Core::GetCurrentWorld()->GetComponent<Engine::ECS::Component::TransformComponent>(*payloadData).parent = hierarchyItems[i].id;
+               Engine::ECS::Hierarchy::BuildCache(Engine::Core::GetCurrentWorld());
+            }
          }
          ImGui::EndDragDropTarget();
       }
