@@ -19,7 +19,7 @@ namespace EditorWindows
         static std::filesystem::path projectDir;
         static Engine::Math::Vec2 viewportMousePos;
         static Engine::Math::Vec2 viewportSize;
-        static EntityID selectedEntity;
+        static std::vector<EntityID> selectedEntities;
 
         static void HandleWindowResize();
 
@@ -33,6 +33,8 @@ namespace EditorWindows
         }
 
         static Engine::Math::Vec2 GetMousePositionInWindow(const std::string &windowName);
+
+        static bool IsEntitySelected(EntityID entityID);
 
         static bool MouseInWindow(const char* windowName, ImGuiMouseButton button = ImGuiMouseButton_Left) {
             ImGuiWindow* window = ImGui::FindWindowByName(windowName);

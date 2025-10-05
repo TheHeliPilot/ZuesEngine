@@ -30,7 +30,7 @@ extern GLFWwindow* g_MainWindow;
 using namespace EditorWindows;
 
 std::filesystem::path EditorUi::projectDir = "../../MyGameProject";
-EntityID EditorUi::selectedEntity = NULL_ENTITY_ID;
+std::vector<EntityID> EditorUi::selectedEntities = {};
 Engine::Math::Vec2 EditorUi::viewportMousePos = {-1, -1};
 Engine::Math::Vec2 EditorUi::viewportSize = {-1, -1};
 static std::unordered_map<std::string, ImVec2> g_WindowPosCache;
@@ -616,4 +616,14 @@ Engine::Math::Vec2 EditorUi::GetMousePositionInWindow(const std::string& windowN
     auto it = g_WindowPosCache.find(windowName);
     if(it == g_WindowPosCache.end()) return {-1,-1};
     return { mouse.x - it->second.x, mouse.y - it->second.y };
+}
+
+bool EditorUi::IsEntitySelected(EntityID entityID)
+{
+    for (auto selectedEntity : selectedEntities)
+    {
+        if (selectedEntity == entityID) return true;
+    }
+
+    return false;
 }

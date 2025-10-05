@@ -155,12 +155,17 @@ void ApplyDarkMinimalTheme()
 
 void DrawEditionStuff() {
 
-    if (EditorUi::selectedEntity == NULL_ENTITY_ID) {
+    if (EditorUi::selectedEntities.empty()) {
         HierarchyOperations::draggingStatus = HierarchyOperations::DraggingOperation::None;
         return;
     }
 
-    const Engine::ECS::Component::TransformComponent selectedTransform = Engine::Core::GetCurrentWorld()->GetComponent<Engine::ECS::Component::TransformComponent>(EditorUi::selectedEntity);
+    std::vector<Engine::ECS::Component::TransformComponent> selectedTransforms = {};
+
+    for (auto selected_entity : EditorUi::selectedEntities)
+    {
+        selectedTransforms.push_back(Engine::Core::GetCurrentWorld()->GetComponent<Engine::ECS::Component::TransformComponent>(selected_entity));
+    }
 
     // --- 1. Define Selection State (SIMULATION) ---
     // In your real code, these would be member variables or properties of the drawn objects
@@ -190,24 +195,24 @@ void DrawEditionStuff() {
     // Select color: If selected, use GREEN_SELECTED, otherwise GREEN_UNSELECTED.
     ImVec4 c1 = isArrow1Selected ? GREEN_SELECTED : GREEN_UNSELECTED;
     Engine::Math::Vec4 color1 = {c1.x, c1.y, c1.z, c1.w};
-    Engine::Arrow a1 = Engine::Renderer::DrawArrow(selectedTransform.worldPosition, selectedTransform.worldPosition + Engine::Math::Vec2{0,3}, color1, .05f);
+    Engine::Arrow a1 = Engine::Renderer::DrawArrow(selectedTransforms[0].worldPosition, selectedTransforms[0].worldPosition + Engine::Math::Vec2{0,3}, color1, .05f);
     isArrow1Selected = isMoveSquareSelected || Engine::HitTest::Arrow(mousePos, a1, .2f) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::MoveY;
 
     // Arrow 2 (Red/X-Axis)
     ImVec4 c2 = isArrow2Selected ? RED_SELECTED : RED_UNSELECTED;
     Engine::Math::Vec4 color2 = {c2.x, c2.y, c2.z, c2.w};
-    Engine::Arrow a2 = Engine::Renderer::DrawArrow(selectedTransform.worldPosition, selectedTransform.worldPosition + Engine::Math::Vec2{3,0}, color2, .05f);
+    Engine::Arrow a2 = Engine::Renderer::DrawArrow(selectedTransforms[0].worldPosition, selectedTransforms[0].worldPosition + Engine::Math::Vec2{3,0}, color2, .05f);
     isArrow2Selected = isMoveSquareSelected || Engine::HitTest::Arrow(mousePos, a2, .2f) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::MoveX;
 
     // Circle (Blue)
     ImVec4 c3 = isCircleSelected ? BLUE_SELECTED : BLUE_UNSELECTED;
     Engine::Math::Vec4 color3 = {c3.x, c3.y, c3.z, c3.w};
-    Engine::Circle c = Engine::Renderer::DrawCircle(selectedTransform.worldPosition, 3, color3, 50, true, .05f);
+    Engine::Circle c = Engine::Renderer::DrawCircle(selectedTransforms[0].worldPosition, 3, color3, 50, true, .05f);
     isCircleSelected = Engine::HitTest::Circle(mousePos, c, .2f) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::Rotate;
 
     ImVec4 s1 = isMoveSquareSelected ? BLUE_SELECTED : BLUE_UNSELECTED;
     Engine::Math::Vec4 color4 = {s1.x, s1.y, s1.z, s1.w};
-    Engine::Rect r1 = Engine::Renderer::DrawRect(selectedTransform.worldPosition + Engine::Math::Vec2{.5f,.5f}, {1,1}, color4, 0);
+    Engine::Rect r1 = Engine::Renderer::DrawRect(selectedTransforms[0].worldPosition + Engine::Math::Vec2{.5f,.5f}, {1,1}, color4, 0);
     isMoveSquareSelected = Engine::HitTest::Rect(mousePos, r1) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::MoveXY;
 
     if (Engine::Input::IsMouseButtonPressed(0)) {

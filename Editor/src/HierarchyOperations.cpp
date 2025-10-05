@@ -25,13 +25,22 @@ void HierarchyOperations::DoHierarchyOperations() {
             if (draggingStatus == DraggingOperation::None) {
                 if (Engine::Input::IsMouseButtonJustPressed(0) && EditorWindows::EditorUi::MouseInWindow("Viewport")) {
                     if (const float dis = (MOUSE_POS_WORLD - transform_component.worldPosition).Length(); dis < 1) {
-                        EditorWindows::EditorUi::selectedEntity = id;
+                        // TODO: Multiselect Movement fix
+                        if (Engine::Input::IsKeyPressed(GLFW_KEY_LEFT_SHIFT) || Engine::Input::IsKeyPressed(GLFW_KEY_RIGHT_SHIFT))
+                        {
+                            EditorWindows::EditorUi::selectedEntities.clear();
+                            EditorWindows::EditorUi::selectedEntities.push_back(id);
+                        } else
+                        {
+                            EditorWindows::EditorUi::selectedEntities.clear();
+                            EditorWindows::EditorUi::selectedEntities.push_back(id);
+                        }
                         //LOG_INFO("Clicked on id " + std::to_string(id.id));
                         return;
                     }
-                    EditorWindows::EditorUi::selectedEntity = NULL_ENTITY_ID;
+                    EditorWindows::EditorUi::selectedEntities.clear();
                 }
-            } else if (id.id == EditorWindows::EditorUi::selectedEntity.id) {
+            } else if (EditorWindows::EditorUi::IsEntitySelected(id)) {
 
                 if (lastMousePos.x == -1) {
                     lastMousePos = MOUSE_POS_WORLD;
