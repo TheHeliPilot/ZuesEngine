@@ -32,14 +32,14 @@ void GenerateHierarchyItems()
          continue;
 
       int level = hierarchyItems[i].depth;
-      bool selected = EditorUi::selectedEntity == hierarchyItems[i].id;
+      bool selected = EditorUi::IsEntitySelected(hierarchyItems[i].id);
 
       // Skip children of a closed parent
       if (skipLevel >= 0 && level > skipLevel)
          continue;
 
       // Close nodes if moving up the hierarchy
-      while (prevLevel >= level && openNodeCount > 0)
+      while (prevLevel > level && openNodeCount > 0)
       {
          ImGui::TreePop();
          openNodeCount--;
@@ -48,13 +48,25 @@ void GenerateHierarchyItems()
 
       bool hasChild = (i + 1 < hierarchyItems.size() && hierarchyItems[i + 1].depth > level);
 
-      ImGuiTreeNodeFlags node_flags = base_flags | (selected ? ImGuiTreeNodeFlags_Selected : 0);
+      ImGuiTreeNodeFlags node_flags = base_flags;
       if (!hasChild)
          node_flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
       // Render node
       bool open = ImGui::TreeNodeEx((void*)(intptr_t)hierarchyItems[i].id.id,
                                     node_flags, "%s", hierarchyItems[i].id.name);
+
+      if (selected)
+      {
+         ImDrawList* drawList = ImGui::GetWindowDrawList();
+         ImVec2 min = ImGui::GetItemRectMin();
+         ImVec2 max = ImGui::GetItemRectMax();
+
+         // Set max X to window width
+         max.x = ImGui::GetWindowPos().x + ImGui::GetWindowWidth();
+
+         drawList->AddRect(min, max, IM_COL32(150, 150, 150, 255), 0.0f, 0, 1.0f);
+      }
 
       if (ImGui::BeginDragDropSource())
       {
@@ -90,9 +102,20 @@ void GenerateHierarchyItems()
          ImGui::EndDragDropTarget();
       }
 
+      // TODO: Multiselect Movement fix
       if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
       {
-          EditorUi::selectedEntity = hierarchyItems[i].id;
+         if (Engine::Input::IsKeyPressed(GLFW_KEY_LEFT_SHIFT) || Engine::Input::IsKeyPressed(GLFW_KEY_RIGHT_SHIFT))
+         {
+            EditorUi::selectedEntities.clear();
+            EditorUi::selectedEntities.push_back(hierarchyItems[i].id);
+         }
+         else
+         {
+            EditorUi::selectedEntities.clear();
+            EditorUi::selectedEntities.push_back(hierarchyItems[i].id);
+         }
+
       }
 
       if (hasChild)
@@ -131,18 +154,58 @@ void HierarchyUI::HierarchyWindow()
    Engine::ECS::Hierarchy::BuildCache(Engine::Core::GetCurrentWorld());
    GenerateHierarchyItems();
 
+   ImVec2 availableSpace = ImGui::GetContentRegionAvail();
+   if (ImGui::InvisibleButton("##background_drop", availableSpace))
+   {
+      if (EditorUi::MouseInWindow("Hierarchy") && !EditorUi::selectedEntities.empty())
+      {
+         EditorUi::selectedEntities.clear();
+      }
+   }
 
+   if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+   {
+      if (ImGui::BeginDragDropTarget())
+      {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_ITEM", ImGuiDragDropFlags_AcceptNoDrawDefaultRect))
+            {
+               const auto payloadData = static_cast<EntityID*>(payload->Data);
 
+               Engine::Core::GetCurrentWorld()->GetComponent<Engine::ECS::Component::TransformComponent>(*payloadData).parent = NULL_ENTITY_ID;
+               Engine::ECS::Hierarchy::BuildCache(Engine::Core::GetCurrentWorld());
 
-
-
+         }
+         ImGui::EndDragDropTarget();
+      }
+   }
 
    if (EditorUi::MouseInWindow("Hierarchy") && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered())
       ImGui::OpenPopup("hierarchy_right_click");
 
+   World* world = Engine::Core::GetCurrentWorld();
+
    if (ImGui::BeginPopup("hierarchy_right_click")) {
-      if (ImGui::Selectable("Create Object")) { /* action */ }
-      if (ImGui::Selectable("Create Sprite")) { /* action */ }
+      if (ImGui::Selectable("Create Empty"))
+      {
+         const EntityID emptyEntity = world->CreateEntity("Empty Entity");
+         world->AddComponent<Engine::ECS::Component::TransformComponent>(emptyEntity, {
+            .worldPosition = {0.0f, 0.0f}, // Center the camera at world origin
+            .worldRotation = 0.0f
+        });
+      }
+      if (ImGui::Selectable("Create Sprite"))
+      {
+         const EntityID spriteEntity = world->CreateEntity("Sprite Entity");
+         world->AddComponent<Engine::ECS::Component::TransformComponent>(spriteEntity, {
+            .worldPosition = {0.0f, 0.0f}, // Center the camera at world origin
+            .worldRotation = 0.0f
+        });
+         world->AddComponent<Engine::ECS::Component::SpriteComponent>(spriteEntity, {
+            .spriteName = "",
+            .size = {2.0f, 2.0f}, // Using Sprite size for visual scale
+            .color = {1.0f, 0.0f, 0.0f, 1.0f}, // Red
+        });
+      }
       ImGui::EndPopup();
    }
 

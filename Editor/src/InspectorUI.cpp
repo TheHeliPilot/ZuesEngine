@@ -11,22 +11,29 @@ using namespace EditorWindows;
 static int selectedComponentTypeID = -1;
 
 void InspectorUI::InspectorWindow() {
-    const EntityID e = EditorUi::selectedEntity;
 
     ImGui::Begin("Inspector");
 
-    if (e == NULL_ENTITY_ID) {
+    if (EditorUi::selectedEntities.empty()) {
         ImGui::Text("No entity selected");
         ImGui::End();
         return;
     }
 
+    if (EditorUi::selectedEntities.size() > 1) {
+        ImGui::Text("Cannot edit multiple entities");
+        ImGui::End();
+        return;
+    }
+
     World* world = Engine::Core::GetCurrentWorld();
+    const EntityID e = EditorUi::selectedEntities[0];
     if (!world) {
         ImGui::Text("No active world");
         ImGui::End();
         return;
     }
+
 
     ImGui::Text("Entity ID: %llu", static_cast<unsigned long long>(e.id));
     ImGui::Separator();
@@ -97,8 +104,8 @@ bool InspectorUI::DrawJsonComponentEditor(const char* name, nlohmann::json& j, i
         selectedComponentTypeID = componentTypeID;
         if (ImGui::MenuItem("Remove Component")) {
             World* world = Engine::Core::GetCurrentWorld();
-            if (world && EditorUi::selectedEntity.IsValid()) {
-                world->RemoveComponentByType(EditorUi::selectedEntity, componentTypeID);
+            if (world && EditorUi::selectedEntities[0].IsValid()) {
+                world->RemoveComponentByType(EditorUi::selectedEntities[0], componentTypeID);
             }
             ImGui::CloseCurrentPopup();
         }
