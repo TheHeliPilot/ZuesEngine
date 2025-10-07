@@ -12,6 +12,9 @@
 
 using namespace EditorWindows;
 
+static bool isTreeNodeHovered = false;
+static EntityID lastRightClickedEntity;
+
 void GenerateHierarchyItems()
 {
    static ImGuiTreeNodeFlags base_flags =
@@ -25,6 +28,8 @@ void GenerateHierarchyItems()
    int prevLevel = -1;
    int openNodeCount = 0; // only counts nodes actually pushed
    int skipLevel = -1;    // if >=0, skip all nodes deeper than this
+
+   isTreeNodeHovered = false;
 
    for (int i = 0; i < hierarchyItems.size(); i++)
    {
@@ -74,6 +79,12 @@ void GenerateHierarchyItems()
          ImGui::Text(("Gameobject " + std::to_string(hierarchyItems[i].id.id)).c_str());
          ImGui::EndDragDropSource();
       }
+
+      if (ImGui::IsItemHovered())
+         isTreeNodeHovered = true;
+
+      if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         lastRightClickedEntity = hierarchyItems[i].id;
 
       if (ImGui::BeginDragDropTarget())
       {
@@ -179,7 +190,7 @@ void HierarchyUI::HierarchyWindow()
       }
    }
 
-   if (EditorUi::MouseInWindow("Hierarchy") && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !ImGui::IsAnyItemHovered())
+   if (EditorUi::MouseInWindow("Hierarchy") && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !isTreeNodeHovered)
       ImGui::OpenPopup("hierarchy_right_click");
 
    World* world = Engine::Core::GetCurrentWorld();
@@ -210,14 +221,68 @@ void HierarchyUI::HierarchyWindow()
    }
 
    //EditorUi::MouseInWindow("Hierarchy") pridane aby sa to neotvaralo mimo hierarchie
-   if (EditorUi::MouseInWindow("Hierarchy") && ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+   if (EditorUi::MouseInWindow("Hierarchy") && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && isTreeNodeHovered)
+   {
       ImGui::OpenPopup("hierarchy_right_click_item");
+   }
+
 
    if (ImGui::BeginPopup("hierarchy_right_click_item"))
    {
-      if (ImGui::Selectable("Create Child Object")) { /* action */ }
-      if (ImGui::Selectable("Create Parent Object")) { /* action */ }
-      if (ImGui::Selectable("Delete")) { /* action */ }
+      if (ImGui::Selectable("Create Child Empty"))
+      {
+         const EntityID emptyChildEntity = world->CreateEntity("Child Empty Entity");
+         world->AddComponent<Engine::ECS::Component::TransformComponent>(emptyChildEntity, {
+            .worldPosition = {0.0f, 0.0f}, // Center the camera at world origin
+            .worldRotation = 0.0f,
+            .parent = lastRightClickedEntity
+        });
+      }
+      if (ImGui::Selectable("Create Child Sprite"))
+      {
+         const EntityID childEntitySprite = world->CreateEntity("Child Empty Entity");
+         world->AddComponent<Engine::ECS::Component::TransformComponent>(childEntitySprite, {
+            .worldPosition = {0.0f, 0.0f}, // Center the camera at world origin
+            .worldRotation = 0.0f,
+            .parent = lastRightClickedEntity
+        });
+         world->AddComponent<Engine::ECS::Component::SpriteComponent>(childEntitySprite, {
+             .spriteName = "",
+             .size = {2.0f, 2.0f}, // Using Sprite size for visual scale
+             .color = {1.0f, 0.0f, 0.0f, 1.0f}, // Red
+         });
+      }
+      if (ImGui::Selectable("Create Parent Empty"))
+      {
+         const EntityID parentEmptyEntity = world->CreateEntity("Parent Empty Entity");
+         world->AddComponent<Engine::ECS::Component::TransformComponent>(parentEmptyEntity, {
+            .worldPosition = {0.0f, 0.0f}, // Center the camera at world origin
+            .worldRotation = 0.0f,
+            .parent = world->GetComponent<Engine::ECS::Component::TransformComponent>(lastRightClickedEntity).parent
+        });
+
+         world->GetComponent<Engine::ECS::Component::TransformComponent>(lastRightClickedEntity).parent = parentEmptyEntity;
+      }
+      if (ImGui::Selectable("Create Parent Sprite"))
+      {
+         const EntityID parentSpriteEntity = world->CreateEntity("Parent Sprite Entity");
+         world->AddComponent<Engine::ECS::Component::TransformComponent>(parentSpriteEntity, {
+            .worldPosition = {0.0f, 0.0f}, // Center the camera at world origin
+            .worldRotation = 0.0f,
+            .parent = world->GetComponent<Engine::ECS::Component::TransformComponent>(lastRightClickedEntity).parent
+        });
+         world->AddComponent<Engine::ECS::Component::SpriteComponent>(parentSpriteEntity, {
+             .spriteName = "",
+             .size = {2.0f, 2.0f}, // Using Sprite size for visual scale
+             .color = {1.0f, 0.0f, 0.0f, 1.0f}, // Red
+         });
+
+         world->GetComponent<Engine::ECS::Component::TransformComponent>(lastRightClickedEntity).parent = parentSpriteEntity;
+      }
+      if (ImGui::Selectable("Delete"))
+      {
+         world->DestroyEntity(lastRightClickedEntity);
+      }
       ImGui::EndPopup();
    }
 
