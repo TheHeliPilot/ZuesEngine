@@ -216,25 +216,28 @@ inline bool World::SaveToJson(const std::string& filename) const {
     Engine::WorldSnapshot snapshot;
 
     for (EntityIndex i = 0; i < entityLookup.size(); ++i) {
-        const EntityData& data = entityLookup[i];
+        if (const auto&[generation, archetypePtr, archetypeIndex] = entityLookup[i]; archetypePtr && generation == EntityID(i, generation).GetGeneration()) {
 
-        if (data.archetypePtr && data.generation == EntityID(i, data.generation).GetGeneration()) {
-            EntityID currentEntityID = EntityID(i, data.generation);
+            auto currentArchetype = static_cast<Archetype*>(archetypePtr);
+
+            // 🌟 CRITICAL FIX: Retrieve the EXISTING EntityID object from the Archetype's list.
+            // This ensures we get the stored 'name' field.
+            EntityID currentEntityID = currentArchetype->entityIDs.at(archetypeIndex);
+
             std::stringstream ss_entity;
             ss_entity << "  Serializing Entity ID: " << currentEntityID.id
-                      << " (Index: " << i << ", Archetype Index: " << data.archetypeIndex << ")";
+                      << " (Index: " << i << ", Archetype Index: " << archetypeIndex << ") [Name: " << currentEntityID.name << "]";
             LOG_INFO(ss_entity.str());
 
-            auto currentArchetype = static_cast<Archetype*>(data.archetypePtr);
             Engine::SerializedEntity se;
-            se.id = currentEntityID;
+            se.id = currentEntityID; // se.id now contains the correct name for JSON serialization
 
-            for (const auto& pair : currentArchetype->componentArrays) {
-                Engine::ECS::Component::TypeID compID = pair.first;
-                IComponentArray* compArray = pair.second.get();
+            for (const auto&[fst, snd] : currentArchetype->componentArrays) {
+                Engine::ECS::Component::TypeID compID = fst;
+                IComponentArray* compArray = snd.get();
 
                 Engine::IComponentSerializer* serializer = componentSerializationRegistry.GetSerializer(compID);
-                json componentData = serializer->SerializeComponent(compArray, data.archetypeIndex);
+                json componentData = serializer->SerializeComponent(compArray, archetypeIndex);
 
                 Engine::SerializedComponent sc;
                 sc.typeID = compID;

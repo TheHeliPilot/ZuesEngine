@@ -9,8 +9,8 @@ using EntityGeneration = uint32_t;
 
 struct EntityID {
     uint64_t id;
-    mutable const char* name;
-    inline void setName(const char* meno) const {name = meno;}
+    std::string name;
+    void setName(const std::string &meno) {name = meno;}
 
     // Constructor/utility to create the full ID
     EntityID(const EntityIndex index, const EntityGeneration generation)

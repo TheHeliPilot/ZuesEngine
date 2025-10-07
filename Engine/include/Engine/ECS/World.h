@@ -24,7 +24,7 @@ struct Archetype {
 
     template<typename T>
     ComponentArray<T>* GetComponentArray() {
-        Engine::ECS::Component::TypeID id = Engine::ECS::Component::GetTypeID<T>();
+        const Engine::ECS::Component::TypeID id = Engine::ECS::Component::GetTypeID<T>();
         auto it = componentArrays.find(id);
         if (it == componentArrays.end()) {
             return nullptr;
@@ -60,7 +60,7 @@ public:
     World() = default;
     ~World() = default;
 
-    EntityID CreateEntity(const char* name);
+    EntityID CreateEntity(const std::string &name);
     void DestroyEntity(EntityID entityID);
 
     template<typename T> void RegisterComponent(const std::string& typeName);

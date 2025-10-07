@@ -104,8 +104,15 @@ namespace Engine {
         std::vector<SerializedEntity> entities;
     };
 
-    inline void to_json(json& j, const EntityID& id) { j = id.id; }
-    inline void from_json(const json& j, EntityID& id) { id.id = j.get<uint64_t>(); }
+    inline void to_json(json& j, const EntityID& id) {
+        j["entityId"] = id.id;
+        j["entityName"] = id.name;
+    }
+
+    inline void from_json(const json& j, EntityID& id) {
+        j.at("entityId").get_to(id.id);
+        id.name = j["entityName"].get<std::string>();
+    }
 
     inline void to_json(json& j, const SerializedComponent& sc) {
         j["typeID"] = sc.typeID;
@@ -118,12 +125,13 @@ namespace Engine {
     }
 
     inline void to_json(json& j, const SerializedEntity& se) {
-        j["id"] = se.id.id;
+        to_json(j, se.id);
         j["components"] = se.components;
     }
 
     inline void from_json(const json& j, SerializedEntity& se) {
-        j.at("id").get_to(se.id.id);
+        j.at("entityId").get_to(se.id.id);
+        j.at("entityName").get_to(se.id.name);
         j.at("components").get_to(se.components);
     }
 
@@ -158,12 +166,12 @@ namespace Engine {
     struct ComponentSerializer final : public IComponentSerializer {
         static_assert(std::is_default_constructible_v<T>, "ECS Component must be default constructible for serialization.");
 
-        std::unique_ptr<IComponentArray> CreateComponentArray() const override {
+        [[nodiscard]] std::unique_ptr<IComponentArray> CreateComponentArray() const override {
             return std::make_unique<ComponentArray<T>>();
         }
 
         void DeserializeAndAdd(IComponentArray* array, const json& data) const override {
-            ComponentArray<T>* specificArray = static_cast<ComponentArray<T>*>(array);
+            auto* specificArray = static_cast<ComponentArray<T>*>(array);
             T component{};
 
             if (!data.empty()) {

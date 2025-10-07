@@ -17,7 +17,7 @@ std::size_t std::hash<std::bitset<64>>::operator()(const ComponentSignature &sig
     return std::hash<unsigned long long>()(signature.to_ullong());
 }
 
-EntityID World::CreateEntity(const char* name) {
+EntityID World::CreateEntity(const std::string &name) {
     EntityIndex index;
     EntityGeneration generation = 0;
 
@@ -35,8 +35,8 @@ EntityID World::CreateEntity(const char* name) {
     Archetype* defaultArchetype = GetOrCreateArchetype(ComponentSignature());
 
     // Initialize data
-    const EntityID newID(index, generation);
-    newID.setName(name);
+    EntityID newID(index, generation);
+    newID.name = name;
     entityLookup[index] = { generation, defaultArchetype, defaultArchetype->entityIDs.size() };
     defaultArchetype->entityIDs.push_back(newID);
 
