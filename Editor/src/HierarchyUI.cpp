@@ -59,7 +59,7 @@ void GenerateHierarchyItems()
 
       // Render node
       bool open = ImGui::TreeNodeEx((void*)(intptr_t)hierarchyItems[i].id.id,
-                                    node_flags, "%s", hierarchyItems[i].id.name);
+                                    node_flags, "%s", hierarchyItems[i].id.name.c_str());
 
       if (selected)
       {

@@ -35,7 +35,12 @@ void InspectorUI::InspectorWindow() {
     }
 
 
-    ImGui::Text("Entity ID: %llu", static_cast<unsigned long long>(e.id));
+    char name[32] = {};
+    if (name[0] == '\0') {
+        strncpy(name, e.name.c_str(), sizeof(name) - 1);
+        name[sizeof(name) - 1] = '\0';
+    }
+    ImGui::InputText("Entity Name", name, IM_ARRAYSIZE(name), ImGuiInputTextFlags_CharsNoBlank);
     ImGui::Separator();
 
     const auto& registry = world->GetComponentRegistry();
