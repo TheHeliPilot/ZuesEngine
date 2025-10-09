@@ -358,7 +358,10 @@ int main() {
 
         Engine::Renderer::BeginBatch(); // Start a single batch for the viewport
 
-        Engine::Renderer::DrawText(engineFont, "Test", {0,0}, {1,1,1,1});
+        // Draw test text at world origin (0,0)
+        // Camera halfHeight = 10.0f means viewport shows -10 to +10 vertically (20 units total)
+        // worldScale = 0.1f means 10 pixels = 1 world unit (18px font = 1.8 world units tall)
+        Engine::Renderer::DrawText(engineFont, "Test", {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 1.0f, 0.1f);
 
         // A. Submit main scene objects first
         Engine::Update(System::SystemRole::Editor);

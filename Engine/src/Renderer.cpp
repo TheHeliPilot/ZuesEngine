@@ -733,7 +733,7 @@ namespace Engine {
         return { world.x, world.y };
     }
 
-void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& color, uint32_t textureID) {
+void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& color, uint32_t textureID, float z) {
         // Replace 5000 with your actual MaxIndices constant if needed
         if (s_Data->IndexCount >= 5000) {
             EndBatch();
@@ -765,31 +765,32 @@ void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& col
         }
 
         // Submit 4 vertices using the data from the quad struct
-        // (Vertices are: Bottom-Left, Bottom-Right, Top-Right, Top-Left)
+        // NOTE: After Y-flip transformation, q.y0 > q.y1 (top > bottom in world space)
+        // So q.y0 is TOP and q.y1 is BOTTOM
 
-        // 1. Bottom-Left: (q.x0, q.y1)
-        s_Data->VertexBufferPtr->Position = { q.x0, q.y1, 0.0f };
+        // 1. Bottom-Left: (q.x0, q.y1) where y1 is smaller = bottom
+        s_Data->VertexBufferPtr->Position = { q.x0, q.y1, z };
         s_Data->VertexBufferPtr->Color = color;
         s_Data->VertexBufferPtr->TexCoord = { q.s0, q.t1 };
         s_Data->VertexBufferPtr->TexID = textureSlot;
         s_Data->VertexBufferPtr++;
 
         // 2. Bottom-Right: (q.x1, q.y1)
-        s_Data->VertexBufferPtr->Position = { q.x1, q.y1, 0.0f };
+        s_Data->VertexBufferPtr->Position = { q.x1, q.y1, z };
         s_Data->VertexBufferPtr->Color = color;
         s_Data->VertexBufferPtr->TexCoord = { q.s1, q.t1 };
         s_Data->VertexBufferPtr->TexID = textureSlot;
         s_Data->VertexBufferPtr++;
 
-        // 3. Top-Right: (q.x1, q.y0)
-        s_Data->VertexBufferPtr->Position = { q.x1, q.y0, 0.0f };
+        // 3. Top-Right: (q.x1, q.y0) where y0 is larger = top
+        s_Data->VertexBufferPtr->Position = { q.x1, q.y0, z };
         s_Data->VertexBufferPtr->Color = color;
         s_Data->VertexBufferPtr->TexCoord = { q.s1, q.t0 };
         s_Data->VertexBufferPtr->TexID = textureSlot;
         s_Data->VertexBufferPtr++;
 
         // 4. Top-Left: (q.x0, q.y0)
-        s_Data->VertexBufferPtr->Position = { q.x0, q.y0, 0.0f };
+        s_Data->VertexBufferPtr->Position = { q.x0, q.y0, z };
         s_Data->VertexBufferPtr->Color = color;
         s_Data->VertexBufferPtr->TexCoord = { q.s0, q.t0 };
         s_Data->VertexBufferPtr->TexID = textureSlot;
@@ -800,9 +801,14 @@ void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& col
 
 
     uint32_t Engine::Renderer::LoadFont(const std::string& fontPath, float pixelHeight) {
+        LOG_INFO("LoadFont: Loading font from '" + fontPath + "' at " + std::to_string(pixelHeight) + "px");
+
         // 1. Read the font file into a buffer
         std::ifstream file(fontPath, std::ios::binary | std::ios::ate);
-        if (!file.is_open()) return 0;
+        if (!file.is_open()) {
+            LOG_ERROR("LoadFont: Failed to open font file: " + fontPath);
+            return 0;
+        }
 
         std::streamsize size = file.tellg();
         // NOTE: fontBuffer must persist for the lifetime of the font.
@@ -835,11 +841,14 @@ void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& col
         );
 
         if (result <= 0) {
+            LOG_ERROR("LoadFont: stbtt_BakeFontBitmap failed");
             delete[] fontBuffer;
             delete[] temp_bitmap;
             s_Fonts.pop_back();
             return 0; // Baking failed
         }
+
+        LOG_INFO("LoadFont: Font baked successfully, " + std::to_string(result) + " characters fit in atlas");
 
         // 4. Create an OpenGL texture from the bitmap
         glGenTextures(1, &newFont.AtlasTextureID);
@@ -867,65 +876,93 @@ void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& col
         newFont.Size = pixelHeight;
         newFont.FontBuffer = fontBuffer;
 
-        return s_Fonts.size();
+        uint32_t fontID = s_Fonts.size();
+        LOG_INFO("LoadFont: Font loaded successfully with ID " + std::to_string(fontID) + ", texture ID: " + std::to_string(newFont.AtlasTextureID));
+
+        return fontID;
     }
 
     // --- 3. Implementation: DrawText ---
     // Draws a string of text using a previously loaded font, positioning it starting at 'position'.
     // --- 3. Implementation: DrawText (using stbtt_aligned_quad) ---
-    void Renderer::DrawText(uint32_t fontID, const std::string& text, const Math::Vec2& position, const Math::Vec4& color, float scale) {
-        if (!s_Data || fontID == 0 || fontID > s_Fonts.size()) {
+    void Renderer::DrawText(uint32_t fontID, const std::string& text, const Math::Vec2& position, const Math::Vec4& color, float scale, float worldScale) {
+        if (!s_Data) {
+            LOG_ERROR("DrawText: s_Data is null");
+            return;
+        }
+        if (fontID == 0 || fontID > s_Fonts.size()) {
+            LOG_ERROR("DrawText: Invalid fontID " + std::to_string(fontID) + " (fonts loaded: " + std::to_string(s_Fonts.size()) + ")");
             return;
         }
 
         const Font& font = s_Fonts[fontID - 1];
+        LOG_INFO("DrawText: Rendering '" + text + "' at (" + std::to_string(position.x) + ", " + std::to_string(position.y) + ") with worldScale=" + std::to_string(worldScale));
+        LOG_INFO("DrawText: Font atlas texture ID: " + std::to_string(font.AtlasTextureID));
 
-        float x = position.x;
-        float y = position.y;
+        // Start at origin in pixel space - we'll transform to world space
+        float pixelX = 0.0f;
+        float pixelY = 0.0f;
         float dummyY = 0.0f;
 
+        int charCount = 0;
         for (const char c : text) {
             if (c >= FIRST_CHAR && c < (FIRST_CHAR + CHAR_COUNT)) {
 
-                // FIX: Declaration changed to the required type
+                // 1. Get quad geometry in pixel space and advance x cursor
                 stbtt_aligned_quad q;
-
-                // 1. Get quad geometry and advance x cursor
-                // This call now succeeds because the 7th argument type matches.
                 stbtt_GetBakedQuad(
                     font.BakedChars,
                     FONT_ATLAS_WIDTH,
                     FONT_ATLAS_HEIGHT,
                     c - FIRST_CHAR,
-                    &x,
+                    &pixelX,
                     &dummyY,
-                    &q,             // Correct type: stbtt_aligned_quad*
+                    &q,
                     1
                 );
 
-                // 2. Apply scale to the relative quad offsets
+                // 2. Apply text scale to the pixel-space quad
                 q.x0 *= scale;
                 q.y0 *= scale;
                 q.x1 *= scale;
                 q.y1 *= scale;
 
-                // 3. Adjust Y-coordinates to the absolute baseline position
-                q.y0 += y;
-                q.y1 += y;
+                // 3. Adjust Y-coordinates to the pixel baseline position
+                q.y0 += pixelY;
+                q.y1 += pixelY;
 
-                // 4. Submit the character quad
+                // 4. Transform from pixel space to world space
+                // In stb_truetype: y0 is TOP, y1 is BOTTOM (Y-down screen space)
+                // In world space: we want Y-up, so negate both (top becomes positive, bottom becomes negative)
+                q.x0 = q.x0 * worldScale + position.x;
+                q.y0 = -q.y0 * worldScale + position.y;  // Top in Y-down -> becomes top in Y-up
+                q.x1 = q.x1 * worldScale + position.x;
+                q.y1 = -q.y1 * worldScale + position.y;  // Bottom in Y-down -> becomes bottom in Y-up
+
+                if (charCount == 0) {
+                    LOG_INFO("DrawText: First char quad: x=[" + std::to_string(q.x0) + " to " + std::to_string(q.x1) + "], y=[" + std::to_string(q.y0) + " to " + std::to_string(q.y1) + "]");
+                    LOG_INFO("DrawText: First char UVs: s=[" + std::to_string(q.s0) + " to " + std::to_string(q.s1) + "], t=[" + std::to_string(q.t0) + " to " + std::to_string(q.t1) + "]");
+                }
+
+                // 5. Submit the character quad (now in world space)
+                // Use z = 0.9f to render text on top of most scene geometry
                 SubmitTextQuad(
                     q,
                     color,
-                    font.AtlasTextureID
+                    font.AtlasTextureID,
+                    0.9f
                 );
+
+                charCount++;
 
             } else if (c == '\n') {
                 // Newline handling
-                x = position.x;
-                y -= (font.Size * scale);
+                pixelX = 0.0f;
+                pixelY -= (font.Size * scale);
             }
         }
+
+        LOG_INFO("DrawText: Submitted " + std::to_string(charCount) + " characters");
     }
 
 } // namespace Engine

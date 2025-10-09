@@ -223,7 +223,6 @@ inline bool World::SaveToJson(const std::string& filename) const {
             // 🌟 CRITICAL FIX: Retrieve the EXISTING EntityID object from the Archetype's list.
             // This ensures we get the stored 'name' field.
             EntityID currentEntityID = currentArchetype->entityIDs.at(archetypeIndex);
-
             std::stringstream ss_entity;
             ss_entity << "  Serializing Entity ID: " << currentEntityID.id
                       << " (Index: " << i << ", Archetype Index: " << archetypeIndex << ") [Name: " << currentEntityID.name << "]";
