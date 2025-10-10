@@ -28,6 +28,7 @@ add_library(Engine STATIC
         include/Engine/ECS/World.inl
         include/Engine/ECS/Components.h
         include/Engine/ECS/Systems/RenderingSystem.h
+        include/Engine/ECS/Systems/TextRenderingSystem.h
         include/Engine/Math.h
         include/Engine/SceneSetup.h
         include/Engine/SceneSetup.h
@@ -47,6 +48,7 @@ add_library(Engine STATIC
         src/CameraSystem.cpp
         src/HierarchySystem.cpp
         src/RenderingSystem.cpp
+        src/TextRenderingSystem.cpp
         src/ViewportCameraSystem.cpp
         include/Engine/ECS/HierarchyOutliner.h
         src/HierarchyOutliner.cpp

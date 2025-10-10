@@ -66,4 +66,16 @@ namespace Engine::ECS::Component {
 
     struct TestObjectMoverTag{bool move = true;};
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TestObjectMoverTag, move);
+
+    // Text Component for rendering text in the world
+    struct TextComponent {
+        std::string text = "Sample Text";
+        uint32_t fontID = 1; // Font ID from Renderer::LoadFont
+        Math::Vec4 color = {1.0f, 1.0f, 1.0f, 1.0f};
+        float scale = 1.0f;
+        float worldScale = 0.1f; // World units per pixel (default: 10 pixels = 1 world unit)
+        int layer = 0;
+        int sortOrder = 0;
+    };
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TextComponent, text, fontID, color, scale, worldScale, layer, sortOrder)
 }

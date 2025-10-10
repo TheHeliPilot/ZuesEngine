@@ -80,6 +80,8 @@ namespace Engine {
         world->RegisterComponent<ECS::Component::ViewportCameraTag>("Viewport Camera");
         Engine::ECS::Component::RegisterComponent<ECS::Component::TestObjectMoverTag>();
         world->RegisterComponent<ECS::Component::TestObjectMoverTag>("Test Mover");
+        Engine::ECS::Component::RegisterComponent<ECS::Component::TextComponent>();
+        world->RegisterComponent<ECS::Component::TextComponent>("Text");
 
         LOG_INFO("Engine components registered successfully");
     }
@@ -88,6 +90,7 @@ namespace Engine {
         s_World->RegisterSystem(std::make_unique<HierarchySystem>());
         s_World->RegisterSystem(std::make_unique<CameraSystem>());
         s_World->RegisterSystem(std::make_unique<RenderingSystem>());
+        s_World->RegisterSystem(std::make_unique<TextRenderingSystem>());
         s_World->RegisterSystem(std::make_unique<ViewportCameraSystem>());
         s_World->RegisterSystem(std::make_unique<TestObjectMoverSystem>());
         s_World->UpdateSystems(0, System::SystemRole::Shared);

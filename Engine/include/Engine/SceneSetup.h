@@ -110,6 +110,22 @@ namespace Engine {
             .color = {0.0f, 1.0f, 1.0f, 1.0f}, // Cyan
         });
 
+        // --- Text Entity (for testing TextComponent) ---
+        const EntityID textEntity = world->CreateEntity("TestText");
+        world->AddComponent<Engine::ECS::Component::TransformComponent>(textEntity, {
+            .worldPosition = {0.0f, 0.0f},
+            .worldRotation = 0.0f,
+        });
+        world->AddComponent<ECS::Component::TextComponent>(textEntity, {
+            .text = "Hello World!",
+            .fontID = 1, // Font ID 1 (loaded in main.cpp)
+            .color = {1.0f, 1.0f, 1.0f, 1.0f}, // White
+            .scale = 1.0f,
+            .worldScale = 0.05f, // 10 pixels = 1 world unit
+            .layer = 0,
+            .sortOrder = 100 // Render on top of sprites
+        });
+
         // Rebuild hierarchy cache after all entities are created
         ECS::Hierarchy::BuildCache(world);
     }

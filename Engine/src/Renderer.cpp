@@ -202,6 +202,10 @@ namespace Engine {
         s_Data->VertexBufferBase = new Vertex[MaxVertices];
         s_Data->VertexBufferPtr = s_Data->VertexBufferBase; // Initialize pointer
 
+        // CRITICAL: Zero-initialize the entire vertex buffer to prevent artifacts
+        // from uninitialized memory
+        memset(s_Data->VertexBufferBase, 0, MaxVertices * sizeof(Vertex));
+
         // OpenGL Global State
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -390,16 +394,14 @@ namespace Engine {
     void Renderer::BeginBatch() {
         if (s_Data == nullptr) return;
 
-        // OPTIMIZED: Only clear the memory that was actually used in the previous frame
-        // This avoids clearing the entire 2.5MB buffer (20000 quads * 4 vertices * 32 bytes)
-        if (s_Data->LastFrameVertexCount > 0) {
-            memset(s_Data->VertexBufferBase, 0, s_Data->LastFrameVertexCount * sizeof(Vertex));
-        }
-
         // Reset batching state
         s_Data->IndexCount = 0;
         s_Data->VertexBufferPtr = s_Data->VertexBufferBase;
-        s_Data->TextureSlotIndex = 1; // Keep white texture at slot 0
+        s_Data->TextureSlotIndex = 1; // Slot 0 is always the white texture
+
+        // Don't clear the texture slots array - old IDs don't matter because
+        // we only bind textures up to TextureSlotIndex in EndBatch
+        // This avoids accidentally setting slots to 0
 
         SetTextureUniforms();
     }
@@ -407,15 +409,11 @@ namespace Engine {
     void Renderer::EndBatch() {
         if (s_Data->IndexCount == 0) return;
 
-        // Calculate vertices written
+        // Calculate and upload vertices written
         const uint32_t verticesWritten = s_Data->VertexBufferPtr - s_Data->VertexBufferBase;
 
-        // Store for next frame's cleanup
-        s_Data->LastFrameVertexCount = verticesWritten;
-
-        // Only upload what we actually wrote
+        // Upload only the vertices we actually wrote
         const GLsizeiptr size = verticesWritten * sizeof(Vertex);
-
         glBindBuffer(GL_ARRAY_BUFFER, s_Data->QuadVBO);
         glBufferSubData(GL_ARRAY_BUFFER, 0, size, s_Data->VertexBufferBase);
 
@@ -431,17 +429,40 @@ namespace Engine {
             glBindTexture(GL_TEXTURE_2D, s_Data->TextureSlots[i]);
         }
 
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        glDisable(GL_SCISSOR_TEST);
+        glDisable(GL_STENCIL_TEST);
+
         glBindVertexArray(s_Data->QuadVAO);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_Data->QuadEBO);
+        glBindBuffer(GL_ARRAY_BUFFER, s_Data->QuadVBO);
 
-        // Only draw the indices we actually need
-        glDrawElements(GL_TRIANGLES, s_Data->IndexCount, GL_UNSIGNED_INT, nullptr);
+        // Use glMultiDrawElements to batch draw calls efficiently
+        // Draw each quad separately to avoid artifacts
+        const uint32_t numQuads = s_Data->IndexCount / 6;
 
-        // Reset state for next batch (but don't clear LastFrameVertexCount yet)
+        // Resize pre-allocated vectors only if needed
+        if (s_Data->MultiDrawCounts.size() < numQuads) {
+            s_Data->MultiDrawCounts.resize(numQuads);
+            s_Data->MultiDrawIndices.resize(numQuads);
+        }
+
+        // Fill the arrays (each quad uses 6 indices)
+        for (uint32_t i = 0; i < numQuads; i++) {
+            s_Data->MultiDrawCounts[i] = 6;
+            s_Data->MultiDrawIndices[i] = (void*)(i * 6 * sizeof(uint32_t));
+        }
+
+        glMultiDrawElements(GL_TRIANGLES, s_Data->MultiDrawCounts.data(), GL_UNSIGNED_INT, s_Data->MultiDrawIndices.data(), numQuads);
+
+        // CRITICAL: Reset counters immediately after drawing
+        // This prevents drawing stale data if BeginBatch isn't called
         s_Data->IndexCount = 0;
         s_Data->VertexBufferPtr = s_Data->VertexBufferBase;
-        s_Data->TextureSlotIndex = 1;
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        // Note: We don't reset TextureSlotIndex here - BeginBatch will handle texture state
     }
 
     // In Renderer.cpp
@@ -734,26 +755,29 @@ namespace Engine {
     }
 
 void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& color, uint32_t textureID, float z) {
-        // Replace 5000 with your actual MaxIndices constant if needed
-        if (s_Data->IndexCount >= 5000) {
+        // Check buffer space BEFORE any state changes
+        if (s_Data->IndexCount + 6 > MaxIndices) {
             EndBatch();
             BeginBatch();
         }
 
-        // Texture ID slot lookup logic (remains the same)
+        // Texture ID slot lookup logic - search existing slots
         float textureSlot = 0.0f;
+        bool found = false;
         for (uint32_t i = 1; i < s_Data->TextureSlotIndex; i++) {
             if (s_Data->TextureSlots[i] == textureID) {
                 textureSlot = (float)i;
+                found = true;
                 break;
             }
         }
 
-        // If the texture isn't found, load it into a new slot (logic remains the same)
-        if (textureSlot == 0.0f) {
+        // If the texture isn't found, assign it to a new slot
+        if (!found) {
             if (s_Data->TextureSlotIndex >= MAX_TEXTURE_SLOTS) {
                 EndBatch();
                 BeginBatch();
+                // After flush, assign to slot 1
                 s_Data->TextureSlots[1] = textureID;
                 textureSlot = 1.0f;
                 s_Data->TextureSlotIndex = 2;
@@ -855,8 +879,9 @@ void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& col
         glBindTexture(GL_TEXTURE_2D, newFont.AtlasTextureID);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // Use GL_NEAREST for crisp, pixel-perfect text rendering (no blurriness)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
         // Disable byte-alignment restriction for 1-byte grayscale data
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -896,15 +921,12 @@ void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& col
         }
 
         const Font& font = s_Fonts[fontID - 1];
-        LOG_INFO("DrawText: Rendering '" + text + "' at (" + std::to_string(position.x) + ", " + std::to_string(position.y) + ") with worldScale=" + std::to_string(worldScale));
-        LOG_INFO("DrawText: Font atlas texture ID: " + std::to_string(font.AtlasTextureID));
 
         // Start at origin in pixel space - we'll transform to world space
         float pixelX = 0.0f;
         float pixelY = 0.0f;
         float dummyY = 0.0f;
 
-        int charCount = 0;
         for (const char c : text) {
             if (c >= FIRST_CHAR && c < (FIRST_CHAR + CHAR_COUNT)) {
 
@@ -939,11 +961,6 @@ void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& col
                 q.x1 = q.x1 * worldScale + position.x;
                 q.y1 = -q.y1 * worldScale + position.y;  // Bottom in Y-down -> becomes bottom in Y-up
 
-                if (charCount == 0) {
-                    LOG_INFO("DrawText: First char quad: x=[" + std::to_string(q.x0) + " to " + std::to_string(q.x1) + "], y=[" + std::to_string(q.y0) + " to " + std::to_string(q.y1) + "]");
-                    LOG_INFO("DrawText: First char UVs: s=[" + std::to_string(q.s0) + " to " + std::to_string(q.s1) + "], t=[" + std::to_string(q.t0) + " to " + std::to_string(q.t1) + "]");
-                }
-
                 // 5. Submit the character quad (now in world space)
                 // Use z = 0.9f to render text on top of most scene geometry
                 SubmitTextQuad(
@@ -953,16 +970,12 @@ void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& col
                     0.9f
                 );
 
-                charCount++;
-
             } else if (c == '\n') {
                 // Newline handling
                 pixelX = 0.0f;
                 pixelY -= (font.Size * scale);
             }
         }
-
-        LOG_INFO("DrawText: Submitted " + std::to_string(charCount) + " characters");
     }
 
 } // namespace Engine

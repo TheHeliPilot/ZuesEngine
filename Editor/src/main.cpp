@@ -298,7 +298,7 @@ int main() {
     // --- 1. Load Main Font (Exo2) ---
     const ImFont* exo2Font = io.Fonts->AddFontFromFileTTF("fonts/Exo2-VariableFont_wght.ttf", 18.0f);
     if (!exo2Font) LOG_ERROR("Failed to load Exo2 font to Editor!");
-    const uint32_t engineFont = Engine::Renderer::LoadFont("fonts/Exo2-VariableFont_wght.ttf", 18);
+    const uint32_t engineFont = Engine::Renderer::LoadFont("fonts/Exo2-VariableFont_wght.ttf", 64);
 
     // --- 2. Load Icon Font (IconLibs.ttf / EngineerFont) ---
     // The EngineerFont glyphs are typically in the 0xF800 to 0xF8FF range.
@@ -372,6 +372,8 @@ int main() {
 
         Engine::Renderer::EndBatch(); // Draws everything to the FBO
 
+        // Unbind the FBO so ImGui renders to the screen
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // --- 2. Render ImGui UI on Top ---
         // ImGui now renders last, on top of the main window's background.

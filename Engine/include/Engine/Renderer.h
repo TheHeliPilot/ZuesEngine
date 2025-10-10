@@ -57,8 +57,8 @@ namespace Engine {
 
 
     // --- TEXTURE/FONT ATLAS CONSTANTS ---
-    static constexpr uint32_t FONT_ATLAS_WIDTH = 512;
-    static constexpr uint32_t FONT_ATLAS_HEIGHT = 512;
+    static constexpr uint32_t FONT_ATLAS_WIDTH = 1024;
+    static constexpr uint32_t FONT_ATLAS_HEIGHT = 1024;
     static constexpr uint32_t FIRST_CHAR = 32; // First printable ASCII character (' ')
     static constexpr uint32_t CHAR_COUNT = 96; // Total count of printable ASCII characters (32-127)
 
@@ -186,6 +186,10 @@ namespace Engine {
             std::array<uint32_t, MAX_TEXTURE_SLOTS> TextureSlots; // OpenGL IDs
             uint32_t TextureSlotIndex = 1; // Slot 0 is reserved for the white texture
             uint32_t WhiteTextureID = 0;
+
+            // Pre-allocated vectors for glMultiDrawElements (to avoid per-frame allocations)
+            std::vector<int> MultiDrawCounts;
+            std::vector<const void*> MultiDrawIndices;
         };
 
         static RendererData* s_Data; // Ptr to the static data

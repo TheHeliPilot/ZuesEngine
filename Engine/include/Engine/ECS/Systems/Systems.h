@@ -7,6 +7,7 @@
 
 #include "CameraSystem.h"
 #include "RenderingSystem.h"
+#include "TextRenderingSystem.h"
 #include "ViewportCameraSystem.h"
 #include "HierarchySystem.h"
 #include "TestObjectMoverSystem.h"
