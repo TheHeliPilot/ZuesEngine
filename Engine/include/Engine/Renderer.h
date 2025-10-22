@@ -134,7 +134,8 @@ namespace Engine {
                              const Math::Vec2& position,
                              const Math::Vec4& color,
                              float scale = 1.0f, // Scale parameter moved to the end, made optional
-                             float worldScale = 0.01f); // World units per pixel (default: 100 pixels = 1 world unit)
+                             float worldScale = 0.01f,
+                             float rotation = 0); // World units per pixel (default: 100 pixels = 1 world unit)
 
 
     private:
@@ -143,7 +144,14 @@ namespace Engine {
 
         // Internal helper to submit text quads directly to the vertex buffer
         // NOTE: The stbtt_aligned_quad type is used here, matching the stb_truetype function
-        static void SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& color, uint32_t textureID, float z = 0.9f);
+        static void SubmitTextQuad(float x0, float y0,  // Bottom-Left
+                                   float x1, float y1,  // Bottom-Right
+                                   float x2, float y2,  // Top-Right
+                                   float x3, float y3,  // Top-Left
+                                   float s0, float t0, float s1, float t1,  // Texture coords
+                                   const Math::Vec4& color,
+                                   uint32_t textureID,
+                                   float z);
 
 
         // 2D Vertex Structure for Batching
@@ -151,7 +159,7 @@ namespace Engine {
             Math::Vec3 Position; // Engine::Math::Vec3
             Math::Vec4 Color;    // Engine::Math::Vec4
             Math::Vec2 TexCoord; // Engine::Math::Vec2
-            float TexID;   // Texture slot index (0.0 to 31.0)
+            float TexID{};   // Texture slot index (0.0 to 31.0)
         };
 
         // Constants for Batching Limits

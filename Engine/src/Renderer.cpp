@@ -440,23 +440,8 @@ namespace Engine {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_Data->QuadEBO);
         glBindBuffer(GL_ARRAY_BUFFER, s_Data->QuadVBO);
 
-        // Use glMultiDrawElements to batch draw calls efficiently
-        // Draw each quad separately to avoid artifacts
-        const uint32_t numQuads = s_Data->IndexCount / 6;
-
-        // Resize pre-allocated vectors only if needed
-        if (s_Data->MultiDrawCounts.size() < numQuads) {
-            s_Data->MultiDrawCounts.resize(numQuads);
-            s_Data->MultiDrawIndices.resize(numQuads);
-        }
-
-        // Fill the arrays (each quad uses 6 indices)
-        for (uint32_t i = 0; i < numQuads; i++) {
-            s_Data->MultiDrawCounts[i] = 6;
-            s_Data->MultiDrawIndices[i] = (void*)(i * 6 * sizeof(uint32_t));
-        }
-
-        glMultiDrawElements(GL_TRIANGLES, s_Data->MultiDrawCounts.data(), GL_UNSIGNED_INT, s_Data->MultiDrawIndices.data(), numQuads);
+        // Draw the quad (should only be 1 quad since we flush after each)
+        glDrawElements(GL_TRIANGLES, s_Data->IndexCount, GL_UNSIGNED_INT, nullptr);
 
         // CRITICAL: Reset counters immediately after drawing
         // This prevents drawing stale data if BeginBatch isn't called
@@ -586,6 +571,10 @@ namespace Engine {
 
         // Increment the index count
         s_Data->IndexCount += 6;
+
+        // DISABLE BATCHING: Flush after every quad to render individually
+        EndBatch();
+        BeginBatch();
     }
 
     // --- Camera Management Implementation ---
@@ -754,7 +743,16 @@ namespace Engine {
         return { world.x, world.y };
     }
 
-void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& color, uint32_t textureID, float z) {
+    void Renderer::SubmitTextQuad(
+            float x0, float y0,  // Bottom-Left
+            float x1, float y1,  // Bottom-Right
+            float x2, float y2,  // Top-Right
+            float x3, float y3,  // Top-Left
+            float s0, float t0, float s1, float t1,  // Texture coords
+            const Math::Vec4& color,
+            uint32_t textureID,
+            float z
+    ) {
         // Check buffer space BEFORE any state changes
         if (s_Data->IndexCount + 6 > MaxIndices) {
             EndBatch();
@@ -766,7 +764,7 @@ void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& col
         bool found = false;
         for (uint32_t i = 1; i < s_Data->TextureSlotIndex; i++) {
             if (s_Data->TextureSlots[i] == textureID) {
-                textureSlot = (float)i;
+                textureSlot = (float) i;
                 found = true;
                 break;
             }
@@ -777,50 +775,49 @@ void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& col
             if (s_Data->TextureSlotIndex >= MAX_TEXTURE_SLOTS) {
                 EndBatch();
                 BeginBatch();
-                // After flush, assign to slot 1
                 s_Data->TextureSlots[1] = textureID;
                 textureSlot = 1.0f;
                 s_Data->TextureSlotIndex = 2;
             } else {
-                textureSlot = (float)s_Data->TextureSlotIndex;
+                textureSlot = (float) s_Data->TextureSlotIndex;
                 s_Data->TextureSlots[s_Data->TextureSlotIndex] = textureID;
                 s_Data->TextureSlotIndex++;
             }
         }
 
-        // Submit 4 vertices using the data from the quad struct
-        // NOTE: After Y-flip transformation, q.y0 > q.y1 (top > bottom in world space)
-        // So q.y0 is TOP and q.y1 is BOTTOM
-
-        // 1. Bottom-Left: (q.x0, q.y1) where y1 is smaller = bottom
-        s_Data->VertexBufferPtr->Position = { q.x0, q.y1, z };
+        // Submit 4 vertices with individual corner positions
+        // 1. Bottom-Left
+        s_Data->VertexBufferPtr->Position = {x0, y0, z};
         s_Data->VertexBufferPtr->Color = color;
-        s_Data->VertexBufferPtr->TexCoord = { q.s0, q.t1 };
+        s_Data->VertexBufferPtr->TexCoord = {s0, t1};
         s_Data->VertexBufferPtr->TexID = textureSlot;
         s_Data->VertexBufferPtr++;
 
-        // 2. Bottom-Right: (q.x1, q.y1)
-        s_Data->VertexBufferPtr->Position = { q.x1, q.y1, z };
+        // 2. Bottom-Right
+        s_Data->VertexBufferPtr->Position = {x1, y1, z};
         s_Data->VertexBufferPtr->Color = color;
-        s_Data->VertexBufferPtr->TexCoord = { q.s1, q.t1 };
+        s_Data->VertexBufferPtr->TexCoord = {s1, t1};
         s_Data->VertexBufferPtr->TexID = textureSlot;
         s_Data->VertexBufferPtr++;
 
-        // 3. Top-Right: (q.x1, q.y0) where y0 is larger = top
-        s_Data->VertexBufferPtr->Position = { q.x1, q.y0, z };
+        // 3. Top-Right
+        s_Data->VertexBufferPtr->Position = {x2, y2, z};
         s_Data->VertexBufferPtr->Color = color;
-        s_Data->VertexBufferPtr->TexCoord = { q.s1, q.t0 };
+        s_Data->VertexBufferPtr->TexCoord = {s1, t0};
         s_Data->VertexBufferPtr->TexID = textureSlot;
         s_Data->VertexBufferPtr++;
 
-        // 4. Top-Left: (q.x0, q.y0)
-        s_Data->VertexBufferPtr->Position = { q.x0, q.y0, z };
+        // 4. Top-Left
+        s_Data->VertexBufferPtr->Position = {x3, y3, z};
         s_Data->VertexBufferPtr->Color = color;
-        s_Data->VertexBufferPtr->TexCoord = { q.s0, q.t0 };
+        s_Data->VertexBufferPtr->TexCoord = {s0, t0};
         s_Data->VertexBufferPtr->TexID = textureSlot;
         s_Data->VertexBufferPtr++;
 
         s_Data->IndexCount += 6;
+
+        EndBatch();
+        BeginBatch();
     }
 
 
@@ -907,10 +904,7 @@ void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& col
         return fontID;
     }
 
-    // --- 3. Implementation: DrawText ---
-    // Draws a string of text using a previously loaded font, positioning it starting at 'position'.
-    // --- 3. Implementation: DrawText (using stbtt_aligned_quad) ---
-    void Renderer::DrawText(uint32_t fontID, const std::string& text, const Math::Vec2& position, const Math::Vec4& color, float scale, float worldScale) {
+    void Renderer::DrawText(uint32_t fontID, const std::string& text, const Math::Vec2& position, const Math::Vec4& color, float scale, float worldScale, float rotation) {
         if (!s_Data) {
             LOG_ERROR("DrawText: s_Data is null");
             return;
@@ -921,6 +915,10 @@ void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& col
         }
 
         const Font& font = s_Fonts[fontID - 1];
+
+        // Precompute rotation matrix values
+        float cosTheta = std::cos(rotation);
+        float sinTheta = std::sin(rotation);
 
         // Start at origin in pixel space - we'll transform to world space
         float pixelX = 0.0f;
@@ -933,14 +931,14 @@ void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& col
                 // 1. Get quad geometry in pixel space and advance x cursor
                 stbtt_aligned_quad q;
                 stbtt_GetBakedQuad(
-                    font.BakedChars,
-                    FONT_ATLAS_WIDTH,
-                    FONT_ATLAS_HEIGHT,
-                    c - FIRST_CHAR,
-                    &pixelX,
-                    &dummyY,
-                    &q,
-                    1
+                        font.BakedChars,
+                        FONT_ATLAS_WIDTH,
+                        FONT_ATLAS_HEIGHT,
+                        c - FIRST_CHAR,
+                        &pixelX,
+                        &dummyY,
+                        &q,
+                        1
                 );
 
                 // 2. Apply text scale to the pixel-space quad
@@ -953,21 +951,39 @@ void Renderer::SubmitTextQuad(const stbtt_aligned_quad& q, const Math::Vec4& col
                 q.y0 += pixelY;
                 q.y1 += pixelY;
 
-                // 4. Transform from pixel space to world space
-                // In stb_truetype: y0 is TOP, y1 is BOTTOM (Y-down screen space)
-                // In world space: we want Y-up, so negate both (top becomes positive, bottom becomes negative)
-                q.x0 = q.x0 * worldScale + position.x;
-                q.y0 = -q.y0 * worldScale + position.y;  // Top in Y-down -> becomes top in Y-up
-                q.x1 = q.x1 * worldScale + position.x;
-                q.y1 = -q.y1 * worldScale + position.y;  // Bottom in Y-down -> becomes bottom in Y-up
+                // 4. Transform from pixel space to world space with rotation
+                // Get all 4 corners in world space BEFORE rotation
+                float wx0 = q.x0 * worldScale;
+                float wy0 = -q.y0 * worldScale;  // Top
+                float wx1 = q.x1 * worldScale;
+                float wy1 = -q.y1 * worldScale;  // Bottom
 
-                // 5. Submit the character quad (now in world space)
-                // Use z = 0.9f to render text on top of most scene geometry
+                // Define all 4 corners of the quad
+                float corners[4][2] = {
+                        {wx0, wy1},  // Bottom-Left
+                        {wx1, wy1},  // Bottom-Right
+                        {wx1, wy0},  // Top-Right
+                        {wx0, wy0}   // Top-Left
+                };
+
+                // Rotate all 4 corners around origin, then translate to position
+                for (int i = 0; i < 4; i++) {
+                    float x = corners[i][0];
+                    float y = corners[i][1];
+                    corners[i][0] = x * cosTheta - y * sinTheta + position.x;
+                    corners[i][1] = x * sinTheta + y * cosTheta + position.y;
+                }
+
+                // 5. Submit the rotated character quad
                 SubmitTextQuad(
-                    q,
-                    color,
-                    font.AtlasTextureID,
-                    0.9f
+                        corners[0][0], corners[0][1],  // Bottom-Left
+                        corners[1][0], corners[1][1],  // Bottom-Right
+                        corners[2][0], corners[2][1],  // Top-Right
+                        corners[3][0], corners[3][1],  // Top-Left
+                        q.s0, q.t0, q.s1, q.t1,        // Texture coords
+                        color,
+                        font.AtlasTextureID,
+                        0.9f
                 );
 
             } else if (c == '\n') {

@@ -67,6 +67,7 @@ void TextRenderingSystem::Update(float deltaTime, Engine::ECS::Component::Transf
         transform->worldPosition,
         text->color,
         text->scale,
-        text->worldScale
+        text->worldScale,
+        transform->worldRotation * Engine::Math::DEGREES_TO_RADIANS
     );
 }

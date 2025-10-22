@@ -69,7 +69,7 @@ void RenderingSystem::Run(World* world, const float deltaTime) {
 
 void RenderingSystem::Update(float deltaTime, Engine::ECS::Component::TransformComponent* pos, Engine::ECS::Component::SpriteComponent* sprite) {
     // Skip rendering if fully transparent
-    if (sprite->color.w <= 0.0f || sprite->spriteName == "")  {
+    if (sprite->color.w <= 0.0f || sprite->spriteName.empty())  {
         //TODO: FIX!!!
         //return;
     }
@@ -86,7 +86,7 @@ void RenderingSystem::Update(float deltaTime, Engine::ECS::Component::TransformC
 
     Engine::Renderer::SubmitQuad(
         pos->worldPosition,
-        0,
+        pos->worldRotation * Engine::Math::DEGREES_TO_RADIANS,
         sprite->size,
         sprite->color,
         textureID,

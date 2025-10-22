@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Read(//c/Users/bucka/CLionProjects/ZuesEngine/**)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Read(//c/ZuesEngine/**)"
     ],
     "deny": [],
     "ask": []
