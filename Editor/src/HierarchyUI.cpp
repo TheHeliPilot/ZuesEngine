@@ -160,7 +160,6 @@ void GenerateHierarchyItems()
 void HierarchyUI::HierarchyWindow()
 {
    ImGui::Begin("Hierarchy");
-   ImGui::ShowDemoWindow();
 
    Engine::ECS::Hierarchy::BuildCache(Engine::Core::GetCurrentWorld());
    GenerateHierarchyItems();
