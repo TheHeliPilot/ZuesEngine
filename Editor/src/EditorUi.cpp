@@ -576,7 +576,7 @@ void EditorUi::DrawWindowUi() {
     LoggerUI::LoggerWindow();
     HierarchyUI::HierarchyWindow();
     InspectorUI::InspectorWindow();
-    //AssetBrowserUI::AssetBrowserWindow();
+    AssetBrowserUI::AssetBrowserWindow();
     TextureCutterUI::TextureCutterWindow();
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0,0});
