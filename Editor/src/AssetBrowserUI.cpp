@@ -33,19 +33,53 @@ namespace EditorWindows {
 
         return "no response";
     }
+    static void DrawBreadcrumbPath(std::string& current_path){
+        fs::path path = current_path;
+
+        std::vector<fs::path> parts;
+        for (auto& p : path) parts.push_back(p);
+
+
+        std::string partialPath;
+        for (size_t i = 0; i < parts.size(); ++i)
+        {
+            if (i > 0)
+                partialPath += fs::path::preferred_separator;
+            partialPath += parts[i].string();
+
+            std::string folderName = parts[i].string();
+            if (folderName.empty()) continue;
+
+            ImGui::PushID(static_cast<int>(i));
+            ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(0,0,0,0));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f,0.2f,0.2f,0.25f));
+            if (ImGui::SmallButton(folderName.c_str())) {
+                current_path = partialPath;
+            }
+            ImGui::PopStyleColor(2);
+            ImGui::PopID();
+
+            if (i < parts.size() - 1) {
+                ImGui::SameLine(0, 1);
+                ImGui::Text(">");
+                ImGui::SameLine(0, 1);
+            }
+        }
+    }
 
     void AssetBrowserUI::AssetBrowserWindow() {
         ImGui::Begin("Asset Browser");
 
-        static std::string current_path = fs::current_path().string(); // persistent between frames
+        static std::string current_path = fs::current_path().string();
 
-        ImGui::Text("Current path: %s", current_path.c_str());
+        DrawBreadcrumbPath(current_path);
+
+        //ImGui::Text("Current path: %s", current_path.c_str());
         ImGui::Separator();
 
         // Up one level
-
         if (fs::path(current_path).has_parent_path()) {
-            ImGui::Text("/..");
+            ImGui::Text("\\..");
             if (ImGui::IsItemClicked()) {
                 current_path = fs::path(current_path).parent_path().string();
                 ImGui::End();
