@@ -11,5 +11,6 @@
 #include "ViewportCameraSystem.h"
 #include "HierarchySystem.h"
 #include "TestObjectMoverSystem.h"
+#include "PhysicsSystem.h"
 
 #endif //ENGINE_SYSTEMS_H

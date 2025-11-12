@@ -34,7 +34,7 @@ namespace EditorWindows
 
         static Engine::Math::Vec2 GetMousePositionInWindow(const std::string &windowName);
 
-        static bool IsEntitySelected(EntityID entityID);
+        static bool IsEntitySelected(const EntityID &entityID);
 
         static bool MouseInWindow(const char* windowName, ImGuiMouseButton button = ImGuiMouseButton_Left) {
             ImGuiWindow* window = ImGui::FindWindowByName(windowName);

@@ -5,5 +5,7 @@
     <mapping directory="$PROJECT_DIR$/extern/glad" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/extern/glfw" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/extern/imgui" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../Engine/cmake-build-debug/_deps/box2d-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../Engine/extern/box2d" vcs="Git" />
   </component>
 </project>

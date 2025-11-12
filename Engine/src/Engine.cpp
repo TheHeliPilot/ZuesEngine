@@ -6,6 +6,7 @@
 #include "../include/Engine/Core.h"
 #include "../include/Engine/Renderer.h"
 #include "../include/Engine/Network.h"
+#include "../include/Engine/ECS/Systems/Systems.h"
 #include <GLFW/glfw3.h>
 
 namespace Engine {
@@ -82,12 +83,19 @@ namespace Engine {
         world->RegisterComponent<ECS::Component::TestObjectMoverTag>("Test Mover");
         Engine::ECS::Component::RegisterComponent<ECS::Component::TextComponent>();
         world->RegisterComponent<ECS::Component::TextComponent>("Text");
+        Engine::ECS::Component::RegisterComponent<ECS::Component::RigidbodyComponent>();
+        world->RegisterComponent<ECS::Component::RigidbodyComponent>("Rigidbody");
+        Engine::ECS::Component::RegisterComponent<ECS::Component::BoxColliderComponent>();
+        world->RegisterComponent<ECS::Component::BoxColliderComponent>("Box Collider");
+        Engine::ECS::Component::RegisterComponent<ECS::Component::CircleColliderComponent>();
+        world->RegisterComponent<ECS::Component::CircleColliderComponent>("Circle Collider");
 
         LOG_INFO("Engine components registered successfully");
     }
 
     void RegisterSystems(World* s_World) {
         s_World->RegisterSystem(std::make_unique<HierarchySystem>());
+        s_World->RegisterSystem(std::make_unique<PhysicsSystem>());
         s_World->RegisterSystem(std::make_unique<CameraSystem>());
         s_World->RegisterSystem(std::make_unique<RenderingSystem>());
         s_World->RegisterSystem(std::make_unique<TextRenderingSystem>());

@@ -614,14 +614,14 @@ void EditorUi::BuildProject(bool play) {
 
 Engine::Math::Vec2 EditorUi::GetMousePositionInWindow(const std::string& windowName) {
     const ImVec2 mouse = ImGui::GetMousePos();
-    auto it = g_WindowPosCache.find(windowName);
+    const auto it = g_WindowPosCache.find(windowName);
     if(it == g_WindowPosCache.end()) return {-1,-1};
     return { mouse.x - it->second.x, mouse.y - it->second.y };
 }
 
-bool EditorUi::IsEntitySelected(EntityID entityID)
+bool EditorUi::IsEntitySelected(const EntityID &entityID)
 {
-    for (auto selectedEntity : selectedEntities)
+    for (const auto& selectedEntity : selectedEntities)
     {
         if (selectedEntity == entityID) return true;
     }

@@ -78,4 +78,34 @@ namespace Engine::ECS::Component {
         int sortOrder = 0;
     };
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TextComponent, text, fontID, color, scale, worldScale, layer, sortOrder)
+
+    // Physics Components
+    struct RigidbodyComponent {
+        void* body = nullptr;  // b2Body* - Managed by PhysicsSystem (void* to avoid including Box2D here)
+        int bodyType = 2;      // b2BodyType: 0=static, 1=kinematic, 2=dynamic
+        float mass = 1.0f;
+        float gravityScale = 1.0f;
+        bool fixedRotation = false;
+    };
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RigidbodyComponent, bodyType, mass, gravityScale, fixedRotation)
+
+    struct BoxColliderComponent {
+        Math::Vec2 size = {1.0f, 1.0f};
+        Math::Vec2 offset = {0.0f, 0.0f};
+        float density = 1.0f;
+        float friction = 0.3f;
+        float restitution = 0.0f;
+        bool isTrigger = false;
+    };
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(BoxColliderComponent, size, offset, density, friction, restitution, isTrigger)
+
+    struct CircleColliderComponent {
+        float radius = 0.5f;
+        Math::Vec2 offset = {0.0f, 0.0f};
+        float density = 1.0f;
+        float friction = 0.3f;
+        float restitution = 0.0f;
+        bool isTrigger = false;
+    };
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CircleColliderComponent, radius, offset, density, friction, restitution, isTrigger)
 }

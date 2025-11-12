@@ -56,6 +56,8 @@ add_library(Engine STATIC
         include/Engine/ECS/Systems/TestObjectMoverSystem.h
         src/TextureManager.cpp
         include/Engine/TextureManager.h
+        src/PhysicsSystem.cpp
+        include/Engine/ECS/Systems/PhysicsSystem.h
 )
 
 target_include_directories(Engine PRIVATE
@@ -68,8 +70,14 @@ target_include_directories(Engine PRIVATE
 # Build ENet
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/extern/enet)
 
+# Build Box2D
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/extern/box2d)
+
 # Link to ENet using its alias target
 target_link_libraries(Engine PUBLIC enet::enet_static)
+
+# Link Box2D
+target_link_libraries(Engine PUBLIC box2d)
 
 # Link other libraries
 target_link_libraries(Engine PRIVATE
