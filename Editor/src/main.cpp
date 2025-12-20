@@ -9,12 +9,14 @@
 #include "Input.h"
 #include "Renderer.h"
 #include "../include/LoggerUI.h"
+#include "../include/customInspectors/InspectorRegistry.h"
 
 // Include for strcpy, which is needed for ImFontConfig::Name
 #include <string.h>
 
 #include "Core.h"
 #include "../include/HierarchyOperations.h"
+#include "../include/customInspectors/SpriteInspector.h"
 
 using namespace EditorWindows;
 
@@ -240,6 +242,13 @@ void DrawEditionStuff() {
     }
 }
 
+static void RegisterBuiltInInspectors() {
+    InspectorRegistry::Register(
+        Engine::ECS::Component::GetTypeID<Engine::ECS::Component::SpriteComponent>(),
+        std::make_unique<SpriteInspector>()
+    );
+}
+
 int main() {
     if (!glfwInit()) {
         LOG_ERROR("Failed to initialize GLFW.");
@@ -286,6 +295,7 @@ int main() {
     }
 
     Engine::TextureManager::ScanAndRegisterAllSprites(EditorUi::projectDir.string());
+    RegisterBuiltInInspectors();
 
     // --- ImGui ---
     IMGUI_CHECKVERSION();

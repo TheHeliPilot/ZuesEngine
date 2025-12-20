@@ -28,6 +28,10 @@ set(IMGUI_SRC
         include/TextureCutterUI.h
         src/AssetBrowserUI.cpp
         include/AssetBrowserUI.h
+        src/SpriteInspector.cpp
+        include/CustomInspectors/SpriteInspector.h
+        src/InspectorRegistry.cpp
+        include/CustomInspectors/InspectorRegistry.h
 )
 
 add_executable(Editor

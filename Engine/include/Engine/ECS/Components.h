@@ -55,9 +55,9 @@ namespace Engine::ECS::Component {
 
     // TAGS
     struct MainCameraTag {
-        bool bullshit = true;
+        bool isEditorCamera = false;
     };
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MainCameraTag, bullshit)
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MainCameraTag, isEditorCamera)
 
     struct ViewportCameraTag {
         float cameraSpeed = 5;
