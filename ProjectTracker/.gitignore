@@ -1,0 +1,13 @@
+# Browser cache and temp files
+.DS_Store
+Thumbs.db
+
+# Backup exports (optional - remove this line if you want to commit backups)
+*backup*.json
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

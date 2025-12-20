@@ -364,11 +364,15 @@ int main() {
         //Engine::Renderer::DrawText(engineFont, "Test", {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 1.0f, 0.1f);
 
         // A. Submit main scene objects first
-        Engine::Update(System::SystemRole::Editor);
+        // Use Game mode when in play mode to run physics and game systems
+        const System::SystemRole updateMode = EditorUi::isPlayMode ? System::SystemRole::Game : System::SystemRole::Editor;
+        Engine::Update(updateMode);
 
-        // B. Submit editor gizmos so they appear on top of the scene
-        DrawEditionStuff();
-        HierarchyOperations::DoHierarchyOperations();
+        // B. Submit editor gizmos so they appear on top of the scene (only in editor mode)
+        if (!EditorUi::isPlayMode) {
+            DrawEditionStuff();
+            HierarchyOperations::DoHierarchyOperations();
+        }
 
         Engine::Renderer::EndBatch(); // Draws everything to the FBO
 

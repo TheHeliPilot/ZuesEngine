@@ -23,7 +23,6 @@ void RenderingSystem::Run(World* world, const float deltaTime) {
     std::vector<RenderableEntity> renderables;
 
     // --- Manual Archetype Iteration (Replaces QueryAndCollect) ---
-    // Requires the GetArchetypes() method to be added to World.h
     for (const auto& pair : world->GetArchetypes()) {
         const ComponentSignature& archetypeSignature = pair.first;
         Archetype* archetype = pair.second.get();
@@ -38,7 +37,6 @@ void RenderingSystem::Run(World* world, const float deltaTime) {
             // Loop through all entities in this matching Archetype
             for (size_t i = 0; i < archetype->entityIDs.size(); ++i) {
 
-                // FIX 2 & 3: Use GetData() and pointer arithmetic to get the component pointer
                 renderables.push_back({
                     posArray->GetData() + i,
                     spriteArray->GetData() + i
@@ -46,17 +44,16 @@ void RenderingSystem::Run(World* world, const float deltaTime) {
             }
         }
     }
-    // --- END Manual Iteration ---
 
 
     // 2. Sort the collected entities by Layer and then SortOrder
-    std::sort(renderables.begin(), renderables.end(),
-        [](const RenderableEntity& a, const RenderableEntity& b) {
-            if (a.sprite->layer != b.sprite->layer) {
-                return a.sprite->layer < b.sprite->layer; // Lower layer first (back)
-            }
-            return a.sprite->sortOrder < b.sprite->sortOrder; // Lower sortOrder first (back)
-        }
+    std::ranges::sort(renderables,
+                      [](const RenderableEntity& a, const RenderableEntity& b) {
+                          if (a.sprite->layer != b.sprite->layer) {
+                              return a.sprite->layer < b.sprite->layer; // Lower layer first (back)
+                          }
+                          return a.sprite->sortOrder < b.sprite->sortOrder; // Lower sortOrder first (back)
+                      }
     );
 
     // 3. Execute the rendering logic (call Update internally) in sorted order
@@ -70,7 +67,7 @@ void RenderingSystem::Run(World* world, const float deltaTime) {
 void RenderingSystem::Update(float deltaTime, Engine::ECS::Component::TransformComponent* pos, Engine::ECS::Component::SpriteComponent* sprite) {
     // Skip rendering if fully transparent
     if (sprite->color.w <= 0.0f || sprite->spriteName.empty())  {
-        //TODO: FIX!!!
+        //TODO: FIX NO-SPRITE RENDERING!!!
         //return;
     }
 

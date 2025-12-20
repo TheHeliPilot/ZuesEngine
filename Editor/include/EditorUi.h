@@ -20,10 +20,16 @@ namespace EditorWindows
         static Engine::Math::Vec2 viewportMousePos;
         static Engine::Math::Vec2 viewportSize;
         static std::vector<EntityID> selectedEntities;
+        static bool isPlayMode;
+        static std::string savedWorldState;
 
         static void HandleWindowResize();
 
         static void DrawWindowUi();
+
+        static void EnterPlayMode();
+
+        static void ExitPlayMode();
 
         // NEW: Function to initiate a manual project build
         static void BuildProject(bool play);

@@ -10,7 +10,7 @@ class World; // Forward declaration
 class PhysicsSystem final : public System {
 public:
     PhysicsSystem();
-    ~PhysicsSystem();
+    ~PhysicsSystem() override;
 
     void Run(World* world, float deltaTime) override;
 

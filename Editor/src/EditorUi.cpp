@@ -17,6 +17,8 @@
 
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
+#include <fstream>
+#include <sstream>
 
 // Note: Ensure stbi_image is included/linked for LoadTextureFromFile to work.
 extern "C" {
@@ -35,6 +37,8 @@ Engine::Math::Vec2 EditorUi::viewportMousePos = {-1, -1};
 Engine::Math::Vec2 EditorUi::viewportSize = {-1, -1};
 static std::unordered_map<std::string, ImVec2> g_WindowPosCache;
 static std::unordered_map<std::string, ImVec2> g_WindowSizeCache;
+bool EditorUi::isPlayMode = false;
+std::string EditorUi::savedWorldState = "";
 
 static ImVec2 FromImVec2(const ImVec2& v) { return {v.x, v.y}; }
 
@@ -73,7 +77,7 @@ uint32_t LoadTextureFromFile(const char* filepath) {
     }
 
     // Flip image manually
-    int rowSize = w * 4;
+    const int rowSize = w * 4;
     unsigned char* tempRow = new unsigned char[rowSize];
     for (int y = 0; y < h / 2; y++) {
         unsigned char* rowA = data + y * rowSize;
@@ -112,12 +116,12 @@ static void DrawCustomTitleBar() {
     ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, title_bar_height));
     ImGui::SetNextWindowViewport(viewport->ID);
 
-    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration
-                                 | ImGuiWindowFlags_NoMove
-                                 | ImGuiWindowFlags_NoResize
-                                 | ImGuiWindowFlags_NoSavedSettings
-                                 | ImGuiWindowFlags_NoDocking
-                                 | ImGuiWindowFlags_NoScrollbar;
+    constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration
+                                       | ImGuiWindowFlags_NoMove
+                                       | ImGuiWindowFlags_NoResize
+                                       | ImGuiWindowFlags_NoSavedSettings
+                                       | ImGuiWindowFlags_NoDocking
+                                       | ImGuiWindowFlags_NoScrollbar;
 
     const ImVec4 accent = ImGui::GetStyle().Colors[ImGuiCol_TitleBgActive];
     ImGui::PushStyleColor(ImGuiCol_WindowBg, accent);
@@ -125,7 +129,7 @@ static void DrawCustomTitleBar() {
     ImGui::PopStyleColor(); // Pop ImGuiCol_WindowBg
 
     // Calculate dimensions
-    ImVec2 winSize = ImGui::GetWindowSize();
+    const ImVec2 winSize = ImGui::GetWindowSize();
     const float button_size_y = winSize.y;
     const float button_size_x = button_size_y * 1.5f;
     const float total_buttons_width = button_size_x * 3.0f;
@@ -137,16 +141,16 @@ static void DrawCustomTitleBar() {
     static uint32_t maximize_texture_id = 0;
     static uint32_t restore_texture_id = 0;
     static uint32_t close_texture_id = 0;
-    static uint32_t build_texture_id = 0;
     static uint32_t play_texture_id = 0;
+    static uint32_t stop_texture_id = 0;
 
     if (logo_texture_id == 0)      logo_texture_id     = LoadTextureFromFile("icons/ZuesLogoNoBG.png");
     if (minimize_texture_id == 0)  minimize_texture_id = LoadTextureFromFile("icons/System/Bar_Bottom.png");
     if (maximize_texture_id == 0)  maximize_texture_id = LoadTextureFromFile("icons/System/Window.png");
     if (restore_texture_id == 0)   restore_texture_id  = LoadTextureFromFile("icons/System/Devices.png");
     if (close_texture_id == 0)     close_texture_id    = LoadTextureFromFile("icons/Menu/Close_LG.png");
-    if (build_texture_id == 0)     build_texture_id    = LoadTextureFromFile("icons/File/Download_Package.png");
     if (play_texture_id == 0)      play_texture_id     = LoadTextureFromFile("icons/Media/Play.png");
+    if (stop_texture_id == 0)      stop_texture_id     = LoadTextureFromFile("icons/Media/Stop.png");
     // -------------------------------
 
     // --- 1. Right-side control buttons (Window Controls) ---
@@ -176,8 +180,8 @@ static void DrawCustomTitleBar() {
         ImGui::PopStyleColor(3);
     };
 
-    const float icon_size_xy = 16.0f; // A suitable size for window control icons
-    const ImVec2 icon_size = {icon_size_xy, icon_size_xy};
+    constexpr float icon_size_xy = 16.0f; // A suitable size for window control icons
+    constexpr ImVec2 icon_size = {icon_size_xy, icon_size_xy};
 
     // Minimize Button (Using unique ID)
     pushTransparentImageButton("##Minimize", minimize_texture_id, icon_size, ImVec4(0.3f, 0.3f, 0.3f, 0.5f), [](){ glfwIconifyWindow(g_MainWindow); });
@@ -185,29 +189,29 @@ static void DrawCustomTitleBar() {
 
     // Maximize/Restore Button (Using unique ID)
     bool maximized = glfwGetWindowAttrib(g_MainWindow, GLFW_MAXIMIZED);
-    uint32_t current_maximize_id = maximized ? restore_texture_id : maximize_texture_id;
+    const uint32_t current_maximize_id = maximized ? restore_texture_id : maximize_texture_id;
     pushTransparentImageButton("##Maximize", current_maximize_id, icon_size, ImVec4(0.3f, 0.3f, 0.3f, 0.5f), [maximized](){
         if(maximized) glfwRestoreWindow(g_MainWindow); else glfwMaximizeWindow(g_MainWindow);
     });
     ImGui::SameLine(0, 0);
 
     // Close Button (Using unique ID)
-    const float close_icon_size_xy = 14.0f;
-    const ImVec2 close_icon_size = {close_icon_size_xy, close_icon_size_xy};
+    constexpr float close_icon_size_xy = 14.0f;
+    constexpr ImVec2 close_icon_size = {close_icon_size_xy, close_icon_size_xy};
     pushTransparentImageButton("##Close", close_texture_id, close_icon_size, ImVec4(0.9f, 0.2f, 0.2f, 1.0f), [](){ glfwSetWindowShouldClose(g_MainWindow, GLFW_TRUE); });
 
     ImGui::PopStyleVar(); // Pop FrameRounding
     // -------------------------------------------------------------------------------------
 
     // --- 2. Logo, Engine Name, and FPS (Left Side) ---
-    const float logo_margin_y = 5.0f;
-    const float logo_size = title_bar_height - (logo_margin_y * 2.0f);
+    constexpr float logo_margin_y = 5.0f;
+    constexpr float logo_size = title_bar_height - (logo_margin_y * 2.0f);
 
     ImGui::SetCursorPos(ImVec2(5.0f, logo_margin_y));
 
     // Draw the Logo
     if (logo_texture_id != 0) {
-        ImGui::Image((ImTextureID)(intptr_t)logo_texture_id, ImVec2(logo_size, logo_size), ImVec2(0,1), ImVec2(1,0));
+        ImGui::Image(static_cast<ImTextureID>((intptr_t) logo_texture_id), ImVec2(logo_size, logo_size), ImVec2(0,1), ImVec2(1,0));
     }
 
     // Position the text next to the logo
@@ -222,22 +226,22 @@ static void DrawCustomTitleBar() {
 
     // FIX 1: Fix Jittering by reserving a fixed width and right-aligning the text manually.
     const float fixed_fps_width = ImGui::CalcTextSize("999").x + 10.0f; // Width for "999" plus margin
-    const float horizontal_padding_after_fps = 10.0f; // Margin before Menu Bar
+    constexpr float horizontal_padding_after_fps = 10.0f; // Margin before Menu Bar
 
-    float fps = ImGui::GetIO().Framerate;
+    const float fps = ImGui::GetIO().Framerate;
     char fps_text[32];
     snprintf(fps_text, sizeof(fps_text), "%.0f", fps);
-    ImVec2 actual_fps_size = ImGui::CalcTextSize(fps_text);
+    const ImVec2 actual_fps_size = ImGui::CalcTextSize(fps_text);
 
     // Reserve the fixed width space for the FPS number
     ImGui::InvisibleButton("##FPS_Region", ImVec2(fixed_fps_width, title_bar_height));
-    ImVec2 region_min = ImGui::GetItemRectMin();
-    ImVec2 region_max = ImGui::GetItemRectMax();
+    const ImVec2 region_min = ImGui::GetItemRectMin();
+    const ImVec2 region_max = ImGui::GetItemRectMax();
 
     // Draw the text manually, right-aligned within the reserved space, and vertically centered
     if (ImGui::IsItemVisible()) {
-        float text_start_y = region_min.y + (title_bar_height - actual_fps_size.y) / 2.0f;
-        float text_start_x = region_max.x - actual_fps_size.x; // Right-aligned to the region max X
+        const float text_start_y = region_min.y + (title_bar_height - actual_fps_size.y) / 2.0f;
+        const float text_start_x = region_max.x - actual_fps_size.x; // Right-aligned to the region max X
 
         ImGui::GetWindowDrawList()->AddText(
             ImVec2(text_start_x, text_start_y),
@@ -251,7 +255,7 @@ static void DrawCustomTitleBar() {
 
     // 8. Manually position the cursor for the Menu Bar
     // The menu bar starts after the reserved FPS region plus margin.
-    float menu_bar_start_x = region_max.x + horizontal_padding_after_fps;
+    const float menu_bar_start_x = region_max.x + horizontal_padding_after_fps;
     ImGui::SetCursorPosX(menu_bar_start_x);
 
     // Menu Bar
@@ -306,7 +310,7 @@ static void DrawCustomTitleBar() {
     constexpr float play_button_width = 90.0f;
     constexpr float icon_text_spacing = 5.0f; // Spacing between icon and text
     constexpr float control_spacing = 15.0f;
-    const float buildControlTotalWidth = build_button_width + play_button_width + control_spacing;
+    constexpr float buildControlTotalWidth = build_button_width + play_button_width + control_spacing;
 
     // Margin from Window Controls
     constexpr float horizontal_margin = 10.0f;
@@ -316,7 +320,7 @@ static void DrawCustomTitleBar() {
     // guaranteeing stability against window movement or ImGui cursor jitter.
 
     // 1. Calculate the ideal start X to center the block on the entire window width. (Stable)
-    float ideal_center_x = (winSize.x - buildControlTotalWidth) / 2.0f;
+    const float ideal_center_x = (winSize.x - buildControlTotalWidth) / 2.0f;
 
     // 2. Define the absolute minimum start X for the buttons using a generous, fixed offset.
     // This value is stable and prevents overlap with the Menu Bar (even if the menu bar's width calculation jitters).
@@ -326,7 +330,7 @@ static void DrawCustomTitleBar() {
     float build_start_x = std::max(ideal_center_x, ABSOLUTE_MINIMUM_START_X);
 
     // 4. Also clamp against the right window controls (control_buttons_start_x is stable).
-    float maximum_safe_start_x = control_buttons_start_x - buildControlTotalWidth - horizontal_margin;
+    const float maximum_safe_start_x = control_buttons_start_x - buildControlTotalWidth - horizontal_margin;
     build_start_x = std::min(build_start_x, maximum_safe_start_x);
 
     // --- END STABLE CENTERING LOGIC ---
@@ -340,8 +344,8 @@ static void DrawCustomTitleBar() {
 
     const float text_height = ImGui::CalcTextSize("Play").y;
 
-    const float icon_size_xy_controls = 16.0f; // Icon size used for Build/Play
-    const float icon_y_start = (title_bar_height - icon_size_xy_controls) / 2.0f;
+    constexpr float icon_size_xy_controls = 16.0f; // Icon size used for Build/Play
+    constexpr float icon_y_start = (title_bar_height - icon_size_xy_controls) / 2.0f;
     const float text_y_start = (title_bar_height - text_height) / 2.0f;
 
     // --- Build Button ---
@@ -359,11 +363,11 @@ static void DrawCustomTitleBar() {
     ImGui::PopStyleVar(); // Pop FramePadding
 
     if (ImGui::IsItemVisible()) {
-        ImVec2 button_min = ImGui::GetItemRectMin();
+        const ImVec2 button_min = ImGui::GetItemRectMin();
 
         // Icon Draw - Y aligned using icon_y_start
         ImGui::SetCursorScreenPos(ImVec2(button_min.x + build_content_start_x_offset, button_min.y + icon_y_start));
-        ImGui::Image((ImTextureID)(intptr_t)build_texture_id, ImVec2(icon_size_xy_controls, icon_size_xy_controls), ImVec2(0, 0), ImVec2(1, 1));
+        ImGui::Image(static_cast<ImTextureID>((intptr_t) restore_texture_id), ImVec2(icon_size_xy_controls, icon_size_xy_controls), ImVec2(0, 0), ImVec2(1, 1));
 
         // Text Draw - Y aligned using text_y_start
         ImGui::SetCursorScreenPos(ImVec2(
@@ -377,43 +381,51 @@ static void DrawCustomTitleBar() {
     ImGui::SetCursorPosY(0.0f);
 
 
-    // --- Play Button ---
+    // --- Play/Stop Button ---
+    // Determine button text and icon based on play mode state
+    const char* play_button_text = EditorUi::isPlayMode ? "Stop" : "Play";
+    const uint32_t play_button_icon = EditorUi::isPlayMode ? stop_texture_id : play_texture_id;
+
     // Calculate content width for horizontal centering inside the button
-    const float play_text_width = ImGui::CalcTextSize("Play").x;
+    const float play_text_width = ImGui::CalcTextSize(play_button_text).x;
     const float play_content_total_width = icon_size_xy_controls + icon_text_spacing + play_text_width;
     const float play_content_start_x_offset = (play_button_width - play_content_total_width) / 2.0f;
 
     // Use FramePadding to push the content to the center
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(play_content_start_x_offset, icon_y_start));
     if(ImGui::Button("##PlayButton", ImVec2(play_button_width, title_bar_height))) {
-        EditorUi::BuildProject(true); // Build and Play
+        if (EditorUi::isPlayMode) {
+            EditorUi::ExitPlayMode();
+        } else {
+            EditorUi::EnterPlayMode();
+        }
     }
     ImGui::PopStyleVar(); // Pop FramePadding
 
     if (ImGui::IsItemVisible()) {
-        ImVec2 button_min = ImGui::GetItemRectMin();
+        const ImVec2 button_min = ImGui::GetItemRectMin();
 
         // Icon Draw - Y aligned using icon_y_start
         ImGui::SetCursorScreenPos(ImVec2(button_min.x + play_content_start_x_offset, button_min.y + icon_y_start));
-        ImGui::Image((ImTextureID)(intptr_t)play_texture_id, ImVec2(icon_size_xy_controls, icon_size_xy_controls), ImVec2(0, 0), ImVec2(1, 1));
+        ImGui::Image(static_cast<ImTextureID>((intptr_t) play_button_icon), ImVec2(icon_size_xy_controls, icon_size_xy_controls), ImVec2(0, 0), ImVec2(1, 1));
 
         // Text Draw - Y aligned using text_y_start
         ImGui::SetCursorScreenPos(ImVec2(
             button_min.x + play_content_start_x_offset + icon_size_xy_controls + icon_text_spacing,
             button_min.y + text_y_start
         ));
-        ImGui::TextUnformatted("Play");
+        ImGui::TextUnformatted(play_button_text);
     }
 
     ImGui::PopStyleVar(2); // Pop ItemSpacing and FrameRounding
 
     // We now fetch the cursor position after the button block for the drag region.
     // This value is relative to the stable button position, so it should be correct.
-    float build_end_x = ImGui::GetCursorPosX();
+    const float build_end_x = ImGui::GetCursorPosX();
 
     // --- 4. Drag Region (Unchanged) ---
     ImGui::SetCursorPos(ImVec2(build_end_x, 0));
-    float drag_width_right = control_buttons_start_x - build_end_x;
+    const float drag_width_right = control_buttons_start_x - build_end_x;
 
     if (drag_width_right > 0) {
         ImGui::InvisibleButton("##DragRegionRight", ImVec2(drag_width_right, title_bar_height));
@@ -421,7 +433,7 @@ static void DrawCustomTitleBar() {
             int x, y;
             glfwGetWindowPos(g_MainWindow, &x, &y);
             const ImVec2 delta = ImGui::GetIO().MouseDelta;
-            glfwSetWindowPos(g_MainWindow, x + (int)delta.x, y + (int)delta.y);
+            glfwSetWindowPos(g_MainWindow, x + static_cast<int>(delta.x), y + static_cast<int>(delta.y));
         }
     }
 
@@ -448,22 +460,22 @@ void EditorUi::HandleWindowResize() {
 
     double client_x, client_y;
     glfwGetCursorPos(g_MainWindow, &client_x, &client_y);
-    const ImVec2 mousePos = {(float)client_x, (float)client_y};
+    const ImVec2 mousePos = {static_cast<float>(client_x), static_cast<float>(client_y)};
 
     int win_x, win_y, win_w, win_h;
     glfwGetWindowPos(g_MainWindow, &win_x, &win_y);
     glfwGetWindowSize(g_MainWindow, &win_w, &win_h);
 
-    bool left_mouse_down = glfwGetMouseButton(g_MainWindow, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+    const bool left_mouse_down = glfwGetMouseButton(g_MainWindow, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
 
     // --- State 1: Detect Resize Start or Update Cursor ---
     if (g_ActiveResizeEdge == ResizeEdge::NONE) {
-        bool near_left = mousePos.x >= 0 && mousePos.x <= BORDER_SIZE;
-        bool near_right = mousePos.x <= win_w && mousePos.x >= win_w - BORDER_SIZE;
-        bool near_bottom = mousePos.y <= win_h && mousePos.y >= win_h - BORDER_SIZE;
-        bool near_top = mousePos.y >= 0 && mousePos.y <= BORDER_SIZE;
+        const bool near_left = mousePos.x >= 0 && mousePos.x <= BORDER_SIZE;
+        const bool near_right = mousePos.x <= win_w && mousePos.x >= win_w - BORDER_SIZE;
+        const bool near_bottom = mousePos.y <= win_h && mousePos.y >= win_h - BORDER_SIZE;
+        const bool near_top = mousePos.y >= 0 && mousePos.y <= BORDER_SIZE;
 
-        bool over_title_bar_content = mousePos.y > BORDER_SIZE && mousePos.y < TITLE_BAR_HEIGHT && !near_left && !near_right;
+        const bool over_title_bar_content = mousePos.y > BORDER_SIZE && mousePos.y < TITLE_BAR_HEIGHT && !near_left && !near_right;
 
         ResizeEdge potentialEdge = ResizeEdge::NONE;
         int cursorShape = GLFW_ARROW_CURSOR;
@@ -495,13 +507,13 @@ void EditorUi::HandleWindowResize() {
 
         double current_x, current_y;
         glfwGetCursorPos(g_MainWindow, &current_x, &current_y);
-        const int delta_x = (int)(current_x - g_LastCursorX);
-        const int delta_y = (int)(current_y - g_LastCursorY);
+        const int delta_x = static_cast<int>(current_x - g_LastCursorX);
+        const int delta_y = static_cast<int>(current_y - g_LastCursorY);
 
         int new_x = win_x, new_y = win_y, new_w = win_w, new_h = win_h;
-        const int MIN_W = 500, MIN_H = 300;
+        constexpr int MIN_W = 500, MIN_H = 300;
 
-        if ((int)g_ActiveResizeEdge & (int)ResizeEdge::LEFT) {
+        if (static_cast<int>(g_ActiveResizeEdge) & static_cast<int>(ResizeEdge::LEFT)) {
             new_w = win_w - delta_x;
             if (new_w > MIN_W) {
                 new_x = win_x + delta_x;
@@ -511,11 +523,11 @@ void EditorUi::HandleWindowResize() {
             }
         }
 
-        if ((int)g_ActiveResizeEdge & (int)ResizeEdge::RIGHT) {
+        if (static_cast<int>(g_ActiveResizeEdge) & static_cast<int>(ResizeEdge::RIGHT)) {
             new_w = std::max(MIN_W, win_w + delta_x);
         }
 
-        if ((int)g_ActiveResizeEdge & (int)ResizeEdge::TOP) {
+        if (static_cast<int>(g_ActiveResizeEdge) & static_cast<int>(ResizeEdge::TOP)) {
             new_h = win_h - delta_y;
             if (new_h > MIN_H) {
                 new_y = win_y + delta_y;
@@ -525,7 +537,7 @@ void EditorUi::HandleWindowResize() {
             }
         }
 
-        if ((int)g_ActiveResizeEdge & (int)ResizeEdge::BOTTOM) {
+        if (static_cast<int>(g_ActiveResizeEdge) & static_cast<int>(ResizeEdge::BOTTOM)) {
             new_h = std::max(MIN_H, win_h + delta_y);
         }
 
@@ -552,13 +564,13 @@ void EditorUi::DrawWindowUi() {
     ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, viewport->WorkSize.y - title_bar_height));
     ImGui::SetNextWindowViewport(viewport->ID);
 
-    const ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking
-                                        | ImGuiWindowFlags_NoTitleBar
-                                        | ImGuiWindowFlags_NoCollapse
-                                        | ImGuiWindowFlags_NoResize
-                                        | ImGuiWindowFlags_NoMove
-                                        | ImGuiWindowFlags_NoNavFocus
-                                        | ImGuiWindowFlags_NoScrollbar;
+    constexpr ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking
+                                              | ImGuiWindowFlags_NoTitleBar
+                                              | ImGuiWindowFlags_NoCollapse
+                                              | ImGuiWindowFlags_NoResize
+                                              | ImGuiWindowFlags_NoMove
+                                              | ImGuiWindowFlags_NoNavFocus
+                                              | ImGuiWindowFlags_NoScrollbar;
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0.0f);
@@ -569,7 +581,7 @@ void EditorUi::DrawWindowUi() {
     ImGui::PopStyleVar(3);
 
     if(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_DockingEnable) {
-        ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
+        const ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
         ImGui::DockSpace(dockspace_id, ImVec2(0,0), dockspace_flags);
     }
 
@@ -581,9 +593,16 @@ void EditorUi::DrawWindowUi() {
     ImGui::ShowDemoWindow();
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0,0});
+
+    // Set viewport border color based on play mode
+    if (isPlayMode) {
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)); // Green border in play mode
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
+    }
+
     ImGui::Begin("Viewport");
 
-    ImVec2 imageStartScreenPos = ImGui::GetCursorScreenPos();
+    const ImVec2 imageStartScreenPos = ImGui::GetCursorScreenPos();
     g_WindowPosCache["Viewport"] = imageStartScreenPos;
 
     const ImVec2 mouseScreenPos = ImGui::GetMousePos();
@@ -597,12 +616,18 @@ void EditorUi::DrawWindowUi() {
 
     Engine::Renderer::SetViewportSize(contentSize.x, contentSize.y);
 
-    if(uint32_t textureID = Engine::Renderer::GetRenderTextureID(); textureID != 0) {
-        ImGui::Image((ImTextureID)(intptr_t)textureID, contentSize, ImVec2(0,1), ImVec2(1,0));
+    if(const uint32_t textureID = Engine::Renderer::GetRenderTextureID(); textureID != 0) {
+        ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(textureID)), contentSize, ImVec2(0,1), ImVec2(1,0));
     }
 
     ImGui::End();
-    ImGui::PopStyleVar();
+
+    if (isPlayMode) {
+        ImGui::PopStyleVar(); // Pop WindowBorderSize
+        ImGui::PopStyleColor(); // Pop Border color
+    }
+
+    ImGui::PopStyleVar(); // Pop WindowPadding
 
     ImGui::End();
 }
@@ -628,3 +653,70 @@ bool EditorUi::IsEntitySelected(const EntityID &entityID)
 
     return false;
 }
+
+void EditorUi::EnterPlayMode() {
+      if (isPlayMode) return;
+
+      LOG_INFO("Entering Play Mode...");
+
+      // Save the current world state to a temporary string
+      World* world = Engine::Core::GetCurrentWorld();
+      if (world) {
+          // Save to a temporary file
+          const std::string tempPath = "temp_editor_state.json";
+          if (world->SaveToJson(tempPath)) {
+              // Read the file into our saved state
+              std::ifstream file(tempPath);
+              if (file.is_open()) {
+                  std::stringstream buffer;
+                  buffer << file.rdbuf();
+                  savedWorldState = buffer.str();
+                  file.close();
+
+                  // Delete temp file
+                  std::filesystem::remove(tempPath);
+
+                  isPlayMode = true;
+                  LOG_INFO("Play Mode: World state saved successfully");
+              } else {
+                  LOG_ERROR("Play Mode: Failed to read temporary state file");
+              }
+          } else {
+              LOG_ERROR("Play Mode: Failed to save world state");
+          }
+      }
+  }
+
+  void EditorUi::ExitPlayMode() {
+      if (!isPlayMode) return;
+
+      LOG_INFO("Exiting Play Mode...");
+
+      // Restore the saved world state
+      World* world = Engine::Core::GetCurrentWorld();
+      if (world && !savedWorldState.empty()) {
+          // Write saved state to temp file
+          const std::string tempPath = "temp_editor_state.json";
+          std::ofstream file(tempPath);
+          if (file.is_open()) {
+              file << savedWorldState;
+              file.close();
+
+              // Load from temp file
+              if (world->LoadFromJson(tempPath)) {
+                  LOG_INFO("Play Mode: World state restored successfully");
+                  // Delete temp file
+                  std::filesystem::remove(tempPath);
+              } else {
+                  LOG_ERROR("Play Mode: Failed to restore world state");
+              }
+          } else {
+              LOG_ERROR("Play Mode: Failed to write temporary state file");
+          }
+
+          savedWorldState.clear();
+      }
+
+      isPlayMode = false;
+  }
+

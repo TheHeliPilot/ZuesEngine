@@ -1,0 +1,679 @@
+/* ZuesEngine Project Tracker v2 - Minimalist Dark Theme */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg-1: #0a0a0a;
+    --bg-2: #111;
+    --bg-3: #181818;
+    --bg-4: #222;
+    --text-1: #e5e5e5;
+    --text-2: #777;
+    --text-3: #444;
+    --border: #222;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --orange: #f97316;
+    --purple: #a855f7;
+    --pink: #ec4899;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg-1);
+    color: var(--text-1);
+    line-height: 1.5;
+    font-size: 14px;
+}
+
+/* Layout */
+.app {
+    display: flex;
+    height: 100vh;
+}
+
+.sidebar {
+    width: 180px;
+    background: var(--bg-2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 24px 16px;
+}
+
+.logo h1 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+}
+
+.version {
+    font-size: 11px;
+    color: var(--text-2);
+    margin-top: 2px;
+}
+
+.nav {
+    margin-top: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.nav-item {
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    color: var(--text-2);
+    text-align: left;
+    cursor: pointer;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s;
+}
+
+.nav-item:hover {
+    background: var(--bg-3);
+    color: var(--text-1);
+}
+
+.nav-item.active {
+    background: var(--bg-3);
+    color: var(--text-1);
+}
+
+.sidebar-actions {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.main {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-1);
+}
+
+/* Header */
+.header {
+    padding: 24px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+}
+
+.header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.stats {
+    font-size: 12px;
+    color: var(--text-2);
+}
+
+/* Views */
+.view {
+    display: none;
+    flex: 1;
+    overflow: hidden;
+    flex-direction: column;
+}
+
+.view.active {
+    display: flex;
+}
+
+/* Buttons */
+.btn-primary {
+    padding: 8px 16px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.15s;
+}
+
+.btn-primary:hover {
+    background: var(--accent-hover);
+}
+
+.btn-ghost {
+    padding: 8px 14px;
+    background: transparent;
+    color: var(--text-2);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+}
+
+.btn-ghost:hover {
+    background: var(--bg-3);
+    color: var(--text-1);
+}
+
+.btn-ghost.danger:hover {
+    color: var(--red);
+}
+
+/* Search */
+.search {
+    padding: 8px 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-1);
+    font-size: 13px;
+    width: 200px;
+}
+
+.search:focus {
+    outline: none;
+    border-color: var(--text-3);
+}
+
+.search::placeholder {
+    color: var(--text-3);
+}
+
+/* Task Tree */
+.task-tree {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 40px 60px;
+}
+
+/* Tree Structure */
+.tree-root {
+    /* Root level tasks */
+}
+
+.tree-item {
+    position: relative;
+}
+
+.tree-item-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    margin: 2px 0;
+    background: var(--bg-2);
+    border-radius: 8px;
+    transition: background 0.15s;
+    position: relative;
+}
+
+.tree-item-content:hover {
+    background: var(--bg-3);
+}
+
+.tree-item-content.completed {
+    opacity: 0.5;
+}
+
+.tree-item-content.completed .tree-title {
+    text-decoration: line-through;
+    color: var(--text-2);
+}
+
+/* Indentation and Tree Lines */
+.tree-children {
+    position: relative;
+    margin-left: 24px;
+    padding-left: 20px;
+    border-left: 1px solid var(--border);
+}
+
+.tree-children::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 20px;
+    width: 1px;
+    background: var(--border);
+}
+
+.tree-children .tree-item-content::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 50%;
+    width: 16px;
+    height: 1px;
+    background: var(--border);
+}
+
+/* Priority Indicator */
+.priority-indicator {
+    width: 3px;
+    height: 24px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.priority-indicator.critical { background: var(--red); }
+.priority-indicator.high { background: var(--orange); }
+.priority-indicator.medium { background: var(--accent); }
+.priority-indicator.low { background: var(--text-3); }
+
+/* Toggle Button */
+.tree-toggle {
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.tree-toggle:hover {
+    background: var(--bg-4);
+    color: var(--text-1);
+}
+
+.tree-toggle.hidden {
+    visibility: hidden;
+}
+
+.tree-toggle svg {
+    transition: transform 0.2s;
+}
+
+.tree-toggle.expanded svg {
+    transform: rotate(90deg);
+}
+
+/* Checkbox */
+.tree-check {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--green);
+    flex-shrink: 0;
+}
+
+/* Task Title */
+.tree-title {
+    flex: 1;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tree-title:hover {
+    background: var(--bg-4);
+}
+
+/* Meta Info */
+.tree-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.child-count {
+    font-size: 11px;
+    color: var(--text-2);
+    background: var(--bg-4);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+/* Tags */
+.tag {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-weight: 500;
+}
+
+.tag-rendering { background: rgba(34, 197, 94, 0.15); color: var(--green); }
+.tag-physics { background: rgba(168, 85, 247, 0.15); color: var(--purple); }
+.tag-audio { background: rgba(249, 115, 22, 0.15); color: var(--orange); }
+.tag-input { background: rgba(59, 130, 246, 0.15); color: var(--accent); }
+.tag-networking { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+.tag-editor { background: rgba(236, 72, 153, 0.15); color: var(--pink); }
+
+/* Task Actions */
+.tree-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+}
+
+.tree-item-content:hover .tree-actions {
+    opacity: 1;
+}
+
+.action-btn {
+    width: 26px;
+    height: 26px;
+    background: var(--bg-4);
+    border: none;
+    color: var(--text-2);
+    cursor: pointer;
+    border-radius: 6px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+
+.action-btn:hover {
+    background: var(--accent);
+    color: white;
+}
+
+.action-btn.delete:hover {
+    background: var(--red);
+}
+
+/* Task Notes */
+.tree-notes {
+    font-size: 12px;
+    color: var(--text-2);
+    padding: 6px 14px 10px;
+    margin-left: 75px;
+    line-height: 1.5;
+}
+
+/* Empty State */
+.empty {
+    text-align: center;
+    color: var(--text-2);
+    padding: 80px 20px;
+    font-size: 14px;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-box {
+    background: var(--bg-2);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 440px;
+    border: 1px solid var(--border);
+}
+
+.modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-2);
+    font-size: 22px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.15s;
+}
+
+.modal-close:hover {
+    color: var(--text-1);
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.field {
+    margin-bottom: 18px;
+}
+
+.field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-2);
+    margin-bottom: 8px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.field input,
+.field select,
+.field textarea {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-1);
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+    outline: none;
+    border-color: var(--text-3);
+}
+
+.field textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+/* Wiki */
+.wiki-layout {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.wiki-nav {
+    width: 200px;
+    background: var(--bg-2);
+    border-right: 1px solid var(--border);
+    padding: 20px 12px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.wiki-link {
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    color: var(--text-2);
+    text-align: left;
+    cursor: pointer;
+    border-radius: 8px;
+    font-size: 13px;
+    transition: all 0.15s;
+}
+
+.wiki-link:hover {
+    background: var(--bg-3);
+    color: var(--text-1);
+}
+
+.wiki-link.active {
+    background: var(--bg-3);
+    color: var(--text-1);
+}
+
+.wiki-content {
+    flex: 1;
+    padding: 40px;
+    overflow-y: auto;
+    max-width: 800px;
+}
+
+.wiki-content h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    letter-spacing: -0.5px;
+}
+
+.wiki-content h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-top: 40px;
+    margin-bottom: 16px;
+    color: var(--text-1);
+}
+
+.wiki-content h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-top: 28px;
+    margin-bottom: 12px;
+}
+
+.wiki-content p {
+    margin-bottom: 16px;
+    color: var(--text-2);
+    line-height: 1.7;
+}
+
+.wiki-content ul, .wiki-content ol {
+    margin-left: 20px;
+    margin-bottom: 16px;
+    color: var(--text-2);
+}
+
+.wiki-content li {
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+
+.wiki-content code {
+    background: var(--bg-3);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: 'SF Mono', 'Consolas', monospace;
+    font-size: 13px;
+    color: var(--text-1);
+}
+
+.wiki-content pre {
+    background: var(--bg-3);
+    padding: 20px;
+    border-radius: 10px;
+    overflow-x: auto;
+    margin-bottom: 20px;
+    border: 1px solid var(--border);
+}
+
+.wiki-content pre code {
+    background: none;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--bg-4);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-3);
+}
+
+/* Selection */
+::selection {
+    background: var(--accent);
+    color: white;
+}

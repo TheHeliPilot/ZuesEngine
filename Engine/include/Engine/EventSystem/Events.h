@@ -24,11 +24,11 @@ namespace Engine {
         // Required for templated subscription
         static EventType StaticType() { return EventType::LogE; }
 
-        EventType GetEventType() const override {
+        [[nodiscard]] EventType GetEventType() const override {
             return StaticType();
         }
 
-        std::string GetMessage() const {
+        [[nodiscard]] std::string GetMessage() const {
             std::string logLevelName = "Info";
             if (logLevel == LOGLEVEL_WARN)
                 logLevelName = "Warning";
@@ -50,7 +50,7 @@ namespace Engine {
     protected:
         int keyCode;
     public:
-        int GetKeyCode() const { return keyCode; }
+        [[nodiscard]] int GetKeyCode() const { return keyCode; }
         explicit KeyEvent(const int code) : keyCode(code) {}
         // No StaticType() here, as this is a base class
     };
@@ -59,14 +59,14 @@ namespace Engine {
     public:
         explicit KeyPressEvent(const int code) : KeyEvent(code) {}
         static EventType StaticType() { return EventType::KeyPressE; }
-        EventType GetEventType() const override { return StaticType(); }
+        [[nodiscard]] EventType GetEventType() const override { return StaticType(); }
     };
 
     class KeyReleaseEvent final : public KeyEvent {
     public:
         explicit KeyReleaseEvent(const int code) : KeyEvent(code) {}
         static EventType StaticType() { return EventType::KeyReleaseE; }
-        EventType GetEventType() const override { return StaticType(); }
+        [[nodiscard]] EventType GetEventType() const override { return StaticType(); }
     };
 
     // --- Mouse Events ---
@@ -76,9 +76,9 @@ namespace Engine {
     public:
         MouseMoveEvent(const double xPos, const double yPos) : x(xPos), y(yPos) {}
         static EventType StaticType() { return EventType::MouseMoveE; }
-        EventType GetEventType() const override { return StaticType(); }
-        double GetX() const { return x; }
-        double GetY() const { return y; }
+        [[nodiscard]] EventType GetEventType() const override { return StaticType(); }
+        [[nodiscard]] double GetX() const { return x; }
+        [[nodiscard]] double GetY() const { return y; }
     };
 
     class MouseButtonPressEvent final : public Event {
@@ -86,8 +86,8 @@ namespace Engine {
     public:
         explicit MouseButtonPressEvent(const int btn) : button(btn) {}
         static EventType StaticType() { return EventType::MouseButtonPressE; }
-        EventType GetEventType() const override { return StaticType(); }
-        int GetButton() const { return button; }
+        [[nodiscard]] EventType GetEventType() const override { return StaticType(); }
+        [[nodiscard]] int GetButton() const { return button; }
     };
 
     class MouseButtonReleaseEvent final : public Event {
@@ -95,8 +95,8 @@ namespace Engine {
     public:
         explicit MouseButtonReleaseEvent(const int btn) : button(btn) {}
         static EventType StaticType() { return EventType::MouseButtonReleaseE; }
-        EventType GetEventType() const override { return StaticType(); }
-        int GetButton() const { return button; }
+        [[nodiscard]] EventType GetEventType() const override { return StaticType(); }
+        [[nodiscard]] int GetButton() const { return button; }
     };
 
 } // namespace Engine
