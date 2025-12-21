@@ -1,4 +1,6 @@
 #pragma once
+
+#include "../../ZuesAPI.h"
 #include "../System.h"
 #include "../Components.h"
 #include <memory>
@@ -7,7 +9,7 @@
 
 class World; // Forward declaration
 
-class PhysicsSystem final : public System {
+class ZUES_API PhysicsSystem final : public System {
 public:
     PhysicsSystem();
     ~PhysicsSystem() override;

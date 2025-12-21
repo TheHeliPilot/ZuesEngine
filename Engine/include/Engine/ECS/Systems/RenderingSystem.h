@@ -1,4 +1,6 @@
 ﻿#pragma once
+
+#include "../../ZuesAPI.h"
 #include "../System.h"
 #include "../Components.h"
 #include <vector>
@@ -6,12 +8,12 @@
 class World; // Forward declaration
 
 // Helper struct to hold an Entity's components for sorting
-struct RenderableEntity {
+struct ZUES_API RenderableEntity {
     Engine::ECS::Component::TransformComponent* pos;
     Engine::ECS::Component::SpriteComponent* sprite;
 };
 
-class RenderingSystem : public SystemBase<Engine::ECS::Component::TransformComponent*, Engine::ECS::Component::SpriteComponent*> {
+class ZUES_API RenderingSystem : public SystemBase<Engine::ECS::Component::TransformComponent*, Engine::ECS::Component::SpriteComponent*> {
 public:
     RenderingSystem();
 

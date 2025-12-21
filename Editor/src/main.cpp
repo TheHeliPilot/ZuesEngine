@@ -1,4 +1,5 @@
 ﻿#include <filesystem>
+#include <memory>
 #include "Engine.h"
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
@@ -17,8 +18,14 @@
 #include "Core.h"
 #include "../include/HierarchyOperations.h"
 #include "../include/customInspectors/SpriteInspector.h"
+#include "../include/HotReloadUI.h"
+#include "../include/GameDLLLoader.h"
+#include "../include/ProjectManager.h"
+#include "../include/ViewportCameraSystem.h"
+#include "stb/stb_image.h"
 
 using namespace EditorWindows;
+using Editor::GameDLLLoader;
 
 // Global pointer for Input handling
 GLFWwindow* g_MainWindow = nullptr;
@@ -267,35 +274,70 @@ int main() {
         return -1;
     }
     g_MainWindow = window;
+    Engine::Input::SetWindow(window); // Set window for Engine's Input system
     glfwMakeContextCurrent(window);
     glfwSwapInterval(0); // vsync
 
     GLFWimage icon;
-    icon.pixels = stbi_load("icons/ZuesLogoNoBG.png", &icon.width, &icon.height, nullptr, 4);
-    if (!icon.pixels) {
-        LOG_ERROR("Failed to load icon: icons/ZuesLogoNoBG.png");
-        //return -1;
+    icon.pixels = stbi_load("../../icons/ZuesLogoNoBG.png", &icon.width, &icon.height, nullptr, 4);
+    if (icon.pixels) {
+        glfwSetWindowIcon(window, 1, &icon);
+        stbi_image_free(icon.pixels);
+    } else {
+        // Note: Can't use LOG_WARN here - Engine not initialized yet
+        fprintf(stderr, "Warning: Failed to load icon: ../../icons/ZuesLogoNoBG.png - using default icon\n");
     }
-
-    glfwSetWindowIcon(window, 1, &icon);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         LOG_ERROR("Failed to initialize GLAD.");
         return -1;
     }
+    printf("[DEBUG] GLAD loaded\n"); fflush(stdout);
 
-    Engine::Initialize(Engine::Network::Role::Host, "0.0.0.0", 7777, true);
+    // Initialize renderer after GLAD is loaded (OpenGL context ready)
+    Engine::Renderer::Init();
+    printf("[DEBUG] Renderer::Init done\n"); fflush(stdout);
+
+    Engine::Initialize(true, true, "0.0.0.0", 7777, true);
+    printf("[DEBUG] Engine::Initialize done\n"); fflush(stdout);
+
     Engine::IEventSystem->Subscribe<Engine::LogEvent>(LoggerUI::GetLogEvent);
-    Engine::SpawnViewportCamera(Engine::Core::GetCurrentWorld());
-    Engine::SetupHierarchyTestScene(Engine::Core::GetCurrentWorld(), 0);
+    printf("[DEBUG] EventSystem subscribe done\n"); fflush(stdout);
 
+    // Register editor-specific systems
+    printf("[DEBUG] About to register ViewportCameraSystem\n"); fflush(stdout);
+    Engine::Core::GetCurrentWorld()->RegisterSystem(std::make_unique<ViewportCameraSystem>());
+    printf("[DEBUG] ViewportCameraSystem registered\n"); fflush(stdout);
+
+    // TODO: Fix DLL boundary issues with inline functions in SceneSetup.h
+    // These inline functions compile into the Editor and make calls to DLL functions,
+    // causing heap corruption due to mixed allocators
+    // Engine::SpawnViewportCamera(Engine::Core::GetCurrentWorld());
+    // Engine::SetupHierarchyTestScene(Engine::Core::GetCurrentWorld(), 0);
+    printf("[DEBUG] SpawnViewportCamera and SetupHierarchyTestScene skipped (DLL boundary fix needed)\n"); fflush(stdout);
+
+    printf("[DEBUG] About to call ProjectManager::OpenOrCreate\n"); fflush(stdout);
     if (!Engine::ProjectManager::OpenOrCreate(EditorUi::projectDir)) {
         LOG_ERROR("Failed to open or create project at " + EditorUi::projectDir.string());
         return -1;
     }
+    printf("[DEBUG] ProjectManager done\n"); fflush(stdout);
+
+    // Initialize hot-reload system for game DLL
+    if (!GameDLLLoader::Get().Initialize(EditorUi::projectDir)) {
+        LOG_WARN("Failed to initialize GameDLLLoader - hot-reload disabled");
+    } else {
+        // Enable auto-reload by default
+        GameDLLLoader::Get().EnableAutoReload(true);
+        LOG_INFO("Game DLL hot-reload system initialized");
+    }
+    printf("[DEBUG] GameDLLLoader done\n"); fflush(stdout);
 
     Engine::TextureManager::ScanAndRegisterAllSprites(EditorUi::projectDir.string());
+    printf("[DEBUG] TextureManager done\n"); fflush(stdout);
+
     RegisterBuiltInInspectors();
+    printf("[DEBUG] RegisterBuiltInInspectors done\n"); fflush(stdout);
 
     // --- ImGui ---
     IMGUI_CHECKVERSION();
@@ -306,9 +348,10 @@ int main() {
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     // --- 1. Load Main Font (Exo2) ---
-    const ImFont* exo2Font = io.Fonts->AddFontFromFileTTF("fonts/Exo2-VariableFont_wght.ttf", 18.0f);
+    // Note: exe is in bin/, fonts are in ../../fonts/
+    const ImFont* exo2Font = io.Fonts->AddFontFromFileTTF("../../fonts/Exo2-VariableFont_wght.ttf", 18.0f);
     if (!exo2Font) LOG_ERROR("Failed to load Exo2 font to Editor!");
-    const uint32_t engineFont = Engine::Renderer::LoadFont("fonts/Exo2-VariableFont_wght.ttf", 64);
+    const uint32_t engineFont = Engine::Renderer::LoadFont("../../fonts/Exo2-VariableFont_wght.ttf", 64);
 
     // --- 2. Load Icon Font (IconLibs.ttf / EngineerFont) ---
     // The EngineerFont glyphs are typically in the 0xF800 to 0xF8FF range.
@@ -324,7 +367,7 @@ int main() {
 
     // Load and merge the icon font
     const ImFont* mergedFont = io.Fonts->AddFontFromFileTTF(
-        "fonts/IconLibs.ttf",
+        "../../fonts/IconLibs.ttf",
         18.0f, // Size must match the size of the main font (exo2Font)
         &icons_config,
         icons_ranges
@@ -350,6 +393,9 @@ int main() {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         Engine::Input::UpdateState();
+
+        // Check for game DLL changes (auto hot-reload)
+        GameDLLLoader::Get().CheckForChanges();
 
         // ----------------------------------------------------
         // CLEAR THE MAIN WINDOW (BACKGROUND FOR IMGUI)

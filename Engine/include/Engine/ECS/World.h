@@ -1,4 +1,6 @@
 ﻿#pragma once
+
+#include "../ZuesAPI.h"
 #include "System.h"
 #include "ECSConfig.h"
 
@@ -11,13 +13,13 @@
 
 #include "WorldSerializationHelpers.h"
 
-struct EntityData {
+struct ZUES_API EntityData {
     EntityGeneration generation = 0;
     void* archetypePtr = nullptr;
     size_t archetypeIndex = 0;
 };
 
-struct Archetype {
+struct ZUES_API Archetype {
     ComponentSignature signature;
     std::vector<EntityID> entityIDs;
     std::map<Engine::ECS::Component::TypeID, std::unique_ptr<IComponentArray>> componentArrays;
@@ -55,7 +57,7 @@ namespace Engine::ECS::Component {
     }
 }
 
-class World {
+class ZUES_API World {
 public:
     World() = default;
     ~World() = default;

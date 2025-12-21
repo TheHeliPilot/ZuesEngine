@@ -14,24 +14,24 @@
 #include "../include/HierarchyUI.h"
 #include "../include/InspectorUI.h"
 #include "../include/TextureCutterUI.h"
+#include "../include/HotReloadUI.h"
+#include "../include/GameDLLLoader.h"
 
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
 #include <fstream>
 #include <sstream>
 
-// Note: Ensure stbi_image is included/linked for LoadTextureFromFile to work.
-extern "C" {
-    extern void stbi_set_flip_vertically_on_load(int flag);
-    extern unsigned char* stbi_load(char const *filename, int *x, int *y, int *comp, int req_comp);
-    extern void stbi_image_free(void *retval_from_stbi_load);
-}
+// Include stb_image for texture loading
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb/stb_image.h"
 
 extern GLFWwindow* g_MainWindow;
 
 using namespace EditorWindows;
 
-std::filesystem::path EditorUi::projectDir = "../../MyGameProject";
+// From Editor/cmake-build-debug/bin/, go up 3 levels to ZuesEngine root, then to project
+std::filesystem::path EditorUi::projectDir = "../../../MyGameProject";
 std::vector<EntityID> EditorUi::selectedEntities = {};
 Engine::Math::Vec2 EditorUi::viewportMousePos = {-1, -1};
 Engine::Math::Vec2 EditorUi::viewportSize = {-1, -1};
@@ -130,6 +130,14 @@ static void DrawCustomTitleBar() {
 
     // Calculate dimensions
     const ImVec2 winSize = ImGui::GetWindowSize();
+
+    // Skip rendering if window isn't properly sized yet (happens on first frame)
+    if (winSize.x <= 0.0f || winSize.y <= 0.0f) {
+        ImGui::End();
+        ImGui::PopStyleVar(2);
+        return;
+    }
+
     const float button_size_y = winSize.y;
     const float button_size_x = button_size_y * 1.5f;
     const float total_buttons_width = button_size_x * 3.0f;
@@ -144,13 +152,14 @@ static void DrawCustomTitleBar() {
     static uint32_t play_texture_id = 0;
     static uint32_t stop_texture_id = 0;
 
-    if (logo_texture_id == 0)      logo_texture_id     = LoadTextureFromFile("icons/ZuesLogoNoBG.png");
-    if (minimize_texture_id == 0)  minimize_texture_id = LoadTextureFromFile("icons/System/Bar_Bottom.png");
-    if (maximize_texture_id == 0)  maximize_texture_id = LoadTextureFromFile("icons/System/Window.png");
-    if (restore_texture_id == 0)   restore_texture_id  = LoadTextureFromFile("icons/System/Devices.png");
-    if (close_texture_id == 0)     close_texture_id    = LoadTextureFromFile("icons/Menu/Close_LG.png");
-    if (play_texture_id == 0)      play_texture_id     = LoadTextureFromFile("icons/Media/Play.png");
-    if (stop_texture_id == 0)      stop_texture_id     = LoadTextureFromFile("icons/Media/Stop.png");
+    // Note: exe is in bin/, icons are in ../../icons/
+    if (logo_texture_id == 0)      logo_texture_id     = LoadTextureFromFile("../../icons/ZuesLogoNoBG.png");
+    if (minimize_texture_id == 0)  minimize_texture_id = LoadTextureFromFile("../../icons/System/Bar_Bottom.png");
+    if (maximize_texture_id == 0)  maximize_texture_id = LoadTextureFromFile("../../icons/System/Window.png");
+    if (restore_texture_id == 0)   restore_texture_id  = LoadTextureFromFile("../../icons/System/Devices.png");
+    if (close_texture_id == 0)     close_texture_id    = LoadTextureFromFile("../../icons/Menu/Close_LG.png");
+    if (play_texture_id == 0)      play_texture_id     = LoadTextureFromFile("../../icons/Media/Play.png");
+    if (stop_texture_id == 0)      stop_texture_id     = LoadTextureFromFile("../../icons/Media/Stop.png");
     // -------------------------------
 
     // --- 1. Right-side control buttons (Window Controls) ---
@@ -159,6 +168,11 @@ static void DrawCustomTitleBar() {
 
     // Custom lambda for the control buttons (Minimize, Maximize, Close)
     auto pushTransparentImageButton = [&](const char* id, uint32_t textureID, const ImVec2& size, const ImVec4& hoverColor, auto callback) {
+        // Skip if size is invalid or texture failed to load
+        if (size.x <= 0.0f || size.y <= 0.0f || textureID == 0) {
+            return;
+        }
+
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0)); // Transparent background
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hoverColor);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, hoverColor);
@@ -210,7 +224,7 @@ static void DrawCustomTitleBar() {
     ImGui::SetCursorPos(ImVec2(5.0f, logo_margin_y));
 
     // Draw the Logo
-    if (logo_texture_id != 0) {
+    if (logo_texture_id != 0 && logo_size > 0.0f) {
         ImGui::Image(static_cast<ImTextureID>((intptr_t) logo_texture_id), ImVec2(logo_size, logo_size), ImVec2(0,1), ImVec2(1,0));
     }
 
@@ -367,7 +381,9 @@ static void DrawCustomTitleBar() {
 
         // Icon Draw - Y aligned using icon_y_start
         ImGui::SetCursorScreenPos(ImVec2(button_min.x + build_content_start_x_offset, button_min.y + icon_y_start));
-        ImGui::Image(static_cast<ImTextureID>((intptr_t) restore_texture_id), ImVec2(icon_size_xy_controls, icon_size_xy_controls), ImVec2(0, 0), ImVec2(1, 1));
+        if (restore_texture_id != 0 && icon_size_xy_controls > 0.0f) {
+            ImGui::Image(static_cast<ImTextureID>((intptr_t) restore_texture_id), ImVec2(icon_size_xy_controls, icon_size_xy_controls), ImVec2(0, 0), ImVec2(1, 1));
+        }
 
         // Text Draw - Y aligned using text_y_start
         ImGui::SetCursorScreenPos(ImVec2(
@@ -407,7 +423,9 @@ static void DrawCustomTitleBar() {
 
         // Icon Draw - Y aligned using icon_y_start
         ImGui::SetCursorScreenPos(ImVec2(button_min.x + play_content_start_x_offset, button_min.y + icon_y_start));
-        ImGui::Image(static_cast<ImTextureID>((intptr_t) play_button_icon), ImVec2(icon_size_xy_controls, icon_size_xy_controls), ImVec2(0, 0), ImVec2(1, 1));
+        if (play_button_icon != 0 && icon_size_xy_controls > 0.0f) {
+            ImGui::Image(static_cast<ImTextureID>((intptr_t) play_button_icon), ImVec2(icon_size_xy_controls, icon_size_xy_controls), ImVec2(0, 0), ImVec2(1, 1));
+        }
 
         // Text Draw - Y aligned using text_y_start
         ImGui::SetCursorScreenPos(ImVec2(
@@ -586,11 +604,12 @@ void EditorUi::DrawWindowUi() {
     }
 
     LoggerUI::LoggerWindow();
-    HierarchyUI::HierarchyWindow();
+    //HierarchyUI::HierarchyWindow(); //TODO: fix image size 0 crash
     InspectorUI::InspectorWindow();
     AssetBrowserUI::AssetBrowserWindow();
-    TextureCutterUI::TextureCutterWindow();
-    ImGui::ShowDemoWindow();
+    //TextureCutterUI::TextureCutterWindow(); //TODO: fix implementation to actually work
+    Editor::HotReloadUI::Draw(); // Hot-reload panel
+    //ImGui::ShowDemoWindow();
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0,0});
 
@@ -614,10 +633,13 @@ void EditorUi::DrawWindowUi() {
     const ImVec2 contentSize = ImGui::GetContentRegionAvail();
     g_WindowSizeCache["Viewport"] = contentSize;
 
-    Engine::Renderer::SetViewportSize(contentSize.x, contentSize.y);
+    // Only render if we have a valid size (avoid ImGui assertion on zero size)
+    if (contentSize.x > 0.0f && contentSize.y > 0.0f) {
+        Engine::Renderer::SetViewportSize(contentSize.x, contentSize.y);
 
-    if(const uint32_t textureID = Engine::Renderer::GetRenderTextureID(); textureID != 0) {
-        ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(textureID)), contentSize, ImVec2(0,1), ImVec2(1,0));
+        if(const uint32_t textureID = Engine::Renderer::GetRenderTextureID(); textureID != 0) {
+            ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(textureID)), contentSize, ImVec2(0,1), ImVec2(1,0));
+        }
     }
 
     ImGui::End();
@@ -634,7 +656,7 @@ void EditorUi::DrawWindowUi() {
 
 
 void EditorUi::BuildProject(bool play) {
-    Engine::ProjectManager::BuildProjectAsync(play);
+    Editor::GameDLLLoader::Get().BuildGameDLL(true);
 }
 
 Engine::Math::Vec2 EditorUi::GetMousePositionInWindow(const std::string& windowName) {

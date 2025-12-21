@@ -1,9 +1,12 @@
 cmake_minimum_required(VERSION 3.29.6)
-project(Engine)
+project(ZuesEngine VERSION 1.0.0)
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(Engine STATIC
+# Build as SHARED library (DLL on Windows, .so on Linux, .dylib on macOS)
+add_library(ZuesEngine SHARED
+        include/Engine/ZuesAPI.h
         include/Engine/Core.h
         include/Engine/Engine.h
         include/Engine/Network.h
@@ -31,14 +34,10 @@ add_library(Engine STATIC
         include/Engine/ECS/Systems/TextRenderingSystem.h
         include/Engine/Math.h
         include/Engine/SceneSetup.h
-        include/Engine/SceneSetup.h
         include/Engine/ECS/Systems/CameraSystem.h
         include/Engine/ECS/Systems/Systems.h
         src/Input.cpp
         include/Engine/Input.h
-        src/ProjectManager.cpp
-        include/Engine/ProjectManager.h
-        include/Engine/ECS/Systems/ViewportCameraSystem.h
         include/Engine/ECS/WorldSerializationHelpers.h
         include/json/json.hpp
         include/json/json_fwd.hpp
@@ -49,7 +48,6 @@ add_library(Engine STATIC
         src/HierarchySystem.cpp
         src/RenderingSystem.cpp
         src/TextRenderingSystem.cpp
-        src/ViewportCameraSystem.cpp
         include/Engine/ECS/HierarchyOutliner.h
         src/HierarchyOutliner.cpp
         src/TestObjectMoverSystem.cpp
@@ -58,9 +56,20 @@ add_library(Engine STATIC
         include/Engine/TextureManager.h
         src/PhysicsSystem.cpp
         include/Engine/ECS/Systems/PhysicsSystem.h
+        include/Engine/GameDLLInterface.h
 )
 
-target_include_directories(Engine PRIVATE
+# Define ZUES_ENGINE_EXPORTS when building the DLL
+target_compile_definitions(ZuesEngine PRIVATE ZUES_ENGINE_EXPORTS)
+
+# Public include directories - consumers of the library get these
+target_include_directories(ZuesEngine PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/Engine
+)
+
+# Private include directories - only for building the library
+target_include_directories(ZuesEngine PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/extern/glfw/include
         ${CMAKE_CURRENT_SOURCE_DIR}/extern/glad/include
         ${CMAKE_CURRENT_SOURCE_DIR}/extern/KHR
@@ -73,23 +82,48 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/extern/enet)
 # Build Box2D
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/extern/box2d)
 
-# Link to ENet using its alias target
-target_link_libraries(Engine PUBLIC enet::enet_static)
+# Build GLFW as part of the engine build
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/extern/glfw)
 
-# Link Box2D
-target_link_libraries(Engine PUBLIC box2d)
+# Build GLAD
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/extern/glad)
 
-# Link other libraries
-target_link_libraries(Engine PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/extern/glfw/cmake-build-debug/src/libglfw3.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/extern/glad/cmake-build-debug/libglad.a
-)
+# Link dependencies - PUBLIC so consumers also link these
+target_link_libraries(ZuesEngine PUBLIC enet::enet_static)
+target_link_libraries(ZuesEngine PUBLIC box2d)
+# GLFW and GLAD must be PUBLIC so Editor shares the same instance
+# This ensures the OpenGL context created by Editor is visible to Engine
+target_link_libraries(ZuesEngine PUBLIC glfw)
+target_link_libraries(ZuesEngine PUBLIC glad)
 
+# Platform-specific libraries
 if (WIN32)
-    target_link_libraries(Engine PRIVATE opengl32 ws2_32 winmm)
+    target_link_libraries(ZuesEngine PRIVATE opengl32 ws2_32 winmm)
 elseif (APPLE)
     find_library(OpenGL_LIBRARY OpenGL)
-    target_link_libraries(Engine PRIVATE ${OpenGL_LIBRARY})
+    target_link_libraries(ZuesEngine PRIVATE ${OpenGL_LIBRARY})
 elseif (UNIX)
-    target_link_libraries(Engine PRIVATE GL X11 pthread Xrandr Xi dl)
+    target_link_libraries(ZuesEngine PRIVATE GL X11 pthread Xrandr Xi dl)
+endif()
+
+# Set output directories for the DLL
+set_target_properties(ZuesEngine PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    WINDOWS_EXPORT_ALL_SYMBOLS OFF
+)
+
+# On Windows, copy the DLL to a shared bin directory for easy access
+if(WIN32)
+    add_custom_command(TARGET ZuesEngine POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/../bin"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:ZuesEngine>
+            "${CMAKE_SOURCE_DIR}/../bin/"
+        COMMENT "Copying ZuesEngine.dll to shared bin directory"
+    )
 endif()

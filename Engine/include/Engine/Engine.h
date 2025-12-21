@@ -1,9 +1,11 @@
-﻿//
+//
 // Created by bucka on 9/26/2025.
 //
 
 #ifndef ZUESENGINE_ENGINE_H
 #define ZUESENGINE_ENGINE_H
+
+#include "ZuesAPI.h"
 
 #define GLFW_INCLUDE_NONE
 #include "Core.h"
@@ -16,21 +18,21 @@
 #include "EventSystem/Events.h"
 #include "SceneSetup.h"
 #include "ECS/Systems/Systems.h"
-#include "ProjectManager.h"
 #include "HitTest.h"
 #include "ECS/HierarchyOutliner.h"
+#include "GameDLLInterface.h"
 #include "../stb/stb_image.h"
 
 namespace Engine {
-    extern EventSystem* IEventSystem;
-    extern Network* INetwork;
+    ZUES_API extern EventSystem* IEventSystem;
+    ZUES_API extern Network* INetwork;
 
-    void Initialize(Network::Role role, const std::string& address, const uint16_t port, bool autoRegister);
-    void Update(System::SystemRole currentMode);
-    void Shutdown();
+    ZUES_API void Initialize(bool enableNetwork, bool isHost, const std::string& address, uint16_t port, bool autoRegister = true);
+    ZUES_API void Update(System::SystemRole currentMode);
+    ZUES_API void Shutdown();
 
-    void RegisterComponents();
-    void RegisterSystems(World*);
+    ZUES_API void RegisterComponents();
+    ZUES_API void RegisterSystems(World*);
 }
 
 #endif //ZUESENGINE_ENGINE_H

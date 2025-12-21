@@ -14,38 +14,44 @@ namespace Engine {
     EventSystem* IEventSystem = nullptr;
     Network* INetwork = nullptr;
 
-    void Initialize(const Network::Role role, const std::string& address, const uint16_t port, bool autoRegister) {
+    void Initialize(bool enableNetwork, const bool isHost, const std::string& address, const uint16_t port, bool autoRegister) {
         IEventSystem = new EventSystem();
         INetwork = new Network();
 
         Core::Init(autoRegister);
 
-        switch (role) {
-            case Network::Role::Client:
-                if (!INetwork->Connect(address, port)) {
-                    LOG_WARN("Continuing in singleplayer mode!");
-                }
-                break;
-            case Network::Role::Host:
-                if (INetwork->Host(address, port)) {
-                    LOG_WARN("Continuing in singleplayer mode!");
-                }
-                break;
-            case Network::Role::None:
-                LOG_WARN("No role selected for network initialization!");
-                break;
+        // Initialize ENet system if networking is enabled
+        if (enableNetwork) {
+            if (!Network::InitializeSystem()) {
+                LOG_ERROR("Failed to initialize network system!");
+                enableNetwork = false; // Fall back to singleplayer
+            }
         }
 
-        if (!glfwInit()) {
-            LOG_ERROR("Failed to initialize GLFW");
+        if (enableNetwork) {
+            if (isHost) {
+                if (!INetwork->StartHost(address, port)) {
+                    LOG_WARN("Failed to host - continuing in singleplayer mode!");
+                }
+            } else {
+                if (!INetwork->StartClient(address, port)) {
+                    LOG_WARN("Failed to connect - continuing in singleplayer mode!");
+                }
+            }
         } else {
-            Renderer::Init();
+            LOG_INFO("Starting in singleplayer mode (no networking)");
         }
+
+        // Note: GLFW and Renderer are initialized by the Editor/Host application
+        // The Editor calls gladLoadGLLoader and Renderer::Init after creating the OpenGL context
     }
 
     float lastFrameTime = static_cast<float>(glfwGetTime());
     void Update(const System::SystemRole currentMode) {
-        INetwork->Update();
+        // Poll network events every frame
+        if (INetwork) {
+            INetwork->PollEvents();
+        }
 
         const float currentTime = static_cast<float>(glfwGetTime());
         const float deltaTime = currentTime - lastFrameTime;
@@ -59,6 +65,20 @@ namespace Engine {
         Renderer::Shutdown();
         TextureManager::Shutdown();
         Core::Shutdown();
+
+        // Clean up network
+        if (INetwork) {
+            INetwork->Stop();
+            delete INetwork;
+            INetwork = nullptr;
+        }
+
+        Network::ShutdownSystem();
+
+        if (IEventSystem) {
+            delete IEventSystem;
+            IEventSystem = nullptr;
+        }
     }
 
     void RegisterComponents() {
@@ -99,7 +119,7 @@ namespace Engine {
         s_World->RegisterSystem(std::make_unique<CameraSystem>());
         s_World->RegisterSystem(std::make_unique<RenderingSystem>());
         s_World->RegisterSystem(std::make_unique<TextRenderingSystem>());
-        s_World->RegisterSystem(std::make_unique<ViewportCameraSystem>());
+        // ViewportCameraSystem is now registered by the Editor (it's editor-specific)
         s_World->RegisterSystem(std::make_unique<TestObjectMoverSystem>());
         s_World->UpdateSystems(0, System::SystemRole::Shared);
     }

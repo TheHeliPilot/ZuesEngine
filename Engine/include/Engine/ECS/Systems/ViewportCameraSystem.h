@@ -1,6 +1,8 @@
 ﻿// ViewportCameraSystem.h
 
 #pragma once
+
+#include "../../ZuesAPI.h"
 #include "../../Input.h"
 #include "../System.h"
 #include "../Components.h"

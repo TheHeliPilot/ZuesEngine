@@ -1,12 +1,14 @@
 ﻿// HierarchySystem.h
 
 #pragma once
+
+#include "../../ZuesAPI.h"
 #include "../System.h"
 #include "../Components.h"
 #include "../World.h" // Needed for World::ForEach
 
 // This system finds the active camera and tells the Renderer what the view matrix should be.
-class HierarchySystem final : public SystemBase<Engine::ECS::Component::TransformComponent*> {
+class ZUES_API HierarchySystem final : public SystemBase<Engine::ECS::Component::TransformComponent*> {
 public:
     HierarchySystem();
 

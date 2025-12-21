@@ -1,4 +1,6 @@
-﻿#pragma once
+#pragma once
+
+#include "../ZuesAPI.h"
 #include <cstdint>
 #include <functional> // For std::hash
 #include <string>
@@ -7,7 +9,7 @@
 using EntityIndex = uint32_t;
 using EntityGeneration = uint32_t;
 
-struct EntityID {
+struct ZUES_API EntityID {
     uint64_t id;
     std::string name;
     void setName(const std::string &meno) {name = meno;}

@@ -1,13 +1,14 @@
 ﻿#ifndef ZUESENGINE_CORE_H
 #define ZUESENGINE_CORE_H
 
+#include "ZuesAPI.h"
 #include "ECS/World.h"
 #include "ECS/Systems/Systems.h"
 #include <memory>
 #include <cstdint> // Required for uint32_t
 
 namespace Engine {
-    class Core {
+    class ZUES_API Core {
     public:
         static void Init(bool autoRegister);
         // Accepts deltaTime for framerate-independent updates

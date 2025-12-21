@@ -1,6 +1,7 @@
 ﻿#ifndef ZUESENGINE_RENDERER_H
 #define ZUESENGINE_RENDERER_H
 
+#include "ZuesAPI.h"
 #include <cstdint> // For uint32_t
 #include <array>   // For std::array
 #include <string>
@@ -23,19 +24,19 @@ struct stbtt_quad {
 
 namespace Engine {
 
-    struct Line {
+    struct ZUES_API Line {
         Math::Vec2 start;
         Math::Vec2 end;
         float thickness;
     };
 
-    struct Rect {
+    struct ZUES_API Rect {
         Math::Vec2 position;
         Math::Vec2 size;
         float rotationRadians;
     };
 
-    struct Circle {
+    struct ZUES_API Circle {
         Math::Vec2 center;
         float radius;
         bool outlineOnly = false;
@@ -43,13 +44,13 @@ namespace Engine {
         Math::Vec4 color = {1.0f, 1.0f, 1.0f, 1.0f};
     };
 
-    struct Arrow {
+    struct ZUES_API Arrow {
         Math::Vec2 start;
         Math::Vec2 end;
         float thickness;
     };
 
-    struct Triangle {
+    struct ZUES_API Triangle {
         Math::Vec2 v0;
         Math::Vec2 v1;
         Math::Vec2 v2;
@@ -62,7 +63,7 @@ namespace Engine {
     static constexpr uint32_t FIRST_CHAR = 32; // First printable ASCII character (' ')
     static constexpr uint32_t CHAR_COUNT = 96; // Total count of printable ASCII characters (32-127)
 
-    struct Font {
+    struct ZUES_API Font {
         uint32_t AtlasTextureID = 0;
         float Size = 0.0f; // The pixel height the font was rendered at
         stbtt_bakedchar BakedChars[CHAR_COUNT]; // stb_truetype character metrics
@@ -72,7 +73,7 @@ namespace Engine {
 
     // --- Renderer Class ---
 
-    class Renderer {
+    class ZUES_API Renderer {
     public:
         // --- Core Lifecycle ---
         static void Init();

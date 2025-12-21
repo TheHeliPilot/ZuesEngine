@@ -1,4 +1,6 @@
-﻿#pragma once
+#pragma once
+
+#include "../ZuesAPI.h"
 #include "ECSConfig.h"
 #include <vector>
 #include <algorithm>
@@ -33,7 +35,7 @@ namespace Engine::ECS::Component {
 
 
 // Component Storage Interface (Base class for type erasure)
-class IComponentArray {
+class ZUES_API IComponentArray {
 public:
     virtual ~IComponentArray() = default;
     // Performs Swap-and-Pop on the component at 'index'

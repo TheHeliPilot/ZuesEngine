@@ -1,4 +1,6 @@
-﻿#pragma once
+#pragma once
+
+#include "ZuesAPI.h"
 
 #include <memory>
 #include <cmath> // For converting degrees to radians if needed later

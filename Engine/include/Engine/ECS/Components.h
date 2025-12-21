@@ -1,4 +1,6 @@
-﻿#pragma once
+#pragma once
+
+#include "../ZuesAPI.h"
 #include "../ECS/Component.h"
 #include "../../json/json.hpp"
 #include "../Math.h"
@@ -25,7 +27,7 @@ namespace nlohmann {
 
 namespace Engine::ECS::Component {
 
-    struct TransformComponent {
+    struct ZUES_API TransformComponent {
         Math::Vec2 worldPosition = {0.0f, 0.0f};
         float worldRotation = 0.0f; // Angle in degrees
         Math::Vec2 localPosition = {0.0f, 0.0f};
@@ -35,7 +37,7 @@ namespace Engine::ECS::Component {
     };
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TransformComponent, worldPosition, worldRotation, localPosition, localRotation, parent)
 
-    struct SpriteComponent {
+    struct ZUES_API SpriteComponent {
         std::string spriteName = "";  // Changed from uint32_t textureID
         Math::Vec2 size = {1.0f, 1.0f};
         Math::Vec4 color = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -45,7 +47,7 @@ namespace Engine::ECS::Component {
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteComponent, spriteName, size, color, layer, sortOrder)
 
     // 3. Camera Component
-    struct CameraComponent {
+    struct ZUES_API CameraComponent {
         float zoom = 1.0f;
         float halfHeight = 10.0f;
         Math::Vec4 backgroundColor = {0.1f, 0.1f, 0.1f, 1.0f};
@@ -54,21 +56,21 @@ namespace Engine::ECS::Component {
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraComponent, zoom, halfHeight, backgroundColor, isActive)
 
     // TAGS
-    struct MainCameraTag {
+    struct ZUES_API MainCameraTag {
         bool isEditorCamera = false;
     };
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MainCameraTag, isEditorCamera)
 
-    struct ViewportCameraTag {
+    struct ZUES_API ViewportCameraTag {
         float cameraSpeed = 5;
     };
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ViewportCameraTag, cameraSpeed);
 
-    struct TestObjectMoverTag{bool move = true;};
+    struct ZUES_API TestObjectMoverTag{bool move = true;};
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TestObjectMoverTag, move);
 
     // Text Component for rendering text in the world
-    struct TextComponent {
+    struct ZUES_API TextComponent {
         std::string text = "Sample Text";
         uint32_t fontID = 1; // Font ID from Renderer::LoadFont
         Math::Vec4 color = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -80,7 +82,7 @@ namespace Engine::ECS::Component {
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TextComponent, text, fontID, color, scale, worldScale, layer, sortOrder)
 
     // Physics Components
-    struct RigidbodyComponent {
+    struct ZUES_API RigidbodyComponent {
         void* body = nullptr;  // b2Body* - Managed by PhysicsSystem (void* to avoid including Box2D here)
         int bodyType = 2;      // b2BodyType: 0=static, 1=kinematic, 2=dynamic
         float mass = 1.0f;
@@ -89,7 +91,7 @@ namespace Engine::ECS::Component {
     };
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RigidbodyComponent, bodyType, mass, gravityScale, fixedRotation)
 
-    struct BoxColliderComponent {
+    struct ZUES_API BoxColliderComponent {
         Math::Vec2 size = {1.0f, 1.0f};
         Math::Vec2 offset = {0.0f, 0.0f};
         float density = 1.0f;
@@ -99,7 +101,7 @@ namespace Engine::ECS::Component {
     };
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(BoxColliderComponent, size, offset, density, friction, restitution, isTrigger)
 
-    struct CircleColliderComponent {
+    struct ZUES_API CircleColliderComponent {
         float radius = 0.5f;
         Math::Vec2 offset = {0.0f, 0.0f};
         float density = 1.0f;

@@ -1,6 +1,7 @@
 ﻿#ifndef ZUESENGINE_TEXTUREMANAGER_H
 #define ZUESENGINE_TEXTUREMANAGER_H
 
+#include "ZuesAPI.h"
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -14,7 +15,7 @@ namespace Engine {
     /**
      * @brief Structure holding basic metadata for a loaded OpenGL texture.
      */
-    struct TextureInfo {
+    struct ZUES_API TextureInfo {
         uint32_t ID = 0;
         int Width = 0;
         int Height = 0;
@@ -27,7 +28,7 @@ namespace Engine {
      * @brief Manages the loading, storage, and retrieval of texture assets.
      * This class uses a static approach for easy access across the engine.
      */
-    class TextureManager {
+    class ZUES_API TextureManager {
     public:
         static TextureInfo GetTexture(const std::string &textureName);
 

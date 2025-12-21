@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "../ZuesAPI.h"
+
 #include <unordered_map>
 #include <vector>
 #include <functional>
@@ -27,7 +29,7 @@ namespace Engine {
     // ------------------------------
     // Base Event
     // ------------------------------
-    class Event {
+    class ZUES_API Event {
     public:
         Event() {
             timestamp = std::chrono::system_clock::now();
@@ -41,7 +43,7 @@ namespace Engine {
     // ------------------------------
     // Event System
     // ------------------------------
-    class EventSystem final {
+    class ZUES_API EventSystem final {
     public:
         EventSystem() = default;
         virtual ~EventSystem() = default;

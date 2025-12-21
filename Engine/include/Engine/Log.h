@@ -5,10 +5,11 @@
 #ifndef ENGINE_LOG_H
 #define ENGINE_LOG_H
 
+#include "ZuesAPI.h"
 #include <string>
 
 namespace Engine::Log {
-    class EngineLog {
+    class ZUES_API EngineLog {
     public:
         enum class LogLevel { Info, Warning, Err };
 

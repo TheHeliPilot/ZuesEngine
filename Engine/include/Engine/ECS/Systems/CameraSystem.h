@@ -1,11 +1,13 @@
 ﻿// CameraSystem.h
 
 #pragma once
+
+#include "../../ZuesAPI.h"
 #include "../System.h"
 #include "../Components.h"
 
 // This system finds the active camera and tells the Renderer what the view matrix should be.
-class CameraSystem final : public SystemBase<Engine::ECS::Component::TransformComponent*, Engine::ECS::Component::CameraComponent*, Engine::ECS::Component::MainCameraTag*> {
+class ZUES_API CameraSystem final : public SystemBase<Engine::ECS::Component::TransformComponent*, Engine::ECS::Component::CameraComponent*, Engine::ECS::Component::MainCameraTag*> {
 public:
     CameraSystem();
 

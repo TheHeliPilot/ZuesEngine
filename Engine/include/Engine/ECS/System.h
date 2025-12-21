@@ -1,4 +1,6 @@
 ﻿#pragma once
+
+#include "../ZuesAPI.h"
 #include "Entity.h"
 #include "Component.h"
 #include "ECSConfig.h"
@@ -7,7 +9,7 @@
 
 class World; // Forward declaration
 
-class System {
+class ZUES_API System {
 public:
     enum class SystemRole { Shared, Editor, Game };
 

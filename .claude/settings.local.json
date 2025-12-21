@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(find:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(cat:*)",
+      "Bash(cmake --build:*)",
+      "Bash(\"C:\\Program Files\\CMake\\bin\\cmake.exe\" --build build --config Debug)",
+      "Bash(where:*)"
     ]
   }
 }

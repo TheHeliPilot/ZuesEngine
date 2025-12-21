@@ -3,7 +3,8 @@
     "allow": [
       "Read(//c/Users/bucka/CLionProjects/ZuesEngine/**)",
       "Bash(find:*)",
-      "Read(//c/ZuesEngine/**)"
+      "Read(//c/ZuesEngine/**)",
+      "Bash(cmake:*)"
     ],
     "deny": [],
     "ask": []

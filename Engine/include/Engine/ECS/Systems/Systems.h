@@ -1,4 +1,4 @@
-﻿//
+//
 // Created by bucka on 9/28/2025.
 //
 
@@ -8,7 +8,7 @@
 #include "CameraSystem.h"
 #include "RenderingSystem.h"
 #include "TextRenderingSystem.h"
-#include "ViewportCameraSystem.h"
+// ViewportCameraSystem moved to Editor - it's editor-specific
 #include "HierarchySystem.h"
 #include "TestObjectMoverSystem.h"
 #include "PhysicsSystem.h"

@@ -1,4 +1,6 @@
 #pragma once
+
+#include "../../ZuesAPI.h"
 #include "../System.h"
 #include "../Components.h"
 #include <vector>
@@ -11,7 +13,7 @@ struct RenderableTextEntity {
     Engine::ECS::Component::TextComponent* text;
 };
 
-class TextRenderingSystem : public SystemBase<Engine::ECS::Component::TransformComponent*, Engine::ECS::Component::TextComponent*> {
+class ZUES_API TextRenderingSystem : public SystemBase<Engine::ECS::Component::TransformComponent*, Engine::ECS::Component::TextComponent*> {
 public:
     TextRenderingSystem();
 

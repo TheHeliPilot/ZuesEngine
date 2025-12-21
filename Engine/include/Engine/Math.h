@@ -1,4 +1,6 @@
-﻿#ifndef ZUESENGINE_MATH_H
+﻿#include "ZuesAPI.h"
+
+#ifndef ZUESENGINE_MATH_H
 #define ZUESENGINE_MATH_H
 
 #include <cmath> // For sin, cos, sqrt
@@ -14,7 +16,7 @@ namespace Engine::Math {
     // --- Vector Definitions ---
 
     // Vec2: Used for position, size, and UV coordinates
-    struct Vec2 {
+    struct ZUES_API Vec2 {
         float x, y;
 
         // Default constructor
@@ -67,7 +69,7 @@ namespace Engine::Math {
     };
 
     // Vec3: Used for 3D position, normal, and scale
-    struct Vec3 {
+    struct ZUES_API Vec3 {
         float x, y, z;
 
         // Default constructor
@@ -117,7 +119,7 @@ namespace Engine::Math {
     };
 
     // Vec4: Used for color (RGBA)
-    struct Vec4 {
+    struct ZUES_API Vec4 {
         float x, y, z, w; // Or r, g, b, a
 
         // Default constructor (often white)
@@ -129,7 +131,7 @@ namespace Engine::Math {
     // --- Matrix Definitions ---
 
     // Mat4: 4x4 Matrix (Column-major layout)
-    struct Mat4 {
+    struct ZUES_API Mat4 {
         float elements[16]; // Column-major (OpenGL style)
 
         // --- Constructors ---

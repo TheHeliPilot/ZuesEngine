@@ -1,11 +1,13 @@
 ﻿// ViewportCameraSystem.h
 
 #pragma once
+
+#include "../../ZuesAPI.h"
 #include "../../Input.h"
 #include "../System.h"
 #include "../Components.h"
 
-class TestObjectMoverSystem final : public SystemBase<Engine::ECS::Component::TransformComponent*, Engine::ECS::Component::TestObjectMoverTag*> {
+class ZUES_API TestObjectMoverSystem final : public SystemBase<Engine::ECS::Component::TransformComponent*, Engine::ECS::Component::TestObjectMoverTag*> {
 public:
     TestObjectMoverSystem();
 

@@ -1,12 +1,13 @@
 ﻿#ifndef ZUESENGINE_HITTEST_H
 #define ZUESENGINE_HITTEST_H
 
+#include "ZuesAPI.h"
 #include "Math.h"
 #include "Renderer.h"
 
 namespace Engine {
 
-    class HitTest {
+    class ZUES_API HitTest {
     public:
         // Add optional padding/tolerance parameter (default 2.0f)
         static bool Line(const Math::Vec2& point,

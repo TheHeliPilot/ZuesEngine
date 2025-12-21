@@ -9,6 +9,7 @@
 #include <fstream>
 #include <vector> // Required for shader logging
 #include <glad/glad.h>
+#include <GLFW/glfw3.h>
 #include <cmath>
 
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -191,7 +192,14 @@ namespace Engine {
     // --- Core Lifecycle Implementations ---
 
     void Renderer::Init() {
-        // ... (Initialization logic remains the same) ...
+        // Load OpenGL function pointers for this DLL
+        // Each DLL has its own copy of GLAD that needs to be initialized
+        // Use gladLoadGL which loads from opengl32.dll directly on Windows
+        if (!gladLoadGL()) {
+            LOG_ERROR("Failed to initialize GLAD in Engine DLL");
+            return;
+        }
+
         if (s_Data != nullptr) {
             // Already initialized
             return;

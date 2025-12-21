@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "../ZuesAPI.h"
+
 #include "EventSystem.h"
 #include <string>
 #include <utility>
@@ -10,7 +12,7 @@
 
 namespace Engine {
 
-    class LogEvent final : public Event {
+    class ZUES_API LogEvent final : public Event {
     public:
         std::string message;
         Log::EngineLog::LogLevel logLevel;
@@ -46,7 +48,7 @@ namespace Engine {
 
     // --- Keyboard Events ---
 
-    class KeyEvent : public Event {
+    class ZUES_API KeyEvent : public Event {
     protected:
         int keyCode;
     public:
@@ -55,14 +57,14 @@ namespace Engine {
         // No StaticType() here, as this is a base class
     };
 
-    class KeyPressEvent final : public KeyEvent {
+    class ZUES_API KeyPressEvent final : public KeyEvent {
     public:
         explicit KeyPressEvent(const int code) : KeyEvent(code) {}
         static EventType StaticType() { return EventType::KeyPressE; }
         [[nodiscard]] EventType GetEventType() const override { return StaticType(); }
     };
 
-    class KeyReleaseEvent final : public KeyEvent {
+    class ZUES_API KeyReleaseEvent final : public KeyEvent {
     public:
         explicit KeyReleaseEvent(const int code) : KeyEvent(code) {}
         static EventType StaticType() { return EventType::KeyReleaseE; }
@@ -71,7 +73,7 @@ namespace Engine {
 
     // --- Mouse Events ---
 
-    class MouseMoveEvent final : public Event {
+    class ZUES_API MouseMoveEvent final : public Event {
         double x, y;
     public:
         MouseMoveEvent(const double xPos, const double yPos) : x(xPos), y(yPos) {}
@@ -81,7 +83,7 @@ namespace Engine {
         [[nodiscard]] double GetY() const { return y; }
     };
 
-    class MouseButtonPressEvent final : public Event {
+    class ZUES_API MouseButtonPressEvent final : public Event {
         int button;
     public:
         explicit MouseButtonPressEvent(const int btn) : button(btn) {}
@@ -90,7 +92,7 @@ namespace Engine {
         [[nodiscard]] int GetButton() const { return button; }
     };
 
-    class MouseButtonReleaseEvent final : public Event {
+    class ZUES_API MouseButtonReleaseEvent final : public Event {
         int button;
     public:
         explicit MouseButtonReleaseEvent(const int btn) : button(btn) {}
