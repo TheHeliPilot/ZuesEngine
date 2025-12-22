@@ -11,10 +11,11 @@
 
 namespace Engine {
 
-    EventSystem* IEventSystem = nullptr;
-    Network* INetwork = nullptr;
+    // Global subsystem pointers - MUST be exported for game DLLs
+    ZUES_API EventSystem* IEventSystem = nullptr;
+    ZUES_API Network* INetwork = nullptr;
 
-    void Initialize(bool enableNetwork, const bool isHost, const std::string& address, const uint16_t port, bool autoRegister) {
+    void Initialize(bool enableNetwork, const bool isHost, const std::string& address, const uint16_t port, const bool autoRegister) {
         IEventSystem = new EventSystem();
         INetwork = new Network();
 
@@ -53,7 +54,7 @@ namespace Engine {
             INetwork->PollEvents();
         }
 
-        const float currentTime = static_cast<float>(glfwGetTime());
+        const auto currentTime = static_cast<float>(glfwGetTime());
         const float deltaTime = currentTime - lastFrameTime;
         lastFrameTime = currentTime;
 
@@ -119,8 +120,11 @@ namespace Engine {
         s_World->RegisterSystem(std::make_unique<CameraSystem>());
         s_World->RegisterSystem(std::make_unique<RenderingSystem>());
         s_World->RegisterSystem(std::make_unique<TextRenderingSystem>());
-        // ViewportCameraSystem is now registered by the Editor (it's editor-specific)
         s_World->RegisterSystem(std::make_unique<TestObjectMoverSystem>());
         s_World->UpdateSystems(0, System::SystemRole::Shared);
+    }
+
+    EventSystem* GetCurrentEventSystem()  {
+        return IEventSystem;
     }
 }

@@ -177,6 +177,9 @@ add_custom_target(copy_engine_headers ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/Engine/extern/glad/include"
         "${ZUES_OUTPUT_DIR}/include"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/Engine/extern/box2d/include"
+        "${ZUES_OUTPUT_DIR}/include"
     COMMENT "Copying Engine and dependency headers to output directory"
 )
 

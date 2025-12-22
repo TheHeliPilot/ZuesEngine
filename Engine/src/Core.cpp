@@ -64,7 +64,7 @@ bool WriteFile(const std::filesystem::path& filePath, const std::string& content
     return true;
 }
 
-void Engine::Core::Init(bool autoRegister) {
+void Engine::Core::Init(const bool autoRegister) {
     // 1. Create the ECS World instance (Moved from main.cpp)
     s_World = std::make_unique<World>();
     LOG_INFO("Initializing Core Game Logic...");
@@ -75,6 +75,7 @@ void Engine::Core::Init(bool autoRegister) {
     }
     // 3. Setup Scene/Entities (Moved from main.cpp)
     //Engine::SetupSimpleScene(s_World.get(), 0);
+
     s_World->UpdateSystems(0, System::SystemRole::Shared);
 
     LOG_INFO("Core Game Logic Initialized.");

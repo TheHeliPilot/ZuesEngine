@@ -1,5 +1,10 @@
 ﻿#include "../include/Engine/Network.h"
+
+// Define ENET_IMPLEMENTATION to include the ENet implementation directly
+// This is required because ENet is a single-header library
+#define ENET_IMPLEMENTATION
 #include <enet.h>
+
 #include <unordered_map>
 #include <sstream>
 #include "../include/Engine/EngineDefines.h"

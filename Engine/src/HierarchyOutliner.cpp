@@ -1,18 +1,19 @@
 ﻿#include "../include/Engine/ECS/HierarchyOutliner.h"
+#include "../include/Engine/ZuesAPI.h"
 
 #include "../include/Engine/ECS/Entity.h"
 #include "../include/Engine/EngineDefines.h"
 
 namespace Engine::ECS::Hierarchy {
 
-    // Define the static cache storage declared as 'extern' in the header
-    HierarchyCacheData s_cache;
+    // Define the static cache storage declared as 'extern' in the header - MUST be exported for game DLLs
+    ZUES_API HierarchyCacheData s_cache;
 
     // --- Helper for Depth-First Traversal and Flattening ---
     // Recursively adds children to the flattened list, used by GetFlattenedHierarchy.
     static void TraverseAndFlatten(
-        EntityID currentID, 
-        int depth, 
+        EntityID currentID,
+        const int depth, 
         std::vector<HierarchyNode>& flattenedList) 
     {
         // 1. Add the current entity to the flat list
@@ -93,7 +94,7 @@ namespace Engine::ECS::Hierarchy {
     void Traverse(std::function<void(EntityID, int)> action) {
         // --- Traverse using DFS starting from roots ---
         std::function<void(EntityID, int)> dfs = 
-            [&](EntityID currentID, int depth) {
+            [&](EntityID currentID, const int depth) {
             
             action(currentID, depth);
             

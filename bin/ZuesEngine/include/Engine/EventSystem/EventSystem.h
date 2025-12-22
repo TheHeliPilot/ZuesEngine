@@ -23,7 +23,11 @@ namespace Engine {
         KeyReleaseE,
         MouseMoveE,
         MouseButtonPressE,
-        MouseButtonReleaseE
+        MouseButtonReleaseE,
+        CollisionEnterE,
+        CollisionExitE,
+        TriggerEnterE,
+        TriggerExitE
     };
 
     // ------------------------------

@@ -3,7 +3,7 @@
 //
 
 #include "../include/Engine/TextureManager.h"
-#include "../include/Engine/TextureManager.h"
+#include "../include/Engine/ZuesAPI.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -19,8 +19,8 @@ namespace Engine {
     constexpr uint32_t CURRENT_META_FILE_VERSION = 2;
 
 
-    // Initialize the static map storage
-    std::unordered_map<std::string, TextureInfo> TextureManager::s_TextureMap;
+    // Initialize the static map storage - MUST be exported for game DLLs
+    ZUES_API std::unordered_map<std::string, TextureInfo> TextureManager::s_TextureMap;
 
     // Add these functions to your TextureManager class
 
@@ -387,7 +387,7 @@ namespace Engine {
             // 6. Final validation: Check if the segment is non-empty and contains ONLY digits
             if (!numberSegment.empty() &&
                 std::ranges::all_of(numberSegment,
-                                    [](char c) { return std::isdigit(static_cast<unsigned char>(c)); }))
+                                    [](const char c) { return std::isdigit(static_cast<unsigned char>(c)); }))
             {
                 // If all checks pass, add the full path to the results vector
                 foundMetaFiles.push_back(entry.path());
@@ -447,7 +447,7 @@ namespace Engine {
             // 6. Final validation and extraction: Check if the segment is non-empty and contains ONLY digits
             if (!numberSegment.empty() &&
                 std::ranges::all_of(numberSegment,
-                                    [](char c) { return std::isdigit(static_cast<unsigned char>(c)); }))
+                                    [](const char c) { return std::isdigit(static_cast<unsigned char>(c)); }))
             {
                 // Convert the segment to a number
                 try {
@@ -744,7 +744,7 @@ namespace Engine {
         LOG_INFO("Updated metafile path: " + metafilePath.string());
     }
 
-    std::string TextureManager::GetSpriteNameByID(uint32_t textureID) {
+    std::string TextureManager::GetSpriteNameByID(const uint32_t textureID) {
         for (const auto& [name, info] : s_TextureMap) {
             if (info.ID == textureID) {
                 return name;

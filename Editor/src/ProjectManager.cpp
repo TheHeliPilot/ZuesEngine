@@ -148,8 +148,28 @@ namespace Engine {
             std::string gladIncludePath = (engineRoot / "extern/glad/include").string();
             std::string engineIncludePath = currentEngineIncludePath.string();
 
-            // ZuesEngine DLL path (new DLL-based architecture)
-            std::string zuesEngineLibPath = (engineRoot / "cmake-build-debug/bin/ZuesEngine.lib").string();
+            // ZuesEngine DLL import library path (new DLL-based architecture)
+            // MinGW uses libZuesEngine.dll.a, MSVC uses ZuesEngine.lib
+            // The import lib is in bin/ZuesEngine/lib/ (currentPath is bin/ZuesEngine when running from editor)
+            std::filesystem::path zuesEngineLibDir = currentPath / "lib";
+            std::string zuesEngineLibPath;
+
+            LOG_INFO("Looking for import library in: " + zuesEngineLibDir.string());
+            LOG_INFO("Current path: " + currentPath.string());
+
+            // Check for MinGW import library first (more common in this setup)
+            if (std::filesystem::exists(zuesEngineLibDir / "libZuesEngine.dll.a")) {
+                zuesEngineLibPath = (zuesEngineLibDir / "libZuesEngine.dll.a").string();
+                LOG_INFO("Found MinGW import library: " + zuesEngineLibPath);
+            } else if (std::filesystem::exists(zuesEngineLibDir / "ZuesEngine.lib")) {
+                zuesEngineLibPath = (zuesEngineLibDir / "ZuesEngine.lib").string();
+                LOG_INFO("Found MSVC import library: " + zuesEngineLibPath);
+            } else {
+                // Fallback: always use the expected import library path (even if it doesn't exist yet)
+                // The project CMakeLists.txt will warn if it's not found at build time
+                zuesEngineLibPath = (zuesEngineLibDir / "libZuesEngine.dll.a").string();
+                LOG_WARN("Import library not found yet, using expected path: " + zuesEngineLibPath);
+            }
 
             // Replace Windows backslashes with forward slashes for CMake/JSON compatibility
             auto replace_slashes = [](std::string& s) {

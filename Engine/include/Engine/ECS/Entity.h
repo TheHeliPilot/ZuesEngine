@@ -2,8 +2,8 @@
 
 #include "../ZuesAPI.h"
 #include <cstdint>
-#include <functional> // For std::hash
 #include <string>
+#include <functional>
 
 // 64-bit Entity ID: 32 bits for Index, 32 bits for Generation
 using EntityIndex = uint32_t;
@@ -12,42 +12,30 @@ using EntityGeneration = uint32_t;
 struct ZUES_API EntityID {
     uint64_t id;
     std::string name;
-    void setName(const std::string &meno) {name = meno;}
 
-    // Constructor/utility to create the full ID
-    EntityID(const EntityIndex index, const EntityGeneration generation)
-        : id((static_cast<uint64_t>(generation) << 32) | index) {}
+    // Constructors (DECLARATION ONLY)
+    EntityID();
+    EntityID(EntityIndex index, EntityGeneration generation);
 
-    // Default constructor for an invalid/null entity
-    EntityID() : id(0) {}
+    // Methods
+    void setName(const std::string& meno);
 
-    // Convenience getters
-    EntityIndex GetIndex() const {
-        return static_cast<EntityIndex>(id & 0xFFFFFFFF);
-    }
+    EntityIndex GetIndex() const;
+    EntityGeneration GetGeneration() const;
+    bool IsValid() const;
 
-    EntityGeneration GetGeneration() const {
-        return static_cast<EntityGeneration>(id >> 32);
-    }
-
-    bool IsValid() const {
-        return id != 0;
-    }
-
-    bool operator==(const EntityID& other) const { return id == other.id; }
-    bool operator!=(const EntityID& other) const { return id != other.id; }
-    bool operator<(const EntityID& other) const { return id < other.id; }
+    bool operator==(const EntityID& other) const;
+    bool operator!=(const EntityID& other) const;
+    bool operator<(const EntityID& other) const;
 };
 
-// Global definition for an invalid entity
-const EntityID NULL_ENTITY_ID = EntityID();
+// Exported factory for a null entity
+ZUES_API EntityID NullEntityID();
 
-// Required for using EntityID in std::unordered_map/set
-namespace std {
-    template<>
-    struct hash<EntityID> {
-        size_t operator()(const EntityID& entityID) const {
-            return std::hash<uint64_t>()(entityID.id);
-        }
-    };
-}
+// std::hash specialization (header-only by necessity)
+template<>
+struct std::hash<EntityID> {
+    size_t operator()(const EntityID& entityID) const noexcept {
+        return std::hash<uint64_t>()(entityID.id);
+    }
+};

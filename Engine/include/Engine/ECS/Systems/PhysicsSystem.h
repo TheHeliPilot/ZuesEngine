@@ -7,12 +7,16 @@
 #include <unordered_map>
 #include <box2d/id.h>
 
+#include "EventSystem/EventSystem.h"
+
 class World; // Forward declaration
 
 class ZUES_API PhysicsSystem final : public System {
 public:
     PhysicsSystem();
     ~PhysicsSystem() override;
+
+    void SetEventSystem(Engine::EventSystem* eventSystem) { m_EventSystem = eventSystem; }
 
     void Run(World* world, float deltaTime) override;
 
@@ -21,8 +25,10 @@ public:
     Engine::Math::Vec2 GetGravity() const;
 
 private:
-    b2WorldId physicsWorldId;
+    b2WorldId physicsWorldId{};
     Engine::Math::Vec2 gravity = {0.0f, -9.8f};
+
+    Engine::EventSystem* m_EventSystem = nullptr;
 
     // Physics simulation settings
     int32_t subStepCount = 4;  // Box2D v3 uses sub-steps instead of velocity/position iterations
@@ -38,6 +44,7 @@ private:
     void SyncTransforms(World* world);
     void DestroyBodies(World* world);
 
-    b2BodyId CreateBody(World* world, EntityID entityID);
-    void CreateFixtures(b2BodyId bodyId, World* world, EntityID entityID);
+    b2BodyId CreateBody(World* world, const EntityID &entityID) const;
+
+    static void CreateFixtures(b2BodyId bodyId, World* world, const EntityID &entityID);
 };

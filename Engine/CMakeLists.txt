@@ -32,7 +32,7 @@ add_library(ZuesEngine SHARED
         include/Engine/ECS/Components.h
         include/Engine/ECS/Systems/RenderingSystem.h
         include/Engine/ECS/Systems/TextRenderingSystem.h
-        include/Engine/Math.h
+        include/Engine/ZuesMath.h
         include/Engine/SceneSetup.h
         include/Engine/ECS/Systems/CameraSystem.h
         include/Engine/ECS/Systems/Systems.h
@@ -57,6 +57,7 @@ add_library(ZuesEngine SHARED
         src/PhysicsSystem.cpp
         include/Engine/ECS/Systems/PhysicsSystem.h
         include/Engine/GameDLLInterface.h
+        src/Entity.cpp
 )
 
 # Define ZUES_ENGINE_EXPORTS when building the DLL
@@ -76,8 +77,8 @@ target_include_directories(ZuesEngine PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/extern/enet/include
 )
 
-# Build ENet
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/extern/enet)
+# ENet is a single-header library - implementation is included directly in Network.cpp
+# We only need the include path, no separate library build needed
 
 # Build Box2D
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/extern/box2d)
@@ -92,7 +93,6 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/extern/glfw)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/extern/glad)
 
 # Link dependencies - PUBLIC so consumers also link these
-target_link_libraries(ZuesEngine PUBLIC enet::enet_static)
 target_link_libraries(ZuesEngine PUBLIC box2d)
 # GLFW and GLAD must be PUBLIC so Editor shares the same instance
 # This ensures the OpenGL context created by Editor is visible to Engine

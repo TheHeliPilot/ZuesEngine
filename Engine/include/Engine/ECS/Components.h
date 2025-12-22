@@ -33,7 +33,7 @@ namespace Engine::ECS::Component {
         Math::Vec2 localPosition = {0.0f, 0.0f};
         float localRotation = 0.0f; //
 
-        EntityID parent = NULL_ENTITY_ID;
+        EntityID parent = NullEntityID();
     };
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TransformComponent, worldPosition, worldRotation, localPosition, localRotation, parent)
 

@@ -17,7 +17,7 @@ namespace Engine {
     // LINE  (matches rotated quad in Renderer::DrawLine)
     // ----------------------------------------------------------------------------------
     bool HitTest::Line(const Math::Vec2& p, const Math::Vec2& a,
-                       const Math::Vec2& b, float thickness, float padding)
+                       const Math::Vec2& b, float thickness, const float padding)
     {
         Math::Vec2 center = (a + b) * 0.5f;
         float length = (b - a).Length();
@@ -31,7 +31,7 @@ namespace Engine {
     // RECT  (already matches rendering)
     // ----------------------------------------------------------------------------------
     bool HitTest::Rect(const Math::Vec2& p, const Math::Vec2& center,
-                       const Math::Vec2& size, float rotationRadians, float padding)
+                       const Math::Vec2& size, const float rotationRadians, const float padding)
     {
         Math::Vec2 local = p - center;
 
@@ -53,7 +53,7 @@ namespace Engine {
     // CIRCLE  (now respects thickness properly)
     // ----------------------------------------------------------------------------------
     bool HitTest::Circle(const Math::Vec2 &point, const Math::Vec2 &center,
-                         float radius, bool outlineOnly, float thickness, float padding)
+                         const float radius, const bool outlineOnly, const float thickness, const float padding)
     {
         const float dist = (point - center).Length();
 
@@ -74,7 +74,7 @@ namespace Engine {
                            const Math::Vec2& v0,
                            const Math::Vec2& v1,
                            const Math::Vec2& v2,
-                           float padding)
+                           const float padding)
     {
         // Filled test
         const bool b1 = Sign(pt, v0, v1) < 0.0f;
@@ -94,7 +94,7 @@ namespace Engine {
     // ARROW (outline arrowhead = matches renderer)
     // ----------------------------------------------------------------------------------
     bool HitTest::Arrow(const Math::Vec2& p, const Math::Vec2& start,
-                        const Math::Vec2& end, float thickness, float padding)
+                        const Math::Vec2& end, const float thickness, const float padding)
     {
         // Shaft
         if (Line(p, start, end, thickness, padding))
@@ -117,19 +117,19 @@ namespace Engine {
     // ----------------------------------------------------------------------------------
     // Overloads
     // ----------------------------------------------------------------------------------
-    bool HitTest::Line(const Math::Vec2& p, const Engine::Line& line, float padding) {
+    bool HitTest::Line(const Math::Vec2& p, const Engine::Line& line, const float padding) {
         return Line(p, line.start, line.end, line.thickness, padding);
     }
 
-    bool HitTest::Rect(const Math::Vec2& p, const Engine::Rect& rect, float padding) {
+    bool HitTest::Rect(const Math::Vec2& p, const Engine::Rect& rect, const float padding) {
         return Rect(p, rect.position, rect.size, rect.rotationRadians, padding);
     }
 
-    bool HitTest::Circle(const Math::Vec2& p, const Engine::Circle& circle, float padding) {
+    bool HitTest::Circle(const Math::Vec2& p, const Engine::Circle& circle, const float padding) {
         return Circle(p, circle.center, circle.radius, circle.outlineOnly, circle.thickness, padding);
     }
 
-    bool HitTest::Arrow(const Math::Vec2& p, const Engine::Arrow& arrow, float padding) {
+    bool HitTest::Arrow(const Math::Vec2& p, const Engine::Arrow& arrow, const float padding) {
         return Arrow(p, arrow.start, arrow.end, arrow.thickness, padding);
     }
 

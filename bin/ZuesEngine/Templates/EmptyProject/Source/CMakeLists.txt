@@ -28,8 +28,12 @@ if(BUILD_AS_DLL)
     add_library(GameDLL SHARED ${PROJECT_SOURCES})
     target_compile_definitions(GameDLL PRIVATE GAME_DLL_EXPORTS)
     set_target_properties(GameDLL PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Builds"
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Builds"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Debug"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Debug"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Debug"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Release"
+        LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Debug"
+        LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Release"
     )
     set(TARGET_NAME GameDLL)
     message(STATUS "Building ${PROJECT_NAME} as DLL for hot-reload")
@@ -37,7 +41,9 @@ else()
     # Build as standalone executable
     add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SOURCES})
     set_target_properties(${PROJECT_NAME} PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Builds"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Debug"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Debug"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Release"
     )
     set(TARGET_NAME ${PROJECT_NAME})
     message(STATUS "Building ${PROJECT_NAME} as standalone EXE")
@@ -62,7 +68,7 @@ endif()
 
 target_include_directories(${TARGET_NAME} PRIVATE
     ${ENGINE_INCLUDE_DIR}
-    ${ENGINE_INCLUDE_DIR}/..
+    ${ENGINE_INCLUDE_DIR}/Engine
     ${GLFW_INCLUDE_DIR}
     ${GLAD_INCLUDE_DIR}
 )
@@ -71,26 +77,23 @@ target_include_directories(${TARGET_NAME} PRIVATE
 # LINKING
 # ============================================================================
 
-# Link ZuesEngine DLL
-if(NOT ZUES_ENGINE_LIB)
-    set(ZUES_ENGINE_LIB "{{ZUES_ENGINE_LIB}}")
+# Link ZuesEngine import library
+# Look for MSVC .lib first, then MinGW .dll.a
+set(ZUES_ENGINE_LIB_DIR "{{ZUES_ENGINE_LIB_DIR}}")
+
+# Try MSVC import library first
+if(EXISTS "${ZUES_ENGINE_LIB_DIR}/ZuesEngine.lib")
+    set(ZUES_ENGINE_LIB "${ZUES_ENGINE_LIB_DIR}/ZuesEngine.lib")
+# Then try MinGW import library
+elseif(EXISTS "${ZUES_ENGINE_LIB_DIR}/libZuesEngine.dll.a")
+    set(ZUES_ENGINE_LIB "${ZUES_ENGINE_LIB_DIR}/libZuesEngine.dll.a")
+else()
+    message(WARNING "ZuesEngine import library not found in ${ZUES_ENGINE_LIB_DIR}!")
 endif()
 
-if(EXISTS "${ZUES_ENGINE_LIB}")
+if(ZUES_ENGINE_LIB)
     target_link_libraries(${TARGET_NAME} PRIVATE ${ZUES_ENGINE_LIB})
-else()
-    # Try to find in common locations
-    find_library(ZUES_ENGINE_FOUND
-        NAMES ZuesEngine
-        PATHS
-            "${CMAKE_CURRENT_SOURCE_DIR}/../../Engine/cmake-build-debug/bin"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../../bin"
-    )
-    if(ZUES_ENGINE_FOUND)
-        target_link_libraries(${TARGET_NAME} PRIVATE ${ZUES_ENGINE_FOUND})
-    else()
-        message(WARNING "ZuesEngine library not found!")
-    endif()
+    message(STATUS "Linking against: ${ZUES_ENGINE_LIB}")
 endif()
 
 # Platform-specific libraries

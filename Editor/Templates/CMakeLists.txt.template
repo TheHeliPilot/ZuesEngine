@@ -33,8 +33,12 @@ if(BUILD_AS_DLL)
     add_library(GameDLL SHARED ${PROJECT_SOURCES})
     target_compile_definitions(GameDLL PRIVATE GAME_DLL_EXPORTS)
     set_target_properties(GameDLL PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Builds"
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Builds"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Debug"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Debug"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Debug"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Release"
+        LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Debug"
+        LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Release"
     )
     set(TARGET_NAME GameDLL)
     message(STATUS "Building ${PROJECT_NAME} as DLL for hot-reload")
@@ -42,7 +46,9 @@ else()
     # Build as standalone executable
     add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SOURCES})
     set_target_properties(${PROJECT_NAME} PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Builds"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Debug"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Debug"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/../Builds/Release"
     )
     set(TARGET_NAME ${PROJECT_NAME})
     message(STATUS "Building ${PROJECT_NAME} as standalone EXE")

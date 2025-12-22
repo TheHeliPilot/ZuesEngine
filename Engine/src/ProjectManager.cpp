@@ -286,10 +286,10 @@ namespace Engine {
             std::string cmakeTemplate = cmakeBuffer.str();
             cmakeTemplateFile.close();
 
-            // Find the ZuesEngine library path
-            std::filesystem::path zuesEngineLibPath = zuesEngineRoot / "bin" / "ZuesEngine.dll";
-            std::string zuesEngineLib = zuesEngineLibPath.string();
-            replace_slashes(zuesEngineLib);
+            // Find the ZuesEngine library directory (contains import libraries)
+            std::filesystem::path zuesEngineLibDir = zuesEngineRoot / "bin" / "ZuesEngine" / "lib";
+            std::string zuesEngineLibDirStr = zuesEngineLibDir.string();
+            replace_slashes(zuesEngineLibDirStr);
 
             // Replace all placeholders in CMakeLists.txt template
             auto replacePlaceholder = [](std::string& content, const std::string& placeholder, const std::string& value) {
@@ -304,7 +304,7 @@ namespace Engine {
             replacePlaceholder(cmakeTemplate, "{{ENGINE_INCLUDE_DIR}}", engineIncludePath);
             replacePlaceholder(cmakeTemplate, "{{GLFW_INCLUDE_DIR}}", glfwIncludePath);
             replacePlaceholder(cmakeTemplate, "{{GLAD_INCLUDE_DIR}}", gladIncludePath);
-            replacePlaceholder(cmakeTemplate, "{{ZUES_ENGINE_LIB}}", zuesEngineLib);
+            replacePlaceholder(cmakeTemplate, "{{ZUES_ENGINE_LIB_DIR}}", zuesEngineLibDirStr);
 
             std::ofstream cmakeFile(cmakePath);
             cmakeFile << cmakeTemplate;
@@ -507,7 +507,7 @@ namespace Engine {
     }
 
     // FIX 9: Correct signature (BuildProjectAsync(bool))
-    bool ProjectManager::BuildProjectAsync(bool playOnFinish) {
+    bool ProjectManager::BuildProjectAsync(const bool playOnFinish) {
         std::lock_guard<std::mutex> lock(s_BuildMutex);
         if (s_IsBuilding) {
             LOG_WARN("Build already in progress.");

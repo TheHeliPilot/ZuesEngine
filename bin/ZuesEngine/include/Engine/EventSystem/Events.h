@@ -7,6 +7,7 @@
 #include <utility>
 #include <format>
 #include "../EngineDefines.h"
+#include "../ECS/Entity.h"
 #include <sstream>
 #include <iomanip>
 
@@ -37,8 +38,8 @@ namespace Engine {
             else if (logLevel == LOGLEVEL_ERR)
                 logLevelName = "Error";
 
-            std::time_t t = std::chrono::system_clock::to_time_t(timestamp);
-            std::tm tm = *std::localtime(&t);
+            const std::time_t t = std::chrono::system_clock::to_time_t(timestamp);
+            const std::tm tm = *std::localtime(&t);
             std::ostringstream oss;
             oss << std::put_time(&tm, "%H:%M:%S");
             return "|" + oss.str() +
@@ -99,6 +100,41 @@ namespace Engine {
         static EventType StaticType() { return EventType::MouseButtonReleaseE; }
         [[nodiscard]] EventType GetEventType() const override { return StaticType(); }
         [[nodiscard]] int GetButton() const { return button; }
+    };
+
+    class ZUES_API PhysicsEvent : public Event {
+    public:
+        EntityID entityA;
+        EntityID entityB;
+        PhysicsEvent(const EntityID& a, const EntityID& b) : entityA(a), entityB(b) {}
+    };
+
+    class ZUES_API CollisionEnterEvent final : public PhysicsEvent {
+    public:
+        using PhysicsEvent::PhysicsEvent;
+        static EventType StaticType() { return EventType::CollisionEnterE; }
+        [[nodiscard]] EventType GetEventType() const override { return StaticType(); }
+    };
+
+    class ZUES_API CollisionExitEvent final : public PhysicsEvent {
+    public:
+        using PhysicsEvent::PhysicsEvent;
+        static EventType StaticType() { return EventType::CollisionExitE; }
+        [[nodiscard]] EventType GetEventType() const override { return StaticType(); }
+    };
+
+    class ZUES_API TriggerEnterEvent final : public PhysicsEvent {
+    public:
+        using PhysicsEvent::PhysicsEvent;
+        static EventType StaticType() { return EventType::TriggerEnterE; }
+        [[nodiscard]] EventType GetEventType() const override { return StaticType(); }
+    };
+
+    class ZUES_API TriggerExitEvent final : public PhysicsEvent {
+    public:
+        using PhysicsEvent::PhysicsEvent;
+        static EventType StaticType() { return EventType::TriggerExitE; }
+        [[nodiscard]] EventType GetEventType() const override { return StaticType(); }
     };
 
 } // namespace Engine

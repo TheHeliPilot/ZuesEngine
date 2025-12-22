@@ -24,6 +24,13 @@ struct ZUES_API Archetype {
     std::vector<EntityID> entityIDs;
     std::map<Engine::ECS::Component::TypeID, std::unique_ptr<IComponentArray>> componentArrays;
 
+    // Non-copyable due to unique_ptr members
+    Archetype() = default;
+    Archetype(const Archetype&) = delete;
+    Archetype& operator=(const Archetype&) = delete;
+    Archetype(Archetype&&) = default;
+    Archetype& operator=(Archetype&&) = default;
+
     template<typename T>
     ComponentArray<T>* GetComponentArray() {
         const Engine::ECS::Component::TypeID id = Engine::ECS::Component::GetTypeID<T>();
@@ -44,7 +51,7 @@ namespace std {
 
 namespace Engine::ECS::Component {
     using ComponentCreator = std::function<std::unique_ptr<IComponentArray>()>;
-    extern std::map<TypeID, ComponentCreator> componentRegistry;
+    ZUES_API extern std::map<TypeID, ComponentCreator> componentRegistry;
 
     template<typename T>
     void RegisterComponent() {
@@ -61,6 +68,14 @@ class ZUES_API World {
 public:
     World() = default;
     ~World() = default;
+
+    // Non-copyable due to unique_ptr members
+    World(const World&) = delete;
+    World& operator=(const World&) = delete;
+
+    // Movable
+    World(World&&) = default;
+    World& operator=(World&&) = default;
 
     EntityID CreateEntity(const std::string &name);
     void DestroyEntity(EntityID entityID);

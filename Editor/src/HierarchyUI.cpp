@@ -94,7 +94,7 @@ void GenerateHierarchyItems()
 
             bool canBeDropped = true;
             EntityID currentEntity = hierarchyItems[i].id;
-            while (currentEntity != NULL_ENTITY_ID)
+            while (currentEntity != NullEntityID())
             {
                EntityID parent = Engine::Core::GetCurrentWorld()->GetComponent<Engine::ECS::Component::TransformComponent>(currentEntity).parent;
 
@@ -185,7 +185,7 @@ void HierarchyUI::HierarchyWindow()
             {
                const auto payloadData = static_cast<EntityID*>(payload->Data);
 
-               Engine::Core::GetCurrentWorld()->GetComponent<Engine::ECS::Component::TransformComponent>(*payloadData).parent = NULL_ENTITY_ID;
+               Engine::Core::GetCurrentWorld()->GetComponent<Engine::ECS::Component::TransformComponent>(*payloadData).parent = NullEntityID();
                Engine::ECS::Hierarchy::BuildCache(Engine::Core::GetCurrentWorld());
 
          }

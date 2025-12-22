@@ -13,7 +13,20 @@
       "Bash(dir C:UsersbuckaDesktopTestProject /s /b)",
       "Bash(findstr:*)",
       "Bash(dir:*)",
-      "Bash(if exist cmake-build-debug rmdir /s /q cmake-build-debug)"
+      "Bash(if exist cmake-build-debug rmdir /s /q cmake-build-debug)",
+      "Bash(\"C:\\Program Files\\JetBrains\\CLion 2025.2.2\\bin\\cmake\\win\\x64\\bin\\cmake.exe\" --build cmake-build-debug --target BuildAll -j 4)",
+      "Bash(\"C:\\Program Files\\JetBrains\\CLion 2025.2.2\\bin\\cmake\\win\\x64\\bin\\cmake.exe\" --build cmake-build-debug --target ZuesEngine)",
+      "Bash(C:PROGRA~1JETBRA~1CLION2~1.2binmingwbinG__~1.EXE -DZUES_ENGINE_EXPORTS -DZUES_PLATFORM_WINDOWS -DZuesEngine_EXPORTS -IC:/Users/bucka/CLionProjects/ZuesEngine/Engine/include -IC:/Users/bucka/CLionProjects/ZuesEngine/Engine/include/Engine -IC:/Users/bucka/CLionProjects/ZuesEngine/Engine/extern/glfw/include -IC:/Users/bucka/CLionProjects/ZuesEngine/Engine/extern/glad/include -IC:/Users/bucka/CLionProjects/ZuesEngine/Engine/extern/KHR -IC:/Users/bucka/CLionProjects/ZuesEngine/Engine/extern/enet/include -IC:/Users/bucka/CLionProjects/ZuesEngine/Engine/extern/box2d/src/../include -IC:/Users/bucka/CLionProjects/ZuesEngine/cmake-build-debug/Engine/extern/box2d/src -g -std=gnu++23 -c C:/Users/bucka/CLionProjects/ZuesEngine/Engine/src/Log.cpp)",
+      "Bash(\"C:\\Program Files\\JetBrains\\CLion 2025.2.2\\bin\\cmake\\win\\x64\\bin\\cmake.exe\" --build cmake-build-debug --target ZuesEngine -j 4)",
+      "Bash(ninja -v:*)",
+      "Bash(\"C:\\Program Files\\JetBrains\\CLion 2025.2.2\\bin\\cmake\\win\\x64\\bin\\cmake.exe\" -S \"C:\\Users\\bucka\\CLionProjects\\ZuesEngine\" -B \"C:\\Users\\bucka\\CLionProjects\\ZuesEngine\\cmake-build-debug\" -G Ninja -DCMAKE_BUILD_TYPE=Debug)",
+      "Bash(\"C:\\Program Files\\JetBrains\\CLion 2025.2.2\\bin\\cmake\\win\\x64\\bin\\cmake.exe\":*)",
+      "Bash(\"C:\\Program Files\\JetBrains\\CLion 2025.2.2\\bin\\cmake\\win\\x64\\bin\\cmake.exe\" --build C:UsersbuckaCLionProjectsZuesEnginebuild --target ZuesEngine --config Debug)",
+      "Bash(\"C:\\Program Files\\JetBrains\\CLion 2025.2.2\\bin\\cmake\\win\\x64\\bin\\cmake.exe\" --build \"C:\\Users\\bucka\\CLionProjects\\ZuesEngine\\build\" --target ZuesEngine --config Debug)",
+      "Bash(\"C:\\Program Files\\JetBrains\\CLion 2025.2.2\\bin\\cmake\\win\\x64\\bin\\cmake.exe\" --build \"C:\\Users\\bucka\\CLionProjects\\ZuesEngine\\build\" --target BuildAll --config Debug)",
+      "Bash(grep:*)",
+      "Bash(\"C:\\Program Files\\JetBrains\\CLion 2025.2.2\\bin\\cmake\\win\\x64\\bin\\cmake.exe\" --build \"C:\\Users\\bucka\\CLionProjects\\ZuesEngine\\cmake-build-debug\" --target ZuesEngine -j 4)",
+      "Bash(\"C:\\PROGRA~1\\JETBRA~1\\CLION2~1.2\\bin\\mingw\\bin\\G__~1.EXE\" -DZUES_ENGINE_EXPORTS -DZUES_PLATFORM_WINDOWS -DZuesEngine_EXPORTS -IC:/Users/bucka/CLionProjects/ZuesEngine/Engine/include -IC:/Users/bucka/CLionProjects/ZuesEngine/Engine/include/Engine -IC:/Users/bucka/CLionProjects/ZuesEngine/Engine/extern/glfw/include -IC:/Users/bucka/CLionProjects/ZuesEngine/Engine/extern/glad/include -IC:/Users/bucka/CLionProjects/ZuesEngine/Engine/extern/KHR -IC:/Users/bucka/CLionProjects/ZuesEngine/Engine/extern/enet/include -IC:/Users/bucka/CLionProjects/ZuesEngine/Engine/extern/box2d/src/../include -IC:/Users/bucka/CLionProjects/ZuesEngine/cmake-build-debug/Engine/extern/box2d/src -g -std=gnu++23 -c Engine/src/World.cpp -o /dev/null)"
     ]
   }
 }

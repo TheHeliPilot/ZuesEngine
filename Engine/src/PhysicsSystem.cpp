@@ -4,6 +4,10 @@
 #include <box2d/math_functions.h>
 #include <cmath>
 
+#include "Core.h"
+#include "Engine.h"
+#include "EventSystem/Events.h"
+
 PhysicsSystem::PhysicsSystem() {
     // Create the Box2D world with gravity
     b2WorldDef worldDef = b2DefaultWorldDef();
@@ -12,6 +16,8 @@ PhysicsSystem::PhysicsSystem() {
 
     // No signature setup - we'll manually query entities
     role = SystemRole::Game;
+
+    SetEventSystem(Engine::GetCurrentEventSystem());
 }
 
 PhysicsSystem::~PhysicsSystem() {
@@ -46,56 +52,46 @@ void PhysicsSystem::Run(World* world, const float deltaTime) {
 }
 
 void PhysicsSystem::CreateBodies(World* world) {
-    // Query all entities with TransformComponent and RigidbodyComponent
     world->ForEach<Engine::ECS::Component::TransformComponent*, Engine::ECS::Component::RigidbodyComponent*>(
-        [this, world](EntityID entityID, Engine::ECS::Component::TransformComponent* transform, Engine::ECS::Component::RigidbodyComponent* rb) {
-            // Check if body exists
+        [this, world](const EntityID &entityID, Engine::ECS::Component::TransformComponent* transform, Engine::ECS::Component::RigidbodyComponent* rb) {
+
             b2BodyId existingBodyId = b2_nullBodyId;
             if (rb->body != nullptr) {
-                uint64_t storedId = reinterpret_cast<uintptr_t>(rb->body);
+                const auto storedId = reinterpret_cast<uintptr_t>(rb->body);
                 existingBodyId = b2LoadBodyId(storedId);
             }
 
-            // If body exists, check if we need to update its properties
             if (rb->body != nullptr && b2Body_IsValid(existingBodyId)) {
-                b2BodyType currentType = b2Body_GetType(existingBodyId);
-                if (currentType != static_cast<b2BodyType>(rb->bodyType)) {
-                    // Body type changed - update it
-                    b2Body_SetType(existingBodyId, static_cast<b2BodyType>(rb->bodyType));
-                }
-
-                // Update gravity scale
+                // 1. Update existing body properties
+                b2Body_SetType(existingBodyId, static_cast<b2BodyType>(rb->bodyType));
                 b2Body_SetGravityScale(existingBodyId, rb->gravityScale);
 
-                // Update fixed rotation
+                // Update user data to store entity ID
+                b2Body_SetUserData(existingBodyId, reinterpret_cast<void*>(entityID.id));
+
                 b2MotionLocks locks = b2Body_GetMotionLocks(existingBodyId);
                 locks.angularZ = rb->fixedRotation;
                 b2Body_SetMotionLocks(existingBodyId, locks);
 
-                // Wake the body to ensure it starts simulating
                 b2Body_SetAwake(existingBodyId, true);
             }
-            // If this entity doesn't have a body yet, create one
             else if (rb->body == nullptr) {
-                b2BodyId bodyId = CreateBody(world, entityID);
+                // 2. Create new body
+                const b2BodyId bodyId = CreateBody(world, entityID);
 
-                // Store the body ID in the component using Box2D's store function
-                uint64_t storedId = b2StoreBodyId(bodyId);
-                rb->body = reinterpret_cast<void*>(static_cast<uintptr_t>(storedId));
+                const uint64_t storedId = b2StoreBodyId(bodyId);
+                rb->body = reinterpret_cast<void*>(storedId);
                 entityBodyMap[entityID] = bodyId;
 
-                // Create fixtures from collider components
                 CreateFixtures(bodyId, world, entityID);
-
-                // Wake the body to ensure it starts simulating
                 b2Body_SetAwake(bodyId, true);
             }
         }
     );
 }
 
-b2BodyId PhysicsSystem::CreateBody(World* world, EntityID entityID) {
-    auto* transform = &world->GetComponent<Engine::ECS::Component::TransformComponent>(entityID);
+b2BodyId PhysicsSystem::CreateBody(World* world, const EntityID &entityID) const {
+    const auto* transform = &world->GetComponent<Engine::ECS::Component::TransformComponent>(entityID);
     auto* rb = &world->GetComponent<Engine::ECS::Component::RigidbodyComponent>(entityID);
 
     // Create body definition
@@ -104,7 +100,7 @@ b2BodyId PhysicsSystem::CreateBody(World* world, EntityID entityID) {
     bodyDef.position = {transform->worldPosition.x, transform->worldPosition.y};
 
     // Convert degrees to rotation (Box2D v3 uses b2Rot which is cos/sin pair)
-    float angleRadians = transform->worldRotation * (3.14159265359f / 180.0f);
+    const float angleRadians = transform->worldRotation * (3.14159265359f / 180.0f);
     bodyDef.rotation = b2MakeRot(angleRadians);
 
     bodyDef.gravityScale = rb->gravityScale;
@@ -116,20 +112,20 @@ b2BodyId PhysicsSystem::CreateBody(World* world, EntityID entityID) {
     }
 
     // Create the body in the physics world
-    b2BodyId bodyId = b2CreateBody(physicsWorldId, &bodyDef);
+    const b2BodyId bodyId = b2CreateBody(physicsWorldId, &bodyDef);
     return bodyId;
 }
 
-void PhysicsSystem::CreateFixtures(b2BodyId bodyId, World* world, EntityID entityID) {
+void PhysicsSystem::CreateFixtures(const b2BodyId bodyId, World* world, const EntityID &entityID) {
     // Default shape definition
     b2ShapeDef shapeDef = b2DefaultShapeDef();
 
     // Check for BoxCollider
     if (world->HasComponent<Engine::ECS::Component::BoxColliderComponent>(entityID)) {
-        auto& collider = world->GetComponent<Engine::ECS::Component::BoxColliderComponent>(entityID);
+        const auto& collider = world->GetComponent<Engine::ECS::Component::BoxColliderComponent>(entityID);
 
         // Create polygon shape (box)
-        b2Polygon box = b2MakeOffsetBox(
+        const b2Polygon box = b2MakeOffsetBox(
             collider.size.x * 0.5f,
             collider.size.y * 0.5f,
             {collider.offset.x, collider.offset.y},
@@ -146,7 +142,7 @@ void PhysicsSystem::CreateFixtures(b2BodyId bodyId, World* world, EntityID entit
 
     // Check for CircleCollider
     if (world->HasComponent<Engine::ECS::Component::CircleColliderComponent>(entityID)) {
-        auto& collider = world->GetComponent<Engine::ECS::Component::CircleColliderComponent>(entityID);
+        const auto& collider = world->GetComponent<Engine::ECS::Component::CircleColliderComponent>(entityID);
 
         b2Circle circle;
         circle.center = {collider.offset.x, collider.offset.y};
@@ -161,7 +157,7 @@ void PhysicsSystem::CreateFixtures(b2BodyId bodyId, World* world, EntityID entit
     }
 
     // Update mass data after creating fixtures
-    auto* rb = &world->GetComponent<Engine::ECS::Component::RigidbodyComponent>(entityID);
+    const auto* rb = &world->GetComponent<Engine::ECS::Component::RigidbodyComponent>(entityID);
     if (rb->bodyType == 2) { // Dynamic body
         b2MassData massData = b2Body_GetMassData(bodyId);
         massData.mass = rb->mass;
@@ -169,12 +165,63 @@ void PhysicsSystem::CreateFixtures(b2BodyId bodyId, World* world, EntityID entit
     }
 }
 
-void PhysicsSystem::StepPhysics(float deltaTime) {
-    // Use fixed time step for stable physics
+void PhysicsSystem::StepPhysics(const float deltaTime) {
     timeAccumulator += deltaTime;
 
     while (timeAccumulator >= fixedTimeStep) {
         b2World_Step(physicsWorldId, fixedTimeStep, subStepCount);
+
+        // Fetch events from the simulation step
+        const b2ContactEvents events = b2World_GetContactEvents(physicsWorldId);
+
+        // 1. Handle Begin Events (CollisionEnter / TriggerEnter)
+        for (int i = 0; i < events.beginCount; ++i) {
+            const b2ContactBeginTouchEvent* ev = &events.beginEvents[i];
+
+            // Extract raw uint64_t from Box2D
+            const auto idA = reinterpret_cast<uintptr_t>(b2Body_GetUserData(b2Shape_GetBody(ev->shapeIdA)));
+            const auto idB = reinterpret_cast<uintptr_t>(b2Body_GetUserData(b2Shape_GetBody(ev->shapeIdB)));
+
+            // MANUALLY reconstruct the EntityID objects
+            EntityID entA; entA.id = idA;
+            EntityID entB; entB.id = idB;
+
+            const bool isTrigger = b2Shape_IsSensor(ev->shapeIdA) || b2Shape_IsSensor(ev->shapeIdB);
+
+            if (m_EventSystem) {
+                if (isTrigger)
+                    m_EventSystem->Dispatch(Engine::TriggerEnterEvent(entA, entB));
+                else
+                    m_EventSystem->Dispatch(Engine::CollisionEnterEvent(entA, entB));
+            }
+
+            // Debug Log
+            printf("[Physics] %s Enter: %llu & %llu\n", isTrigger ? "Trigger" : "Collision", idA, idB);
+        }
+
+        // 2. Handle End Events (CollisionExit / TriggerExit)
+        for (int i = 0; i < events.endCount; ++i) {
+            const b2ContactEndTouchEvent* ev = &events.endEvents[i];
+
+            const auto idA = reinterpret_cast<uintptr_t>(b2Body_GetUserData(b2Shape_GetBody(ev->shapeIdA)));
+            const auto idB = reinterpret_cast<uintptr_t>(b2Body_GetUserData(b2Shape_GetBody(ev->shapeIdB)));
+
+            EntityID entA; entA.id = idA;
+            EntityID entB; entB.id = idB;
+
+            const bool isTrigger = b2Shape_IsSensor(ev->shapeIdA) || b2Shape_IsSensor(ev->shapeIdB);
+
+            if (m_EventSystem) {
+                if (isTrigger)
+                    m_EventSystem->Dispatch(Engine::TriggerExitEvent(entA, entB));
+                else
+                    m_EventSystem->Dispatch(Engine::CollisionExitEvent(entA, entB));
+            }
+
+            // Debug Log
+            printf("[Physics] %s Exit: %llu & %llu\n", isTrigger ? "Trigger" : "Collision", idA, idB);
+        }
+
         timeAccumulator -= fixedTimeStep;
     }
 }
@@ -185,15 +232,15 @@ void PhysicsSystem::SyncTransforms(World* world) {
         if (b2Body_IsValid(bodyId) && world->HasComponent<Engine::ECS::Component::TransformComponent>(entityID)) {
             auto& transform = world->GetComponent<Engine::ECS::Component::TransformComponent>(entityID);
 
-            b2Vec2 pos = b2Body_GetPosition(bodyId);
-            b2Rot rot = b2Body_GetRotation(bodyId);
+            const b2Vec2 pos = b2Body_GetPosition(bodyId);
+            const b2Rot rot = b2Body_GetRotation(bodyId);
 
             // Update world position
             transform.worldPosition.x = pos.x;
             transform.worldPosition.y = pos.y;
 
             // Convert rotation to angle in degrees
-            float angleRadians = b2Rot_GetAngle(rot);
+            const float angleRadians = b2Rot_GetAngle(rot);
             transform.worldRotation = angleRadians * (180.0f / 3.14159265359f);
         }
     }

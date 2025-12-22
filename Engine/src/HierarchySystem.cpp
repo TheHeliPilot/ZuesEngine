@@ -1,7 +1,9 @@
 ﻿// HierarchySystem.cpp
 
-#include "../include/Engine/ECS/Systems/HierarchySystem.h"
+#define _USE_MATH_DEFINES // Required for M_PI on MSVC
 #include <cmath> // Needed for M_PI, std::cos, std::sin
+
+#include "../include/Engine/ECS/Systems/HierarchySystem.h"
 #include <stdexcept> // Needed for std::exception
 
 HierarchySystem::HierarchySystem() {
@@ -53,7 +55,7 @@ void HierarchySystem::Run(World *world, float deltaTime) {
         } catch (const std::exception& e) {
             // Error handling: If the parent entity is missing (e.g., destroyed out of sync),
             // we treat the child as a root entity to prevent crashes and log the error.
-            childT->parent = NULL_ENTITY_ID;
+            childT->parent = NullEntityID();
             childT->worldPosition = childT->localPosition;
             childT->worldRotation = childT->localRotation;
             // Optionally log the error here using your engine's logger:

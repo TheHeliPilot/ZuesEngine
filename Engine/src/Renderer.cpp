@@ -761,7 +761,7 @@ namespace Engine {
             float x3, float y3,  // Top-Left
             float s0, float t0, float s1, float t1,  // Texture coords
             const Math::Vec4& color,
-            uint32_t textureID,
+            const uint32_t textureID,
             float z
     ) {
         // Check buffer space BEFORE any state changes
@@ -832,7 +832,7 @@ namespace Engine {
     }
 
 
-    uint32_t Engine::Renderer::LoadFont(const std::string& fontPath, float pixelHeight) {
+    uint32_t Engine::Renderer::LoadFont(const std::string& fontPath, const float pixelHeight) {
         LOG_INFO("LoadFont: Loading font from '" + fontPath + "' at " + std::to_string(pixelHeight) + "px");
 
         // 1. Read the font file into a buffer
@@ -915,7 +915,7 @@ namespace Engine {
         return fontID;
     }
 
-    void Renderer::DrawText(uint32_t fontID, const std::string& text, const Math::Vec2& position, const Math::Vec4& color, float scale, float worldScale, float rotation) {
+    void Renderer::DrawText(const uint32_t fontID, const std::string& text, const Math::Vec2& position, const Math::Vec4& color, const float scale, const float worldScale, const float rotation) {
         if (!s_Data) {
             LOG_ERROR("DrawText: s_Data is null");
             return;

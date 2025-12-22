@@ -33,6 +33,7 @@ namespace Engine {
 
     ZUES_API void RegisterComponents();
     ZUES_API void RegisterSystems(World*);
+    ZUES_API EventSystem* GetCurrentEventSystem();
 }
 
 #endif //ZUESENGINE_ENGINE_H

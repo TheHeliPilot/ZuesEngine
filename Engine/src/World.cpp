@@ -1,4 +1,5 @@
 ﻿#include "../include/Engine/ECS/World.h"
+#include "../include/Engine/ZuesAPI.h"
 #include <iostream>
 #include <stdexcept>
 #include <algorithm>
@@ -7,9 +8,9 @@
 #include "../include/Engine/ECS/HierarchyOutliner.h"
 #include "../include/Engine/ECS/WorldSerializationHelpers.h"
 
-// NEW: Define the global component registry
+// Global component registry - MUST be exported for game DLLs to access
 namespace Engine::ECS::Component {
-    std::map<TypeID, ComponentCreator> componentRegistry;
+    ZUES_API std::map<TypeID, ComponentCreator> componentRegistry;
 }
 
 std::size_t std::hash<std::bitset<64>>::operator()(const ComponentSignature &signature) const {

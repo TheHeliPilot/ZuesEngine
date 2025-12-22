@@ -28,13 +28,13 @@ namespace Editor {
     bool GameDLLLoader::Initialize(const std::filesystem::path& projectPath) {
         m_ProjectPath = projectPath;
 
-        // The game DLL will be in the project's build directory
+        // The game DLL will be in the project's build directory (in Debug subdirectory)
         #if defined(_WIN32) || defined(_WIN64)
-            m_DLLPath = projectPath / "Builds" / "GameDLL.dll";
+            m_DLLPath = projectPath / "Builds" / "Debug" / "GameDLL.dll";
         #elif defined(__APPLE__)
-            m_DLLPath = projectPath / "Builds" / "libGameDLL.dylib";
+            m_DLLPath = projectPath / "Builds" / "Debug" / "libGameDLL.dylib";
         #else
-            m_DLLPath = projectPath / "Builds" / "libGameDLL.so";
+            m_DLLPath = projectPath / "Builds" / "Debug" / "libGameDLL.so";
         #endif
 
         m_LastSourceCheck = std::chrono::system_clock::now();
@@ -323,6 +323,7 @@ namespace Editor {
         if (m_BuildProgressCallback) m_BuildProgressCallback("Running CMake...", 0.3f);
 
         // CMake configure command - use BUILD_AS_DLL=ON for the game project template
+        // Uses system default generator (Visual Studio on Windows)
         std::string configureCmd = "cmake -S \"" + sourcePath.string() + "\" -B \"" + buildDir.string() +
                                    "\" -DBUILD_AS_DLL=ON -DCMAKE_BUILD_TYPE=Debug";
 
@@ -483,9 +484,9 @@ namespace Editor {
     }
 
     bool GameDLLLoader::CopyDLLForLoading() {
-        // Generate unique temp filename
+        // Generate unique temp filename in the Debug subdirectory
         auto timestamp = std::chrono::system_clock::now().time_since_epoch().count();
-        m_LoadedDLLPath = m_ProjectPath / "Builds" / ("GameDLL_" + std::to_string(timestamp) + ".dll");
+        m_LoadedDLLPath = m_ProjectPath / "Builds" / "Debug" / ("GameDLL_" + std::to_string(timestamp) + ".dll");
 
         try {
             std::filesystem::copy_file(m_DLLPath, m_LoadedDLLPath,
@@ -501,7 +502,9 @@ namespace Editor {
 
     void GameDLLLoader::CleanupTempDLLs() {
         try {
-            std::filesystem::path buildsDir = m_ProjectPath / "Builds";
+            std::filesystem::path buildsDir = m_ProjectPath / "Builds" / "Debug";
+            if (!std::filesystem::exists(buildsDir)) return;
+
             for (const auto& entry : std::filesystem::directory_iterator(buildsDir)) {
                 if (entry.is_regular_file()) {
                     std::string filename = entry.path().filename().string();
@@ -546,9 +549,9 @@ namespace Editor {
         // On Unix, we can often overwrite loaded libraries, but copy anyway for safety
         auto timestamp = std::chrono::system_clock::now().time_since_epoch().count();
         #if defined(__APPLE__)
-            m_LoadedDLLPath = m_ProjectPath / "Builds" / ("libGameDLL_" + std::to_string(timestamp) + ".dylib");
+            m_LoadedDLLPath = m_ProjectPath / "Builds" / "Debug" / ("libGameDLL_" + std::to_string(timestamp) + ".dylib");
         #else
-            m_LoadedDLLPath = m_ProjectPath / "Builds" / ("libGameDLL_" + std::to_string(timestamp) + ".so");
+            m_LoadedDLLPath = m_ProjectPath / "Builds" / "Debug" / ("libGameDLL_" + std::to_string(timestamp) + ".so");
         #endif
 
         try {
@@ -565,7 +568,9 @@ namespace Editor {
 
     void GameDLLLoader::CleanupTempDLLs() {
         try {
-            std::filesystem::path buildsDir = m_ProjectPath / "Builds";
+            std::filesystem::path buildsDir = m_ProjectPath / "Builds" / "Debug";
+            if (!std::filesystem::exists(buildsDir)) return;
+
             for (const auto& entry : std::filesystem::directory_iterator(buildsDir)) {
                 if (entry.is_regular_file()) {
                     std::string filename = entry.path().filename().string();
