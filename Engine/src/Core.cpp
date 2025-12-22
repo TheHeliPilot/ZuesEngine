@@ -2,6 +2,7 @@
 #include "../include/Engine/Engine.h" // Needed for SetupSimpleScene
 #include "../include/Engine/Renderer.h" // Needed for Renderer::Render
 #include "../include/Engine/EngineDefines.h" // Needed for ENGINE_LOG
+#include "../include/Engine/SceneSetup.h" // For SpawnEditorViewportCamera
 // Explicitly include systems for use with std::make_unique
 #include "../include/Engine/ECS/Systems/CameraSystem.h"
 #include "../include/Engine/ECS/Systems/HierarchySystem.h"
@@ -180,4 +181,22 @@ bool Engine::Core::AutoGenerateSystem(
     }
 
     return success;
+}
+
+// Exported function for Editor - creates viewport camera safely across DLL boundary
+EntityID Engine::SpawnEditorViewportCamera(World* world) {
+    const EntityID cameraEntity = world->CreateEntity("EditorViewportCamera");
+    world->AddComponent<Engine::ECS::Component::TransformComponent>(cameraEntity, {
+        .worldPosition = {0.0f, 0.0f},
+        .worldRotation = 0.0f
+    });
+    world->AddComponent<Engine::ECS::Component::CameraComponent>(cameraEntity, {
+        .zoom = 1.0f,
+        .halfHeight = 10.0f,
+        .backgroundColor = {0.2f, 0.2f, 0.2f, 1.0f},
+        .isActive = true
+    });
+    world->AddComponent<Engine::ECS::Component::ViewportCameraTag>(cameraEntity, {});
+    world->AddComponent<Engine::ECS::Component::MainCameraTag>(cameraEntity, {});
+    return cameraEntity;
 }

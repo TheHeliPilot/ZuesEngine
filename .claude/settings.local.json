@@ -6,7 +6,14 @@
       "Bash(cat:*)",
       "Bash(cmake --build:*)",
       "Bash(\"C:\\Program Files\\CMake\\bin\\cmake.exe\" --build build --config Debug)",
-      "Bash(where:*)"
+      "Bash(where:*)",
+      "Bash(dir C:UsersbuckaCLionProjectsZuesEnginebin /s /b)",
+      "Bash(dir \"C:\\Users\\bucka\\CLionProjects\\ZuesEngine\\cmake-build-*\" /b)",
+      "Bash(ls:*)",
+      "Bash(dir C:UsersbuckaDesktopTestProject /s /b)",
+      "Bash(findstr:*)",
+      "Bash(dir:*)",
+      "Bash(if exist cmake-build-debug rmdir /s /q cmake-build-debug)"
     ]
   }
 }

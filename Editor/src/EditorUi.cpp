@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include "Core.h"
+#include "ProjectManager.h"
 #include "imgui_internal.h"
 #include "../include/AssetBrowserUI.h"
 #include "../include/HierarchyUI.h"
@@ -152,24 +153,31 @@ static void DrawCustomTitleBar() {
     static uint32_t play_texture_id = 0;
     static uint32_t stop_texture_id = 0;
 
-    // Note: exe is in bin/, icons are in ../../icons/
-    if (logo_texture_id == 0)      logo_texture_id     = LoadTextureFromFile("../../icons/ZuesLogoNoBG.png");
-    if (minimize_texture_id == 0)  minimize_texture_id = LoadTextureFromFile("../../icons/System/Bar_Bottom.png");
-    if (maximize_texture_id == 0)  maximize_texture_id = LoadTextureFromFile("../../icons/System/Window.png");
-    if (restore_texture_id == 0)   restore_texture_id  = LoadTextureFromFile("../../icons/System/Devices.png");
-    if (close_texture_id == 0)     close_texture_id    = LoadTextureFromFile("../../icons/Menu/Close_LG.png");
-    if (play_texture_id == 0)      play_texture_id     = LoadTextureFromFile("../../icons/Media/Play.png");
-    if (stop_texture_id == 0)      stop_texture_id     = LoadTextureFromFile("../../icons/Media/Stop.png");
+    // Helper lambda to try loading from current dir first, then relative path
+    auto tryLoadIcon = [](const char* currentPath, const char* relativePath) -> uint32_t {
+        uint32_t tex = LoadTextureFromFile(currentPath);
+        if (tex == 0) tex = LoadTextureFromFile(relativePath);
+        return tex;
+    };
+
+    // Try current directory first (icons/), then relative path (../../icons/)
+    if (logo_texture_id == 0)      logo_texture_id     = tryLoadIcon("icons/ZuesLogoNoBG.png", "../../icons/ZuesLogoNoBG.png");
+    if (minimize_texture_id == 0)  minimize_texture_id = tryLoadIcon("icons/System/Bar_Bottom.png", "../../icons/System/Bar_Bottom.png");
+    if (maximize_texture_id == 0)  maximize_texture_id = tryLoadIcon("icons/System/Window.png", "../../icons/System/Window.png");
+    if (restore_texture_id == 0)   restore_texture_id  = tryLoadIcon("icons/System/Devices.png", "../../icons/System/Devices.png");
+    if (close_texture_id == 0)     close_texture_id    = tryLoadIcon("icons/Menu/Close_LG.png", "../../icons/Menu/Close_LG.png");
+    if (play_texture_id == 0)      play_texture_id     = tryLoadIcon("icons/Media/Play.png", "../../icons/Media/Play.png");
+    if (stop_texture_id == 0)      stop_texture_id     = tryLoadIcon("icons/Media/Stop.png", "../../icons/Media/Stop.png");
     // -------------------------------
 
     // --- 1. Right-side control buttons (Window Controls) ---
     ImGui::SetCursorPos(ImVec2(control_buttons_start_x, 0));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
 
-    // Custom lambda for the control buttons (Minimize, Maximize, Close)
-    auto pushTransparentImageButton = [&](const char* id, uint32_t textureID, const ImVec2& size, const ImVec4& hoverColor, auto callback) {
-        // Skip if size is invalid or texture failed to load
-        if (size.x <= 0.0f || size.y <= 0.0f || textureID == 0) {
+    // Custom lambda for the control buttons with text fallback
+    auto pushTransparentImageButton = [&](const char* id, uint32_t textureID, const ImVec2& size, const ImVec4& hoverColor, const char* fallbackText, auto callback) {
+        // Skip if size is invalid
+        if (size.x <= 0.0f || size.y <= 0.0f) {
             return;
         }
 
@@ -177,42 +185,62 @@ static void DrawCustomTitleBar() {
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hoverColor);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, hoverColor);
 
-        // Use a fixed frame padding to center the icon in the window control block
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2( (button_size_x - size.x) / 2.0f, (button_size_y - size.y) / 2.0f ));
+        bool clicked = false;
 
-        if (ImGui::ImageButton(
-            id, // Unique ID
-            static_cast<ImTextureID>(static_cast<intptr_t>(textureID)),
-            size,
-            ImVec2(0, 0), ImVec2(1, 1),
-            ImVec4(0,0,0,0) // bg_col (transparent)
-        )) {
+        // If texture loaded, use ImageButton, otherwise use text button
+        if (textureID != 0) {
+            // Use a fixed frame padding to center the icon in the window control block
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2( (button_size_x - size.x) / 2.0f, (button_size_y - size.y) / 2.0f ));
+
+            if (ImGui::ImageButton(
+                id, // Unique ID
+                static_cast<ImTextureID>(static_cast<intptr_t>(textureID)),
+                size,
+                ImVec2(0, 0), ImVec2(1, 1),
+                ImVec4(0,0,0,0) // bg_col (transparent)
+            )) {
+                clicked = true;
+            }
+
+            ImGui::PopStyleVar(); // Pop FramePadding
+        } else {
+            // Fallback to text button
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, (button_size_y - ImGui::CalcTextSize(fallbackText).y) / 2.0f));
+
+            if (ImGui::Button(fallbackText, ImVec2(button_size_x, button_size_y))) {
+                clicked = true;
+            }
+
+            ImGui::PopStyleVar(); // Pop FramePadding
+        }
+
+        if (clicked) {
             callback();
         }
 
-        ImGui::PopStyleVar(); // Pop FramePadding
         ImGui::PopStyleColor(3);
     };
 
     constexpr float icon_size_xy = 16.0f; // A suitable size for window control icons
     constexpr ImVec2 icon_size = {icon_size_xy, icon_size_xy};
 
-    // Minimize Button (Using unique ID)
-    pushTransparentImageButton("##Minimize", minimize_texture_id, icon_size, ImVec4(0.3f, 0.3f, 0.3f, 0.5f), [](){ glfwIconifyWindow(g_MainWindow); });
+    // Minimize Button
+    pushTransparentImageButton("##Minimize", minimize_texture_id, icon_size, ImVec4(0.3f, 0.3f, 0.3f, 0.5f), "_", [](){ glfwIconifyWindow(g_MainWindow); });
     ImGui::SameLine(0, 0);
 
-    // Maximize/Restore Button (Using unique ID)
+    // Maximize/Restore Button
     bool maximized = glfwGetWindowAttrib(g_MainWindow, GLFW_MAXIMIZED);
     const uint32_t current_maximize_id = maximized ? restore_texture_id : maximize_texture_id;
-    pushTransparentImageButton("##Maximize", current_maximize_id, icon_size, ImVec4(0.3f, 0.3f, 0.3f, 0.5f), [maximized](){
+    const char* maxRestoreText = maximized ? "O" : "[]";
+    pushTransparentImageButton("##Maximize", current_maximize_id, icon_size, ImVec4(0.3f, 0.3f, 0.3f, 0.5f), maxRestoreText, [maximized](){
         if(maximized) glfwRestoreWindow(g_MainWindow); else glfwMaximizeWindow(g_MainWindow);
     });
     ImGui::SameLine(0, 0);
 
-    // Close Button (Using unique ID)
+    // Close Button
     constexpr float close_icon_size_xy = 14.0f;
     constexpr ImVec2 close_icon_size = {close_icon_size_xy, close_icon_size_xy};
-    pushTransparentImageButton("##Close", close_texture_id, close_icon_size, ImVec4(0.9f, 0.2f, 0.2f, 1.0f), [](){ glfwSetWindowShouldClose(g_MainWindow, GLFW_TRUE); });
+    pushTransparentImageButton("##Close", close_texture_id, close_icon_size, ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "X", [](){ glfwSetWindowShouldClose(g_MainWindow, GLFW_TRUE); });
 
     ImGui::PopStyleVar(); // Pop FrameRounding
     // -------------------------------------------------------------------------------------
@@ -232,7 +260,15 @@ static void DrawCustomTitleBar() {
     ImGui::SameLine();
     ImGui::SetCursorPosY(logo_margin_y);
     ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Zues Editor");
+
+    // Show project name if available
+    if (Engine::ProjectManager::GetCurrent()) {
+        std::string projectName = Engine::ProjectManager::GetCurrent()->Name;
+        std::string displayText = "Zues Editor - " + projectName;
+        ImGui::TextUnformatted(displayText.c_str());
+    } else {
+        ImGui::TextUnformatted("Zues Editor");
+    }
 
     // --- FPS DISPLAY (Fixed Width, Jitter Fix) ---
     ImGui::SameLine(0, 5.0f);
@@ -604,7 +640,7 @@ void EditorUi::DrawWindowUi() {
     }
 
     LoggerUI::LoggerWindow();
-    //HierarchyUI::HierarchyWindow(); //TODO: fix image size 0 crash
+    HierarchyUI::HierarchyWindow(); //TODO: fix image size 0 crash
     InspectorUI::InspectorWindow();
     AssetBrowserUI::AssetBrowserWindow();
     //TextureCutterUI::TextureCutterWindow(); //TODO: fix implementation to actually work

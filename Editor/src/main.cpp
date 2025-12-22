@@ -12,10 +12,16 @@
 #include "../include/LoggerUI.h"
 #include "../include/customInspectors/InspectorRegistry.h"
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 // Include for strcpy, which is needed for ImFontConfig::Name
 #include <string.h>
 
 #include "Core.h"
+#include "SceneSetup.h"
 #include "../include/HierarchyOperations.h"
 #include "../include/customInspectors/SpriteInspector.h"
 #include "../include/HotReloadUI.h"
@@ -29,6 +35,18 @@ using Editor::GameDLLLoader;
 
 // Global pointer for Input handling
 GLFWwindow* g_MainWindow = nullptr;
+
+// Helper function to get the directory where the editor executable is located
+static std::filesystem::path GetEditorExecutableDirectory() {
+#ifdef _WIN32
+    char modulePath[MAX_PATH];
+    if (GetModuleFileNameA(nullptr, modulePath, MAX_PATH)) {
+        return std::filesystem::path(modulePath).parent_path();
+    }
+#endif
+    // Fallback to current path if platform-specific method fails
+    return std::filesystem::current_path();
+}
 
 // Helper function to convert a hex string to an ImVec4 color
 static ImVec4 HexToImVec4(const char* hex) {
@@ -256,7 +274,38 @@ static void RegisterBuiltInInspectors() {
     );
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    // Parse command-line arguments
+    bool createProjectMode = false;
+    std::string projectPathArg;
+
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--create-project" && i + 1 < argc) {
+            createProjectMode = true;
+            projectPathArg = argv[i + 1];
+            break;
+        } else if (i == 1 && arg[0] != '-') {
+            // First argument without a flag is treated as project path to open
+            projectPathArg = arg;
+        }
+    }
+
+    // If in create-project mode, create the project and exit
+    if (createProjectMode) {
+        if (!Engine::ProjectManager::OpenOrCreate(projectPathArg)) {
+            fprintf(stderr, "Failed to create project at: %s\n", projectPathArg.c_str());
+            return 1;
+        }
+        fprintf(stdout, "Project created successfully at: %s\n", projectPathArg.c_str());
+        return 0;
+    }
+
+    // Update projectDir if a path was provided via command line
+    if (!projectPathArg.empty()) {
+        EditorUi::projectDir = projectPathArg;
+    }
+
     if (!glfwInit()) {
         LOG_ERROR("Failed to initialize GLFW.");
         return -1;
@@ -274,72 +323,54 @@ int main() {
         return -1;
     }
     g_MainWindow = window;
-    Engine::Input::SetWindow(window); // Set window for Engine's Input system
+    Engine::Input::SetWindow(window);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(0); // vsync
 
+    // --- 1. Load Window Icon (Fallback Pattern) ---
     GLFWimage icon;
-    icon.pixels = stbi_load("../../icons/ZuesLogoNoBG.png", &icon.width, &icon.height, nullptr, 4);
+    // Try current directory first, then relative path
+    icon.pixels = stbi_load("icons/ZuesLogoNoBG.png", &icon.width, &icon.height, nullptr, 4);
+    if (!icon.pixels) {
+        icon.pixels = stbi_load("../../icons/ZuesLogoNoBG.png", &icon.width, &icon.height, nullptr, 4);
+    }
+
     if (icon.pixels) {
         glfwSetWindowIcon(window, 1, &icon);
         stbi_image_free(icon.pixels);
     } else {
-        // Note: Can't use LOG_WARN here - Engine not initialized yet
-        fprintf(stderr, "Warning: Failed to load icon: ../../icons/ZuesLogoNoBG.png - using default icon\n");
+        fprintf(stderr, "Warning: Failed to load icon from current directory or relative paths.\n");
     }
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         LOG_ERROR("Failed to initialize GLAD.");
         return -1;
     }
-    printf("[DEBUG] GLAD loaded\n"); fflush(stdout);
 
-    // Initialize renderer after GLAD is loaded (OpenGL context ready)
     Engine::Renderer::Init();
-    printf("[DEBUG] Renderer::Init done\n"); fflush(stdout);
-
     Engine::Initialize(true, true, "0.0.0.0", 7777, true);
-    printf("[DEBUG] Engine::Initialize done\n"); fflush(stdout);
-
     Engine::IEventSystem->Subscribe<Engine::LogEvent>(LoggerUI::GetLogEvent);
-    printf("[DEBUG] EventSystem subscribe done\n"); fflush(stdout);
 
-    // Register editor-specific systems
-    printf("[DEBUG] About to register ViewportCameraSystem\n"); fflush(stdout);
     Engine::Core::GetCurrentWorld()->RegisterSystem(std::make_unique<ViewportCameraSystem>());
-    printf("[DEBUG] ViewportCameraSystem registered\n"); fflush(stdout);
 
-    // TODO: Fix DLL boundary issues with inline functions in SceneSetup.h
-    // These inline functions compile into the Editor and make calls to DLL functions,
-    // causing heap corruption due to mixed allocators
-    // Engine::SpawnViewportCamera(Engine::Core::GetCurrentWorld());
-    // Engine::SetupHierarchyTestScene(Engine::Core::GetCurrentWorld(), 0);
-    printf("[DEBUG] SpawnViewportCamera and SetupHierarchyTestScene skipped (DLL boundary fix needed)\n"); fflush(stdout);
-
-    printf("[DEBUG] About to call ProjectManager::OpenOrCreate\n"); fflush(stdout);
     if (!Engine::ProjectManager::OpenOrCreate(EditorUi::projectDir)) {
         LOG_ERROR("Failed to open or create project at " + EditorUi::projectDir.string());
         return -1;
     }
-    printf("[DEBUG] ProjectManager done\n"); fflush(stdout);
 
-    // Initialize hot-reload system for game DLL
+    Engine::SpawnEditorViewportCamera(Engine::Core::GetCurrentWorld());
+
     if (!GameDLLLoader::Get().Initialize(EditorUi::projectDir)) {
         LOG_WARN("Failed to initialize GameDLLLoader - hot-reload disabled");
     } else {
-        // Enable auto-reload by default
         GameDLLLoader::Get().EnableAutoReload(true);
         LOG_INFO("Game DLL hot-reload system initialized");
     }
-    printf("[DEBUG] GameDLLLoader done\n"); fflush(stdout);
 
     Engine::TextureManager::ScanAndRegisterAllSprites(EditorUi::projectDir.string());
-    printf("[DEBUG] TextureManager done\n"); fflush(stdout);
-
     RegisterBuiltInInspectors();
-    printf("[DEBUG] RegisterBuiltInInspectors done\n"); fflush(stdout);
 
-    // --- ImGui ---
+    // --- ImGui Setup ---
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -347,42 +378,45 @@ int main() {
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
-    // --- 1. Load Main Font (Exo2) ---
-    // Note: exe is in bin/, fonts are in ../../fonts/
-    const ImFont* exo2Font = io.Fonts->AddFontFromFileTTF("../../fonts/Exo2-VariableFont_wght.ttf", 18.0f);
-    if (!exo2Font) LOG_ERROR("Failed to load Exo2 font to Editor!");
-    const uint32_t engineFont = Engine::Renderer::LoadFont("../../fonts/Exo2-VariableFont_wght.ttf", 64);
+    // Set ImGui ini file path to be in the same directory as the editor executable
+    static std::string iniPath = (GetEditorExecutableDirectory() / "editor_layout.ini").string();
+    io.IniFilename = iniPath.c_str();
 
-    // --- 2. Load Icon Font (IconLibs.ttf / EngineerFont) ---
-    // The EngineerFont glyphs are typically in the 0xF800 to 0xF8FF range.
-    // Setting a broader range 0xEF80-0xF8FF to be safe.
+    // --- 2. Load Main UI Font (Exo2) with Fallback ---
+    ImFont* exo2Font = io.Fonts->AddFontFromFileTTF("fonts/Exo2-VariableFont_wght.ttf", 18.0f);
+    if (!exo2Font) {
+        exo2Font = io.Fonts->AddFontFromFileTTF("../../fonts/Exo2-VariableFont_wght.ttf", 18.0f);
+    }
+
+    if (!exo2Font) {
+        LOG_ERROR("Failed to load Exo2 font from current directory or relative paths!");
+    }
+
+    // --- 3. Load Engine World-Space Font with Fallback ---
+    uint32_t engineFont = Engine::Renderer::LoadFont("fonts/Exo2-VariableFont_wght.ttf", 64);
+    if (engineFont == 0) {
+        engineFont = Engine::Renderer::LoadFont("../../fonts/Exo2-VariableFont_wght.ttf", 64);
+    }
+
+    // --- 4. Load Icon Font (IconLibs) with Fallback ---
     static constexpr ImWchar icons_ranges[] = { 0xE000, 0xF8FF, 0 };
-
-
     ImFontConfig icons_config;
     icons_config.MergeMode = true;
     icons_config.PixelSnapH = true;
     snprintf(icons_config.Name, IM_ARRAYSIZE(icons_config.Name), "IconLibs");
 
+    // Attempt Merge from current directory, then relative path
+    ImFont* mergedFont = io.Fonts->AddFontFromFileTTF("fonts/IconLibs.ttf", 18.0f, &icons_config, icons_ranges);
+    if (!mergedFont) {
+        mergedFont = io.Fonts->AddFontFromFileTTF("../../fonts/IconLibs.ttf", 18.0f, &icons_config, icons_ranges);
+    }
 
-    // Load and merge the icon font
-    const ImFont* mergedFont = io.Fonts->AddFontFromFileTTF(
-        "../../fonts/IconLibs.ttf",
-        18.0f, // Size must match the size of the main font (exo2Font)
-        &icons_config,
-        icons_ranges
-    );
-
-    if (!mergedFont) LOG_ERROR("Failed to load IconLibs font!");
-
-    // --- REMOVED: io.Fonts->Build(); ---
-    // The ImGui backend (ImGui_ImplOpenGL3_Init) will now handle the font build internally,
-    // ensuring it happens *after* the necessary texture flags are set.
+    if (!mergedFont) {
+        LOG_ERROR("Failed to load IconLibs font from current directory or relative paths!");
+    }
 
     ApplyDarkMinimalTheme();
-    //ImGui::StyleColorsClassic();
 
-    // The backend initializes the renderer and sets the required flags
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
@@ -393,61 +427,38 @@ int main() {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         Engine::Input::UpdateState();
-
-        // Check for game DLL changes (auto hot-reload)
         GameDLLLoader::Get().CheckForChanges();
 
-        // ----------------------------------------------------
-        // CLEAR THE MAIN WINDOW (BACKGROUND FOR IMGUI)
-        // ----------------------------------------------------
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
         glClearColor(0.07f, 0.06f, 0.09f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
-        // ----------------------------------------------------
 
+        Engine::Renderer::Render();
+        Engine::Renderer::BeginBatch();
 
-        // --- 1. Render Scene and Gizmos to the FBO ---
-        // Both the scene and the draws are submitted to the same batch.
-        Engine::Renderer::Render(); // Binds and clears the FBO
-
-        Engine::Renderer::BeginBatch(); // Start a single batch for the viewport
-
-        // Draw test text at world origin (0,0)
-        // Camera halfHeight = 10.0f means viewport shows -10 to +10 vertically (20 units total)
-        // worldScale = 0.1f means 10 pixels = 1 world unit (18px font = 1.8 world units tall)
-        //Engine::Renderer::DrawText(engineFont, "Test", {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, 1.0f, 0.1f);
-
-        // A. Submit main scene objects first
-        // Use Game mode when in play mode to run physics and game systems
         const System::SystemRole updateMode = EditorUi::isPlayMode ? System::SystemRole::Game : System::SystemRole::Editor;
         Engine::Update(updateMode);
 
-        // B. Submit editor gizmos so they appear on top of the scene (only in editor mode)
         if (!EditorUi::isPlayMode) {
             DrawEditionStuff();
             HierarchyOperations::DoHierarchyOperations();
         }
 
-        Engine::Renderer::EndBatch(); // Draws everything to the FBO
+        Engine::Renderer::EndBatch();
 
-        // Unbind the FBO so ImGui renders to the screen
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        // --- 2. Render ImGui UI on Top ---
-        // ImGui now renders last, on top of the main window's background.
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        EditorUi::DrawWindowUi(); // Displays the FBO texture (scene + gizmos)
+        EditorUi::DrawWindowUi();
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-
-        // --- Finalize Frame ---
         if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
             GLFWwindow* backup_context = glfwGetCurrentContext();
             ImGui::UpdatePlatformWindows();

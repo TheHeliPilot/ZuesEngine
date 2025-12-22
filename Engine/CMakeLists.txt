@@ -110,20 +110,26 @@ elseif (UNIX)
 endif()
 
 # Set output directories for the DLL
+# When built as subdirectory, use parent's output dir; otherwise use local bin
+if(DEFINED ZUES_OUTPUT_DIR)
+    set(ENGINE_OUTPUT_DIR "${ZUES_OUTPUT_DIR}")
+else()
+    set(ENGINE_OUTPUT_DIR "${CMAKE_BINARY_DIR}/bin")
+endif()
+
 set_target_properties(ZuesEngine PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    RUNTIME_OUTPUT_DIRECTORY "${ENGINE_OUTPUT_DIR}"
+    LIBRARY_OUTPUT_DIRECTORY "${ENGINE_OUTPUT_DIR}"
+    ARCHIVE_OUTPUT_DIRECTORY "${ENGINE_OUTPUT_DIR}/lib"
     WINDOWS_EXPORT_ALL_SYMBOLS OFF
 )
 
-# On Windows, copy the DLL to a shared bin directory for easy access
-if(WIN32)
-    add_custom_command(TARGET ZuesEngine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/../bin"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:ZuesEngine>
-            "${CMAKE_SOURCE_DIR}/../bin/"
-        COMMENT "Copying ZuesEngine.dll to shared bin directory"
+# For multi-config generators (Visual Studio, Xcode)
+foreach(CONFIG_TYPE Debug Release RelWithDebInfo MinSizeRel)
+    string(TOUPPER ${CONFIG_TYPE} CONFIG_TYPE_UPPER)
+    set_target_properties(ZuesEngine PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY_${CONFIG_TYPE_UPPER} "${ENGINE_OUTPUT_DIR}"
+        LIBRARY_OUTPUT_DIRECTORY_${CONFIG_TYPE_UPPER} "${ENGINE_OUTPUT_DIR}"
+        ARCHIVE_OUTPUT_DIRECTORY_${CONFIG_TYPE_UPPER} "${ENGINE_OUTPUT_DIR}/lib"
     )
-endif()
+endforeach()

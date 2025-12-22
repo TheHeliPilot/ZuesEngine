@@ -165,11 +165,15 @@ void HierarchyUI::HierarchyWindow()
    GenerateHierarchyItems();
 
    ImVec2 availableSpace = ImGui::GetContentRegionAvail();
-   if (ImGui::InvisibleButton("##background_drop", availableSpace))
+   // Only create the invisible button if we have valid space (prevents zero-size assertion)
+   if (availableSpace.x > 1.0f && availableSpace.y > 1.0f)
    {
-      if (EditorUi::MouseInWindow("Hierarchy") && !EditorUi::selectedEntities.empty())
+      if (ImGui::InvisibleButton("##background_drop", availableSpace))
       {
-         EditorUi::selectedEntities.clear();
+         if (EditorUi::MouseInWindow("Hierarchy") && !EditorUi::selectedEntities.empty())
+         {
+            EditorUi::selectedEntities.clear();
+         }
       }
    }
 

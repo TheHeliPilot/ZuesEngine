@@ -11,9 +11,55 @@
 #include <atomic>
 #include <mutex> // Necessary since std::mutex is now used in the cpp
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 #include "../include/Engine/Core.h"
 
 namespace Engine {
+
+    // Helper function to get the directory where the executable is located
+    std::filesystem::path GetExecutableDirectory() {
+#ifdef _WIN32
+        char modulePath[MAX_PATH];
+        if (GetModuleFileNameA(nullptr, modulePath, MAX_PATH)) {
+            return std::filesystem::path(modulePath).parent_path();
+        }
+#endif
+        // Fallback to current path if platform-specific method fails
+        return std::filesystem::current_path();
+    }
+
+    // Helper function to get the ZuesEngine root directory
+    // This works whether running from bin/ or bin/Debug/ etc.
+    std::filesystem::path GetZuesEngineRoot() {
+        std::filesystem::path exeDir = GetExecutableDirectory();
+
+        // The executable could be in:
+        // - ZuesEngine/bin/ZuesEditor.exe (1 level deep)
+        // - ZuesEngine/bin/Debug/ZuesEditor.exe (2 levels deep)
+        // - ZuesEngine/cmake-build-debug/Editor/ZuesEditor.exe (2+ levels deep)
+
+        // Walk up the directory tree looking for the Engine folder
+        std::filesystem::path current = exeDir;
+        for (int i = 0; i < 5; ++i) { // Check up to 5 levels
+            if (std::filesystem::exists(current / "Engine" / "include" / "Engine") &&
+                std::filesystem::exists(current / "Editor" / "Templates")) {
+                return current;
+            }
+            if (current.has_parent_path() && current.parent_path() != current) {
+                current = current.parent_path();
+            } else {
+                break;
+            }
+        }
+
+        // Fallback: assume we're 2 levels deep from current_path (old behavior)
+        LOG_WARN("Could not find ZuesEngine root from executable path, using fallback");
+        return std::filesystem::current_path().parent_path().parent_path();
+    }
     // Initialize static members (All declared in the fixed header)
     Project* ProjectManager::s_CurrentProject = nullptr;
     const std::string ProjectManager::CONFIG_FILE_NAME = "project.zues";
@@ -26,11 +72,10 @@ namespace Engine {
     BuildParams ProjectManager::s_BuildParams;
 
 
-    // --- Helper 1: Dynamically calculate Engine Include Path --- (UNCHANGED)
+    // --- Helper 1: Dynamically calculate Engine Include Path ---
     std::filesystem::path CalculateEngineIncludePath() {
         try {
-            const std::filesystem::path currentPath = std::filesystem::current_path();
-            const std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
+            const std::filesystem::path zuesEngineRoot = GetZuesEngineRoot();
             const std::filesystem::path engineIncludePath = zuesEngineRoot / "Engine/include/Engine";
 
             if (!std::filesystem::exists(engineIncludePath)) {
@@ -118,15 +163,41 @@ namespace Engine {
         return true;
     }
 
+    // Helper function to find the Templates directory
+    // Checks: 1) exe_dir/Templates (deployed), 2) ZuesEngineRoot/Editor/Templates (dev)
+    std::filesystem::path GetTemplatesDirectory() {
+        std::filesystem::path exeDir = GetExecutableDirectory();
+
+        // First check if Templates folder exists in same directory as executable (deployed build)
+        std::filesystem::path deployedTemplates = exeDir / "Templates";
+        if (std::filesystem::exists(deployedTemplates / "GameProject.cpp.template")) {
+            return deployedTemplates;
+        }
+
+        // Otherwise, look for Editor/Templates in the engine root (development build)
+        std::filesystem::path zuesRoot = GetZuesEngineRoot();
+        std::filesystem::path devTemplates = zuesRoot / "Editor" / "Templates";
+        if (std::filesystem::exists(devTemplates / "GameProject.cpp.template")) {
+            return devTemplates;
+        }
+
+        // Fallback to dev path even if not found (will error later)
+        LOG_WARN("Could not find Templates directory, using fallback");
+        return devTemplates;
+    }
+
     bool ProjectManager::CreateNewProject(const std::filesystem::path& projectPath) {
         try {
             // --- 0. Path Setup & Calculation ---
             std::string projectName = projectPath.filename().string();
             std::filesystem::path sourcePath = projectPath / "Source";
 
-            std::filesystem::path currentPath = std::filesystem::current_path();
-            std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
+            std::filesystem::path zuesEngineRoot = GetZuesEngineRoot();
             std::filesystem::path engineRoot = zuesEngineRoot / "Engine";
+            std::filesystem::path templatesDir = GetTemplatesDirectory();
+
+            LOG_INFO("ZuesEngine root: " + zuesEngineRoot.string());
+            LOG_INFO("Templates directory: " + templatesDir.string());
 
             // Calculate all paths needed for the project and CMakePresets.json
             std::filesystem::path currentEngineIncludePath = CalculateEngineIncludePath();
@@ -174,9 +245,9 @@ namespace Engine {
             configFile << ProjectManager::ENGINE_INCLUDE_KEY << currentEngineIncludePath.string() << "\n";
             configFile.close();
 
-            // 4. Create main C++ source file (UNCHANGED)
+            // 4. Create main C++ source file
             std::filesystem::path mainCppPath = sourcePath / (projectName + ".cpp");
-            std::filesystem::path cppTemplatePath = zuesEngineRoot / "Editor/Templates/GameProject.cpp.template";
+            std::filesystem::path cppTemplatePath = templatesDir / "GameProject.cpp.template";
 
             if (!std::filesystem::exists(cppTemplatePath)) {
                 LOG_ERROR("FATAL: C++ template file not found. Ensure it exists at: " + cppTemplatePath.string());
@@ -200,55 +271,43 @@ namespace Engine {
             mainCppFile << mainTemplate;
             mainCppFile.close();
 
-            // 5. Create Project CMakeLists.txt (UNCHANGED - Source/CMakeLists.txt)
+            // 5. Create Project CMakeLists.txt using template (Source/CMakeLists.txt)
             std::filesystem::path cmakePath = sourcePath / "CMakeLists.txt";
+            std::filesystem::path cmakeTemplatePath = templatesDir / "CMakeLists.txt.template";
+
+            if (!std::filesystem::exists(cmakeTemplatePath)) {
+                LOG_ERROR("FATAL: CMakeLists.txt template file not found. Ensure it exists at: " + cmakeTemplatePath.string());
+                return false;
+            }
+
+            std::ifstream cmakeTemplateFile(cmakeTemplatePath);
+            std::stringstream cmakeBuffer;
+            cmakeBuffer << cmakeTemplateFile.rdbuf();
+            std::string cmakeTemplate = cmakeBuffer.str();
+            cmakeTemplateFile.close();
+
+            // Find the ZuesEngine library path
+            std::filesystem::path zuesEngineLibPath = zuesEngineRoot / "bin" / "ZuesEngine.dll";
+            std::string zuesEngineLib = zuesEngineLibPath.string();
+            replace_slashes(zuesEngineLib);
+
+            // Replace all placeholders in CMakeLists.txt template
+            auto replacePlaceholder = [](std::string& content, const std::string& placeholder, const std::string& value) {
+                size_t pos = 0;
+                while ((pos = content.find(placeholder, pos)) != std::string::npos) {
+                    content.replace(pos, placeholder.length(), value);
+                    pos += value.length();
+                }
+            };
+
+            replacePlaceholder(cmakeTemplate, "{{PROJECT_NAME}}", projectName);
+            replacePlaceholder(cmakeTemplate, "{{ENGINE_INCLUDE_DIR}}", engineIncludePath);
+            replacePlaceholder(cmakeTemplate, "{{GLFW_INCLUDE_DIR}}", glfwIncludePath);
+            replacePlaceholder(cmakeTemplate, "{{GLAD_INCLUDE_DIR}}", gladIncludePath);
+            replacePlaceholder(cmakeTemplate, "{{ZUES_ENGINE_LIB}}", zuesEngineLib);
+
             std::ofstream cmakeFile(cmakePath);
-
-            std::stringstream cmakeTemplate;
-            cmakeTemplate << "# Project-specific CMakeLists.txt for " << projectName << "\n";
-            cmakeTemplate << "cmake_minimum_required(VERSION 3.10)\n";
-            cmakeTemplate << "project(" << projectName << " VERSION 1.0.0)\n\n";
-
-            cmakeTemplate << "set(CMAKE_CXX_STANDARD 23)\n";
-            cmakeTemplate << "set(CMAKE_CXX_STANDARD_REQUIRED ON)\n\n";
-
-            cmakeTemplate << "# Specify the project's main source file\n";
-            cmakeTemplate << "set(PROJECT_SOURCES " << projectName << ".cpp)\n\n";
-
-            cmakeTemplate << "# Create the executable\n";
-            cmakeTemplate << "add_executable(${PROJECT_NAME} WIN32 ${PROJECT_SOURCES})\n\n";
-
-            cmakeTemplate << "# Engine headers are provided via the ENGINE_INCLUDE_DIR CMake argument.\n";
-            cmakeTemplate << "if(NOT ENGINE_INCLUDE_DIR)\n";
-            cmakeTemplate << "    message(FATAL_ERROR \"ENGINE_INCLUDE_DIR is not defined. The game project cannot find Engine headers.\")\n";
-            cmakeTemplate << "endif()\n";
-
-            cmakeTemplate << "if(NOT GLFW_INCLUDE_DIR OR NOT GLAD_INCLUDE_DIR)\n";
-            cmakeTemplate << "    message(FATAL_ERROR \"External library include paths (GLFW/GLAD) are missing. Check ProjectManager::BuildProject for configuration errors.\")\n";
-            cmakeTemplate << "endif()\n";
-
-            cmakeTemplate << "target_include_directories(${PROJECT_NAME} PRIVATE \n";
-            cmakeTemplate << "    ${ENGINE_INCLUDE_DIR}\n";
-            cmakeTemplate << "    ${GLFW_INCLUDE_DIR}\n";
-            cmakeTemplate << "    ${GLAD_INCLUDE_DIR}\n";
-            cmakeTemplate << ")\n\n";
-
-            cmakeTemplate << "# Absolute library paths provided via the ENGINE_LIBS_PATHS CMake argument.\n";
-            cmakeTemplate << "if(NOT ENGINE_LIBS_PATHS)\n";
-            cmakeTemplate << "    message(FATAL_ERROR \"ENGINE_LIBS_PATHS is not defined. The game project cannot find Engine library files.\")\n";
-            cmakeTemplate << "endif()\n";
-
-            cmakeTemplate << "target_link_libraries(${PROJECT_NAME} PRIVATE\n";
-            cmakeTemplate << "    \"${ENGINE_LIBS_PATHS}\"\n";
-            cmakeTemplate << "    opengl32\n";
-            cmakeTemplate << "    Ws2_32\n";
-            cmakeTemplate << "    Gdi32\n";
-            cmakeTemplate << "    winmm\n";
-            cmakeTemplate << ")\n\n";
-
-            cmakeTemplate << "set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}/../Builds\")\n";
-
-            cmakeFile << cmakeTemplate.str();
+            cmakeFile << cmakeTemplate;
             cmakeFile.close();
 
             // 5.5. Create Top-Level CMakeLists.txt (NEW FOR CLION)
@@ -331,9 +390,8 @@ namespace Engine {
 
         const std::string engineIncludePath = s_CurrentProject->EngineIncludePath.string();
 
-        // Calculate ALL Paths (UNCHANGED)
-        std::filesystem::path currentPath = std::filesystem::current_path();
-        std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
+        // Calculate ALL Paths
+        std::filesystem::path zuesEngineRoot = GetZuesEngineRoot();
         std::filesystem::path engineRoot = zuesEngineRoot / "Engine";
 
         std::filesystem::path glfwIncludeDir = engineRoot / "extern/glfw/include";
@@ -363,7 +421,43 @@ namespace Engine {
 
         LOG_INFO("--- Starting Project Build: " + projectName + " (Play on Finish: " + (playOnFinish ? "Yes" : "No") + ") ---");
 
-        // 2. CMake Configure Step (UNCHANGED)
+        // Helper lambda to execute a command and capture output to the logger
+        auto executeAndLog = [](const std::string& command) -> int {
+#ifdef _WIN32
+            // Redirect stderr to stdout so we capture everything
+            std::string fullCommand = command + " 2>&1";
+            FILE* pipe = _popen(fullCommand.c_str(), "r");
+            if (!pipe) {
+                LOG_ERROR("Failed to execute command: " + command);
+                return -1;
+            }
+
+            char buffer[256];
+            while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+                std::string line(buffer);
+                // Remove trailing newline
+                while (!line.empty() && (line.back() == '\n' || line.back() == '\r')) {
+                    line.pop_back();
+                }
+                if (!line.empty()) {
+                    // Check if it's an error/warning line
+                    if (line.find("error") != std::string::npos || line.find("Error") != std::string::npos) {
+                        LOG_ERROR("[Build] " + line);
+                    } else if (line.find("warning") != std::string::npos || line.find("Warning") != std::string::npos) {
+                        LOG_WARN("[Build] " + line);
+                    } else {
+                        LOG_INFO("[Build] " + line);
+                    }
+                }
+            }
+
+            return _pclose(pipe);
+#else
+            return std::system(command.c_str());
+#endif
+        };
+
+        // 2. CMake Configure Step
         std::string cmakeConfigureCommand =
              "cmake -S \"" + projectSourceDir.string() + "\" -B \"" + tempBuildDir.string() + "\""
              + " -DENGINE_INCLUDE_DIR=\"" + engineIncludePath + "\""
@@ -372,29 +466,29 @@ namespace Engine {
              + " -DGLAD_INCLUDE_DIR=\"" + gladIncludeDir.string() + "\"";
 
         LOG_INFO("Executing configure command: " + cmakeConfigureCommand);
-        int result = std::system(cmakeConfigureCommand.c_str());
+        int result = executeAndLog(cmakeConfigureCommand);
 
         if (result != 0) {
-            LOG_ERROR("Project build failed: CMake Configure step failed. Check console output.");
+            LOG_ERROR("Project build failed: CMake Configure step failed with exit code " + std::to_string(result));
             return false;
         }
 
-        // 3. CMake Build Step (UNCHANGED)
+        // 3. CMake Build Step
         std::string cmakeBuildCommand =
              "cmake --build \"" + tempBuildDir.string() + "\" --target " + projectName + " --config Release";
 
         LOG_INFO("Executing build command: " + cmakeBuildCommand);
 
-        result = std::system(cmakeBuildCommand.c_str());
+        result = executeAndLog(cmakeBuildCommand);
 
         const std::filesystem::path buildOutPath = projectRoot / "Builds" / (projectName + ".exe");
         const std::string buildOutPathStr = buildOutPath.string();
 
         if (result == 0) {
-            LOG_INFO("Project built successfully! 🎉");
+            LOG_INFO("Project built successfully!");
             LOG_INFO("Executable Location: " + buildOutPathStr);
 
-            // 4. Play on Finish Logic (NEW)
+            // 4. Play on Finish Logic
             if (playOnFinish) {
                 if (std::filesystem::exists(buildOutPath)) {
                     LOG_INFO("Starting executable: " + buildOutPathStr);
@@ -407,7 +501,7 @@ namespace Engine {
 
             return true;
         } else {
-            LOG_ERROR("Project build failed: Compilation step returned a non-zero exit code. Check console for CMake/Compiler errors.");
+            LOG_ERROR("Project build failed: Compilation step returned exit code " + std::to_string(result));
             return false;
         }
     }
@@ -450,8 +544,7 @@ namespace Engine {
     }
 
     std::filesystem::path CalculateEngineLibrariesPaths() {
-        const std::filesystem::path currentPath = std::filesystem::current_path();
-        const std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
+        const std::filesystem::path zuesEngineRoot = GetZuesEngineRoot();
         const std::filesystem::path engineRoot = zuesEngineRoot / "Engine";
 
         const std::filesystem::path engineLib = engineRoot / "cmake-build-debug/libEngine.a";
@@ -464,15 +557,13 @@ namespace Engine {
     }
 
     std::filesystem::path CalculateGLFWIncludePath() {
-        const std::filesystem::path currentPath = std::filesystem::current_path();
-        const std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
+        const std::filesystem::path zuesEngineRoot = GetZuesEngineRoot();
         const std::filesystem::path engineRoot = zuesEngineRoot / "Engine";
         return engineRoot / "extern/glfw/include";
     }
 
     std::filesystem::path CalculateGLADIncludePath() {
-        const std::filesystem::path currentPath = std::filesystem::current_path();
-        const std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path();
+        const std::filesystem::path zuesEngineRoot = GetZuesEngineRoot();
         const std::filesystem::path engineRoot = zuesEngineRoot / "Engine";
         return engineRoot / "extern/glad/include";
     }

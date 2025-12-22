@@ -1,5 +1,5 @@
 #include "../include/Engine/Input.h"
-#include "../include/Engine/Math.h" // For Vec2 and GetMousePosition
+#include "../include/Engine/ZuesMath.h" // For Vec2 and GetMousePosition
 
 namespace Engine {
 

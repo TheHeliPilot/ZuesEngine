@@ -730,6 +730,9 @@ namespace Engine {
     Math::Vec2 Renderer::ScreenToWorld(const Math::Vec2& screenPos) {
         if (!s_Data) return {};
 
+        // Guard against invalid viewport size (e.g., first frame before SetViewportSize is called)
+        if (s_Data->ViewportWidth <= 0.0f || s_Data->ViewportHeight <= 0.0f) return {};
+
         // 1. Convert Screen Coordinates (Top-Left origin, Y-down) to NDC (Center origin, Y-up)
 
         // X-axis: Map [0, Width] -> [-1, 1]

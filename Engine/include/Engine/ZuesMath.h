@@ -1,12 +1,61 @@
-﻿#include "ZuesAPI.h"
+#ifndef ZUESENGINE_ZUESMATH_H
+#define ZUESENGINE_ZUESMATH_H
 
-#ifndef ZUESENGINE_MATH_H
-#define ZUESENGINE_MATH_H
-
-#include <cmath> // For sin, cos, sqrt
 #include <cstring> // For memset (in Mat4)
+#include "ZuesAPI.h"
 
 namespace Engine::Math {
+
+    // --- Inline math functions using Taylor series (no std:: dependencies) ---
+
+    // Square root using Newton-Raphson iteration
+    inline float Sqrt(float x) {
+        if (x <= 0.0f) return 0.0f;
+        float guess = x * 0.5f;
+        for (int i = 0; i < 8; ++i) {
+            guess = 0.5f * (guess + x / guess);
+        }
+        return guess;
+    }
+
+    // Sine using Taylor series (11 terms for good precision)
+    inline float Sin(float x) {
+        constexpr float PI = 3.14159265359f;
+        constexpr float TWO_PI = 6.28318530718f;
+
+        // Normalize to [-PI, PI]
+        while (x > PI) x -= TWO_PI;
+        while (x < -PI) x += TWO_PI;
+
+        float x2 = x * x;
+        float x3 = x2 * x;
+        float x5 = x3 * x2;
+        float x7 = x5 * x2;
+        float x9 = x7 * x2;
+        float x11 = x9 * x2;
+
+        // Taylor series: sin(x) = x - x^3/3! + x^5/5! - x^7/7! + x^9/9! - x^11/11!
+        return x - (x3 / 6.0f) + (x5 / 120.0f) - (x7 / 5040.0f) + (x9 / 362880.0f) - (x11 / 39916800.0f);
+    }
+
+    // Cosine using Taylor series (11 terms for good precision)
+    inline float Cos(float x) {
+        constexpr float PI = 3.14159265359f;
+        constexpr float TWO_PI = 6.28318530718f;
+
+        // Normalize to [-PI, PI]
+        while (x > PI) x -= TWO_PI;
+        while (x < -PI) x += TWO_PI;
+
+        float x2 = x * x;
+        float x4 = x2 * x2;
+        float x6 = x4 * x2;
+        float x8 = x6 * x2;
+        float x10 = x8 * x2;
+
+        // Taylor series: cos(x) = 1 - x^2/2! + x^4/4! - x^6/6! + x^8/8! - x^10/10!
+        return 1.0f - (x2 / 2.0f) + (x4 / 24.0f) - (x6 / 720.0f) + (x8 / 40320.0f) - (x10 / 3628800.0f);
+    }
 
     // --- Constants ---
     constexpr float PI = 3.14159265359f;
@@ -24,7 +73,7 @@ namespace Engine::Math {
         // Value constructor
         Vec2(const float x_val, const float y_val) : x(x_val), y(y_val) {}
 
-        float Length() const { return std::sqrt(x * x + y * y); }
+        float Length() const { return Sqrt(x * x + y * y); }
 
         Vec2 Normalize() {
             if (const float len = Length(); len != 0.0f) {
@@ -77,7 +126,7 @@ namespace Engine::Math {
         // Value constructor
         Vec3(const float x_val, const float y_val, const float z_val) : x(x_val), y(y_val), z(z_val) {}
 
-        float Length() const { return std::sqrt(x * x + y * y + z * z); }
+        float Length() const { return Sqrt(x * x + y * y + z * z); }
 
         Vec3 Normalize() {
             if (const float len = Length(); len != 0.0f) {
@@ -183,8 +232,8 @@ namespace Engine::Math {
         static Mat4 Rotate(float radians) {
             Mat4 result(1.0f);
 
-            float c = std::cos(radians);
-            float s = std::sin(radians);
+            float c = Cos(radians);
+            float s = Sin(radians);
 
             result.elements[0 + 0 * 4] = c;
             result.elements[1 + 0 * 4] = s;
@@ -365,4 +414,4 @@ namespace Engine::Math {
 
 }
 
-#endif //ZUESENGINE_MATH_H
+#endif //ZUESENGINE_ZUESMATH_H

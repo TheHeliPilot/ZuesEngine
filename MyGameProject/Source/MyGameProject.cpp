@@ -127,7 +127,7 @@ int main() {
         return -1;
     }
 
-    Engine::Initialize(Engine::Network::Role::None, "0.0.0.0", 7777);
+    Engine::Initialize(false, true, "0.0.0.0", 7777);
 
     const uint32_t GAME_FBO_ID = 1;
     int display_w = 1280, display_h = 720;

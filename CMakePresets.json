@@ -1,0 +1,75 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "description": "Debug build with all components",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ZUES_BUILD_EDITOR": "ON",
+        "ZUES_BUILD_LAUNCHER": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "description": "Release build for distribution",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ZUES_BUILD_EDITOR": "ON",
+        "ZUES_BUILD_LAUNCHER": "ON"
+      }
+    },
+    {
+      "name": "debug-ninja",
+      "displayName": "Debug (Ninja)",
+      "description": "Debug build using Ninja (faster incremental builds)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/cmake-build-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ZUES_BUILD_EDITOR": "ON",
+        "ZUES_BUILD_LAUNCHER": "ON"
+      }
+    },
+    {
+      "name": "release-ninja",
+      "displayName": "Release (Ninja)",
+      "description": "Release build using Ninja",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/cmake-build-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ZUES_BUILD_EDITOR": "ON",
+        "ZUES_BUILD_LAUNCHER": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug-build",
+      "configurePreset": "debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "release-build",
+      "configurePreset": "release",
+      "configuration": "Release"
+    },
+    {
+      "name": "debug-ninja-build",
+      "configurePreset": "debug-ninja"
+    },
+    {
+      "name": "release-ninja-build",
+      "configurePreset": "release-ninja"
+    }
+  ]
+}

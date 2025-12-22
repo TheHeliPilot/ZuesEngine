@@ -1,8 +1,10 @@
 ﻿#pragma once
+#include <cmath>  // Must be before imgui for math function declarations
 #include <filesystem>
 #include <string>
 #include <vector>
 #include <functional>
+#include <ZuesMath.h>
 #include <EventSystem/Events.h>
 
 #include "imgui.h"

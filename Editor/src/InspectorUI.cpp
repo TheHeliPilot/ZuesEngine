@@ -130,7 +130,18 @@ bool InspectorUI::DrawJsonComponentEditor(
         ImGui::Indent();
 
         for (auto& [key, value] : j.items()) {
-            changed |= DrawJsonField(key.c_str(), value);
+            // Skip the "m0", "m1", etc. wrapper keys added by serialization
+            // and draw their contents directly
+            if (key.size() >= 2 && key[0] == 'm' && std::isdigit(key[1])) {
+                // This is a wrapper key (m0, m1, etc.) - draw contents directly
+                if (value.is_object()) {
+                    for (auto& [innerKey, innerValue] : value.items()) {
+                        changed |= DrawJsonField(innerKey.c_str(), innerValue);
+                    }
+                }
+            } else {
+                changed |= DrawJsonField(key.c_str(), value);
+            }
         }
 
         ImGui::Unindent();

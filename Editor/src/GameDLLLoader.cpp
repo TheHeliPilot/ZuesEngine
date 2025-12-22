@@ -5,6 +5,14 @@
 #include <atomic>
 #include <fstream>
 #include <sstream>
+#include <cstdio>
+
+#if defined(_WIN32) || defined(_WIN64)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
 
 namespace Editor {
 
@@ -202,15 +210,126 @@ namespace Editor {
             return;
         }
 
+        // Helper lambda to execute command and capture output to logger (no window)
+        auto executeAndLog = [](const std::string& command) -> int {
+#if defined(_WIN32) || defined(_WIN64)
+            // Create pipes for stdout/stderr
+            SECURITY_ATTRIBUTES sa;
+            sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+            sa.bInheritHandle = TRUE;
+            sa.lpSecurityDescriptor = nullptr;
+
+            HANDLE hStdOutRead, hStdOutWrite;
+            if (!CreatePipe(&hStdOutRead, &hStdOutWrite, &sa, 0)) {
+                LOG_ERROR("Failed to create pipe for command output");
+                return -1;
+            }
+            SetHandleInformation(hStdOutRead, HANDLE_FLAG_INHERIT, 0);
+
+            // Set up process info
+            STARTUPINFOA si = {};
+            si.cb = sizeof(si);
+            si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+            si.wShowWindow = SW_HIDE;
+            si.hStdOutput = hStdOutWrite;
+            si.hStdError = hStdOutWrite;
+
+            PROCESS_INFORMATION pi = {};
+
+            // Redirect stderr to stdout in command
+            std::string fullCommand = "cmd /c " + command + " 2>&1";
+
+            // Create process with no window
+            if (!CreateProcessA(
+                    nullptr,
+                    const_cast<char*>(fullCommand.c_str()),
+                    nullptr,
+                    nullptr,
+                    TRUE,
+                    CREATE_NO_WINDOW,
+                    nullptr,
+                    nullptr,
+                    &si,
+                    &pi)) {
+                LOG_ERROR("Failed to execute command: " + command);
+                CloseHandle(hStdOutWrite);
+                CloseHandle(hStdOutRead);
+                return -1;
+            }
+
+            // Close write end of pipe (we only read)
+            CloseHandle(hStdOutWrite);
+
+            // Read output
+            char buffer[256];
+            DWORD bytesRead;
+            std::string lineBuffer;
+
+            while (ReadFile(hStdOutRead, buffer, sizeof(buffer) - 1, &bytesRead, nullptr) && bytesRead > 0) {
+                buffer[bytesRead] = '\0';
+                lineBuffer += buffer;
+
+                // Process complete lines
+                size_t pos;
+                while ((pos = lineBuffer.find('\n')) != std::string::npos) {
+                    std::string line = lineBuffer.substr(0, pos);
+                    lineBuffer = lineBuffer.substr(pos + 1);
+
+                    // Remove trailing \r if present
+                    if (!line.empty() && line.back() == '\r') {
+                        line.pop_back();
+                    }
+
+                    if (!line.empty()) {
+                        if (line.find("error") != std::string::npos || line.find("Error") != std::string::npos) {
+                            LOG_ERROR("[Build] " + line);
+                        } else if (line.find("warning") != std::string::npos || line.find("Warning") != std::string::npos) {
+                            LOG_WARN("[Build] " + line);
+                        } else {
+                            LOG_INFO("[Build] " + line);
+                        }
+                    }
+                }
+            }
+
+            // Process any remaining content
+            if (!lineBuffer.empty()) {
+                if (lineBuffer.find("error") != std::string::npos || lineBuffer.find("Error") != std::string::npos) {
+                    LOG_ERROR("[Build] " + lineBuffer);
+                } else if (lineBuffer.find("warning") != std::string::npos || lineBuffer.find("Warning") != std::string::npos) {
+                    LOG_WARN("[Build] " + lineBuffer);
+                } else {
+                    LOG_INFO("[Build] " + lineBuffer);
+                }
+            }
+
+            CloseHandle(hStdOutRead);
+
+            // Wait for process to finish
+            WaitForSingleObject(pi.hProcess, INFINITE);
+
+            DWORD exitCode;
+            GetExitCodeProcess(pi.hProcess, &exitCode);
+
+            CloseHandle(pi.hProcess);
+            CloseHandle(pi.hThread);
+
+            return static_cast<int>(exitCode);
+#else
+            return std::system(command.c_str());
+#endif
+        };
+
         if (m_BuildProgressCallback) m_BuildProgressCallback("Running CMake...", 0.3f);
 
         // CMake configure command - use BUILD_AS_DLL=ON for the game project template
         std::string configureCmd = "cmake -S \"" + sourcePath.string() + "\" -B \"" + buildDir.string() +
                                    "\" -DBUILD_AS_DLL=ON -DCMAKE_BUILD_TYPE=Debug";
 
-        int result = std::system(configureCmd.c_str());
+        LOG_INFO("Executing: " + configureCmd);
+        int result = executeAndLog(configureCmd);
         if (result != 0) {
-            m_LastError = "CMake configure failed";
+            m_LastError = "CMake configure failed with exit code " + std::to_string(result);
             LOG_ERROR(m_LastError);
             m_IsBuildInProgress = false;
             m_Status = GameDLLStatus::Error;
@@ -222,9 +341,10 @@ namespace Editor {
         // CMake build command - build GameDLL target
         std::string buildCmd = "cmake --build \"" + buildDir.string() + "\" --target GameDLL --config Debug";
 
-        result = std::system(buildCmd.c_str());
+        LOG_INFO("Executing: " + buildCmd);
+        result = executeAndLog(buildCmd);
         if (result != 0) {
-            m_LastError = "Compilation failed";
+            m_LastError = "Compilation failed with exit code " + std::to_string(result);
             LOG_ERROR(m_LastError);
             m_IsBuildInProgress = false;
             m_Status = GameDLLStatus::Error;
