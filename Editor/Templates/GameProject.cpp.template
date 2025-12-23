@@ -24,8 +24,10 @@
 
 // ============================================================================
 // CUSTOM COMPONENT EXAMPLE
-// Components are data containers attached to entities. They are automatically
-// serialized using nlohmann::json when you implement to_json/from_json.
+// Components are data containers attached to entities. Use ZUES_COMPONENT_JSON
+// for tolerant serialization that handles schema changes gracefully:
+// - New fields get default values when loading old saves
+// - Removed fields are silently ignored when loading
 // ============================================================================
 //
 // namespace Game {
@@ -33,23 +35,10 @@
 //         float health = 100.0f;
 //         float speed = 5.0f;
 //         int score = 0;
-//
-//         // JSON serialization - required for save/load and inspector
-//         friend void to_json(nlohmann::json& j, const PlayerComponent& p) {
-//             j = nlohmann::json{
-//                 {"health", p.health},
-//                 {"speed", p.speed},
-//                 {"score", p.score}
-//             };
-//         }
-//
-//         friend void from_json(const nlohmann::json& j, PlayerComponent& p) {
-//             p.health = j.value("health", 100.0f);
-//             p.speed = j.value("speed", 5.0f);
-//             p.score = j.value("score", 0);
-//         }
 //     };
 // }
+// // Tolerant serialization - must be OUTSIDE namespace for ADL to work
+// ZUES_COMPONENT_JSON(Game::PlayerComponent, health, speed, score)
 
 // ============================================================================
 // CUSTOM SYSTEM EXAMPLE
@@ -91,18 +80,17 @@
 // ============================================================================
 #ifdef GAME_DLL_EXPORTS
 
-// Pointer to the world - set during Init for use in registration
-static World* s_World = nullptr;
+// Store world pointer for component registration
+static World* g_GameWorld = nullptr;
+std::map<size_t, std::function<std::unique_ptr<IComponentArray>()>>* g_EditorComponentRegistry = nullptr;
 
 GAME_API_C int GameDLL_GetVersion() {
     return GAME_DLL_INTERFACE_VERSION;
 }
 
-GAME_API_C void GameDLL_Init(World* world, std::map<Engine::ECS::Component::TypeID, Engine::ECS::Component::ComponentCreator>* compReg) {
-    std::cout << "[{{PROJECT_NAME}}] Game initialized\n";
-    s_World = world;
-    // Called when the DLL is loaded in the editor
-    // Add any initialization code here
+GAME_API_C void GameDLL_Init(World* world, std::map<size_t, std::function<std::unique_ptr<IComponentArray>()>>* registryPtr) {
+    g_GameWorld = world;
+    g_EditorComponentRegistry = registryPtr;
 }
 
 GAME_API_C void GameDLL_Update(float deltaTime) {
@@ -112,24 +100,25 @@ GAME_API_C void GameDLL_Update(float deltaTime) {
 
 GAME_API_C void GameDLL_Shutdown() {
     std::cout << "[{{PROJECT_NAME}}] Game shutdown\n";
-    s_World = nullptr;
-    // Called when the DLL is about to be unloaded
-    // Clean up any resources here
+    g_GameWorld = nullptr;
+    g_EditorComponentRegistry = nullptr;
 }
 
 GAME_API_C void GameDLL_RegisterComponents() {
-    std::cout << "[{{PROJECT_NAME}}] Registering components\n";
-    if (!s_World) return;
-
-    // ============================================================================
-    // REGISTER YOUR CUSTOM COMPONENTS HERE
-    // Use RegisterComponentSafe for hot-reload support (preserves component data)
-    // ============================================================================
-    //
-    // s_World->RegisterComponentSafe<Game::PlayerComponent>("PlayerComponent");
-    //
-    // Note: The string name must be unique and consistent across reloads.
-    // This is how the engine tracks components during hot-reload.
+    if (g_GameWorld && g_EditorComponentRegistry) {
+        // ============================================================================
+        // REGISTER YOUR CUSTOM COMPONENTS HERE
+        // ============================================================================
+        //
+        // // 1. Register the Serializer (handles save/load and inspector)
+        // g_GameWorld->RegisterComponentSafe<Game::PlayerComponent>("PlayerComponent");
+        //
+        // // 2. Register the DATA ARRAY (required for ECS to create component storage)
+        // size_t id = g_GameWorld->GetComponentRegistry().GetIDByName("PlayerComponent");
+        // (*g_EditorComponentRegistry)[id] = []() -> std::unique_ptr<IComponentArray> {
+        //     return std::make_unique<ComponentArray<Game::PlayerComponent>>();
+        // };
+    }
 }
 
 // Helper to register a system with proper metadata for the Systems UI
@@ -160,8 +149,6 @@ GAME_API_C void GameDLL_RegisterSystems(World* world) {
     //   - Game: Only runs during play mode
     //   - Shared: Runs in both editor and play mode
     //   - Editor: Only runs in editor mode (not recommended for game DLL)
-    //
-    // isRequired: If true, the system cannot be disabled in the Systems UI
 }
 
 // Optional: State preservation for hot-reload

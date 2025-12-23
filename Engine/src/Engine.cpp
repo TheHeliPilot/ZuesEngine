@@ -119,8 +119,10 @@ namespace Engine {
     // Helper to create a system with proper metadata and add to registry
     template<typename T>
     static void RegisterSystemWithMetadata(World* world, const std::string& name, System::SystemRole role, bool isRequired) {
-        // Register in the system registry for UI/serialization
-        world->GetSystemRegistry().RegisterSystem<T>(name, role, isRequired, false);
+        // Register in the system registry for UI/serialization (only if not already registered)
+        if (!world->GetSystemRegistry().HasSystem(name)) {
+            world->GetSystemRegistry().RegisterSystem<T>(name, role, isRequired, false);
+        }
 
         // Create and add the actual system instance
         auto system = std::make_unique<T>();
