@@ -220,7 +220,7 @@ inline bool World::SaveToJson(const std::string& filename) const {
         Engine::ECS::Component::GetTypeID<Engine::ECS::Component::ViewportCameraTag>();
 
     for (EntityIndex i = 0; i < entityLookup.size(); ++i) {
-        if (const auto&[generation, archetypePtr, archetypeIndex] = entityLookup[i]; archetypePtr && generation == EntityID(i, generation).GetGeneration()) {
+        if (const auto&[generation, archetypePtr, archetypeIndex, hasUnknown] = entityLookup[i]; archetypePtr && generation == EntityID(i, generation).GetGeneration()) {
 
             auto currentArchetype = static_cast<Archetype*>(archetypePtr);
 
@@ -240,21 +240,26 @@ inline bool World::SaveToJson(const std::string& filename) const {
             Engine::SerializedEntity se;
             se.id = currentEntityID; // se.id now contains the correct name for JSON serialization
 
-            for (const auto&[fst, snd] : currentArchetype->componentArrays) {
-                Engine::ECS::Component::TypeID compID = fst;
+            for (const auto& [compID, snd] : currentArchetype->componentArrays) {
                 IComponentArray* compArray = snd.get();
-
                 Engine::IComponentSerializer* serializer = componentSerializationRegistry.GetSerializer(compID);
-                json componentData = serializer->SerializeComponent(compArray, archetypeIndex);
 
                 Engine::SerializedComponent sc;
                 sc.typeID = compID;
-                sc.data = componentData;
-                se.components.push_back(std::move(sc));
+                sc.data = serializer->SerializeComponent(compArray, archetypeIndex);
 
-                std::stringstream ss_comp;
-                ss_comp << "    - Component ID " << compID << " serialized data: " << componentData.dump();
-                LOG_INFO(ss_comp.str());
+                // Resolve the name (e.g., "PlayerComponent") so it's saved to the file
+                sc.typeName = componentSerializationRegistry.GetTypeName(compID);
+
+                se.components.push_back(std::move(sc));
+            }
+
+            // Also include any dormant components for this entity so we don't lose data
+            EntityIndex entityIndex = currentEntityID.GetIndex();
+            if (auto dormantIt = dormantData.find(entityIndex); dormantIt != dormantData.end()) {
+                for (const auto& dormantComp : dormantIt->second) {
+                    se.components.push_back(dormantComp);
+                }
             }
 
             snapshot.entities.push_back(std::move(se));
@@ -282,7 +287,6 @@ inline bool World::SaveToJson(const std::string& filename) const {
         return false;
     }
 }
-
 inline bool World::LoadFromJson(const std::string& filename) {
     std::stringstream ss_start;
     ss_start << "World Load: Starting load process from file: " << filename;
@@ -291,9 +295,7 @@ inline bool World::LoadFromJson(const std::string& filename) {
     try {
         std::ifstream ifs(filename);
         if (!ifs.is_open()) {
-            std::stringstream ss_error;
-            ss_error << "Filestream didnt open! File: " << filename;
-            LOG_ERROR(ss_error.str());
+            LOG_ERROR("Filestream didnt open! File: " + filename);
             return false;
         }
 
@@ -301,65 +303,95 @@ inline bool World::LoadFromJson(const std::string& filename) {
         ifs >> j;
         LOG_INFO("World Load: Successfully parsed JSON from file.");
 
-        const auto [version, entities] = j.get<Engine::WorldSnapshot>();
+        // We load into a local object so we can modify the components inside it
+        auto snapshot = j.get<Engine::WorldSnapshot>();
+        auto& entities = snapshot.entities;
+
         std::stringstream ss_count;
         ss_count << "World Load: WorldSnapshot has " << entities.size() << " entities.";
         LOG_INFO(ss_count.str());
 
+        // Reset world state
         entityLookup.clear();
         freeIndices.clear();
         archetypes.clear();
+        dormantData.clear();  // Clear any previous dormant data
         LOG_INFO("World Load: Cleared existing world state.");
 
-        for (const auto&[id, components] : entities) {
+        // 1. First Pass: Resolve TypeIDs and create Archetypes
+        for (auto&[id, components] : entities) {
             EntityIndex index = id.GetIndex();
             EntityGeneration generation = id.GetGeneration();
-            std::stringstream ss_entity;
-            ss_entity << "  Loading Entity ID: " << id.id << " (Target Index: " << index << ", Generation: " << generation << ")";
-            LOG_INFO(ss_entity.str());
 
             if (index >= entityLookup.size()) {
                 entityLookup.resize(index + 1);
-                std::stringstream ss_resize;
-                ss_resize << "    Resizing entity lookup table to size: " << entityLookup.size();
-                LOG_INFO(ss_resize.str());
             }
 
             ComponentSignature newSignature;
-            for (const auto& sc : components) {
-                newSignature.set(sc.typeID);
+            std::vector<Engine::SerializedComponent> unknownComponents;
+            std::vector<Engine::SerializedComponent> knownComponents;
+
+            // Loop through components by reference to allow modification of typeID
+            for (auto& sc : components) {
+                // Check if component has a valid serializer (not just a name)
+                bool hasValidSerializer = false;
+
+                if (!sc.typeName.empty() && componentSerializationRegistry.HasName(sc.typeName)) {
+                    // Update the volatile ID based on the persistent Name
+                    sc.typeID = componentSerializationRegistry.GetIDByName(sc.typeName);
+                    // Must also have a serializer - name alone isn't enough (DLL might be unloaded)
+                    hasValidSerializer = (componentSerializationRegistry.GetSerializer(sc.typeID) != nullptr);
+                } else if (sc.typeName.empty() && sc.typeID < MAX_COMPONENTS) {
+                    // Engine component without typeName (backwards compatibility)
+                    hasValidSerializer = (componentSerializationRegistry.GetSerializer(sc.typeID) != nullptr);
+                }
+
+                if (hasValidSerializer) {
+                    newSignature.set(sc.typeID);
+                    knownComponents.push_back(sc);
+                } else {
+                    // Unknown component from missing DLL - store it as dormant
+                    // DO NOT add to signature - entity stays in archetype with known components only
+                    LOG_WARN("Component '" + sc.typeName + "' is currently unknown. Storing as dormant data.");
+                    unknownComponents.push_back(sc);
+                }
             }
-            std::stringstream ss_sig;
-            ss_sig << "    Determined new Component Signature based on " << components.size() << " components.";
-            LOG_INFO(ss_sig.str());
 
             Archetype* targetArchetype = GetOrCreateArchetype(newSignature);
-            LOG_INFO("    Archetype found/created for signature.");
 
             EntityData& data = entityLookup[index];
             data.generation = generation;
             data.archetypePtr = targetArchetype;
             data.archetypeIndex = targetArchetype->entityIDs.size();
-            targetArchetype->entityIDs.push_back(id);
-            std::stringstream ss_register;
-            ss_register << "    Entity registered to Archetype. New archetype index: " << data.archetypeIndex;
-            LOG_INFO(ss_register.str());
 
-            for (const auto& sc : components) {
+            // Store dormant component data if we have any unknown components
+            if (!unknownComponents.empty()) {
+                dormantData[index] = std::move(unknownComponents);
+                data.hasUnknownComponents = true;
+            } else {
+                data.hasUnknownComponents = false;
+            }
+
+            // Register the entity ID
+            targetArchetype->entityIDs.push_back(id);
+
+            // 2. Second Pass: Deserialize ONLY known component data
+            for (const auto& sc : knownComponents) {
                 Engine::IComponentSerializer* serializer = componentSerializationRegistry.GetSerializer(sc.typeID);
 
-                auto compArrayIt = targetArchetype->componentArrays.find(sc.typeID);
-                if (compArrayIt == targetArchetype->componentArrays.end()) {
-                    throw std::runtime_error("Internal ECS error: Archetype component array missing after creation.");
+                if (!serializer) {
+                    LOG_ERROR("No serializer found for Component ID: " + std::to_string(sc.typeID));
+                    continue;
                 }
 
-                serializer->DeserializeAndAdd(compArrayIt->second.get(), sc.data);
-                std::stringstream ss_comp;
-                ss_comp << "      - Component ID " << sc.typeID << " Deserialized. Data: " << sc.data.dump(2);
-                LOG_INFO(ss_comp.str());
+                auto compArrayIt = targetArchetype->componentArrays.find(sc.typeID);
+                if (compArrayIt != targetArchetype->componentArrays.end() && compArrayIt->second != nullptr) {
+                    serializer->DeserializeAndAdd(compArrayIt->second.get(), sc.data);
+                }
             }
         }
 
+        // Rebuild free list
         size_t freeCount = 0;
         for (size_t i = 0; i < entityLookup.size(); ++i) {
             if (!entityLookup[i].archetypePtr) {
@@ -367,15 +399,17 @@ inline bool World::LoadFromJson(const std::string& filename) {
                 freeCount++;
             }
         }
-        std::stringstream ss_free;
-        ss_free << "World Load: Finished. Recalculated " << freeCount << " free entity indices.";
-        LOG_INFO(ss_free.str());
+
+        // Log summary of dormant data
+        if (!dormantData.empty()) {
+            LOG_WARN("World Load: " + std::to_string(dormantData.size()) + " entities have unknown components. Load the DLL to recover.");
+        }
+
+        LOG_INFO("World Load: Finished. Recalculated " + std::to_string(freeCount) + " free indices.");
 
         return true;
     } catch (const std::exception& e) {
-        std::stringstream ss_catch;
-        ss_catch << "World Load: Exception during world load: " << e.what();
-        LOG_ERROR(ss_catch.str());
+        LOG_ERROR("World Load: Exception: " + std::string(e.what()));
         return false;
     }
 }
@@ -501,4 +535,218 @@ inline std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> World::GetA
 // Non-const overload (calls const version)
 inline std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> World::GetAllComponents(const EntityID entityID) {
     return const_cast<const World*>(this)->GetAllComponents(entityID);
+}
+
+// =========================================================================
+// Dormant Component Access Methods
+// =========================================================================
+
+inline const std::vector<Engine::SerializedComponent>& World::GetDormantComponents(EntityID entityID) const {
+    static const std::vector<Engine::SerializedComponent> empty;
+    auto it = dormantData.find(entityID.GetIndex());
+    if (it != dormantData.end()) {
+        return it->second;
+    }
+    return empty;
+}
+
+inline bool World::HasDormantComponents(EntityID entityID) const {
+    return dormantData.find(entityID.GetIndex()) != dormantData.end();
+}
+
+inline void World::ClearDormantComponents(EntityID entityID) {
+    dormantData.erase(entityID.GetIndex());
+    if (entityID.GetIndex() < entityLookup.size()) {
+        entityLookup[entityID.GetIndex()].hasUnknownComponents = false;
+    }
+}
+
+inline bool World::EntityHasUnknownComponents(EntityID entityID) const {
+    EntityIndex index = entityID.GetIndex();
+    if (index >= entityLookup.size()) return false;
+    if (entityLookup[index].generation != entityID.GetGeneration()) return false;
+    return entityLookup[index].hasUnknownComponents;
+}
+
+inline bool World::HasAnyEntitiesWithUnknownComponents() const {
+    return !dormantData.empty();
+}
+
+// =========================================================================
+// Hot-Reload Recovery Methods (ReloadAndHeal)
+// =========================================================================
+
+inline nlohmann::json World::SerializeToMemory() const {
+    Engine::WorldSnapshot snapshot;
+
+    // Get the TypeID for ViewportCameraTag to skip editor-only entities
+    const Engine::ECS::Component::TypeID viewportCameraTagID =
+        Engine::ECS::Component::GetTypeID<Engine::ECS::Component::ViewportCameraTag>();
+
+    for (EntityIndex i = 0; i < entityLookup.size(); ++i) {
+        if (const auto&[generation, archetypePtr, archetypeIndex, hasUnknown] = entityLookup[i];
+            archetypePtr && generation == EntityID(i, generation).GetGeneration()) {
+
+            auto currentArchetype = static_cast<Archetype*>(archetypePtr);
+
+            // Skip editor-only entities
+            if (currentArchetype->signature.test(viewportCameraTagID)) {
+                continue;
+            }
+
+            EntityID currentEntityID = currentArchetype->entityIDs.at(archetypeIndex);
+
+            Engine::SerializedEntity se;
+            se.id = currentEntityID;
+
+            for (const auto& [compID, snd] : currentArchetype->componentArrays) {
+                if (!snd) continue;  // Skip null arrays (DLL unloaded)
+
+                IComponentArray* compArray = snd.get();
+                Engine::IComponentSerializer* serializer = componentSerializationRegistry.GetSerializer(compID);
+
+                if (!serializer) continue;  // Skip if no serializer (DLL unloaded)
+
+                Engine::SerializedComponent sc;
+                sc.typeID = compID;
+                sc.data = serializer->SerializeComponent(compArray, archetypeIndex);
+                sc.typeName = componentSerializationRegistry.GetTypeName(compID);
+
+                se.components.push_back(std::move(sc));
+            }
+
+            // Also include any dormant components
+            EntityIndex entityIndex = currentEntityID.GetIndex();
+            if (auto dormantIt = dormantData.find(entityIndex); dormantIt != dormantData.end()) {
+                for (const auto& dormantComp : dormantIt->second) {
+                    se.components.push_back(dormantComp);
+                }
+            }
+
+            snapshot.entities.push_back(std::move(se));
+        }
+    }
+
+    return nlohmann::json(snapshot);
+}
+
+inline void World::LoadFromMemory(const nlohmann::json& snapshotJson) {
+    LOG_INFO("World Load: Loading from memory snapshot...");
+
+    try {
+        auto snapshot = snapshotJson.get<Engine::WorldSnapshot>();
+        auto& entities = snapshot.entities;
+
+        LOG_INFO("World Load: Snapshot has " + std::to_string(entities.size()) + " entities.");
+
+        // Reset world state
+        entityLookup.clear();
+        freeIndices.clear();
+        archetypes.clear();
+        dormantData.clear();
+
+        // 1. First Pass: Resolve TypeIDs and create Archetypes
+        for (auto&[id, components] : entities) {
+            EntityIndex index = id.GetIndex();
+            EntityGeneration generation = id.GetGeneration();
+
+            if (index >= entityLookup.size()) {
+                entityLookup.resize(index + 1);
+            }
+
+            ComponentSignature newSignature;
+            std::vector<Engine::SerializedComponent> unknownComponents;
+            std::vector<Engine::SerializedComponent> knownComponents;
+
+            for (auto& sc : components) {
+                // Check if component has a valid serializer (not just a name)
+                bool hasValidSerializer = false;
+
+                if (!sc.typeName.empty() && componentSerializationRegistry.HasName(sc.typeName)) {
+                    sc.typeID = componentSerializationRegistry.GetIDByName(sc.typeName);
+                    // Must also have a serializer - name alone isn't enough (DLL might be unloaded)
+                    hasValidSerializer = (componentSerializationRegistry.GetSerializer(sc.typeID) != nullptr);
+                } else if (sc.typeName.empty() && sc.typeID < MAX_COMPONENTS) {
+                    hasValidSerializer = (componentSerializationRegistry.GetSerializer(sc.typeID) != nullptr);
+                }
+
+                if (hasValidSerializer) {
+                    newSignature.set(sc.typeID);
+                    knownComponents.push_back(sc);
+                } else {
+                    LOG_WARN("Component '" + sc.typeName + "' is currently unknown. Storing as dormant data.");
+                    unknownComponents.push_back(sc);
+                }
+            }
+
+            Archetype* targetArchetype = GetOrCreateArchetype(newSignature);
+
+            EntityData& data = entityLookup[index];
+            data.generation = generation;
+            data.archetypePtr = targetArchetype;
+            data.archetypeIndex = targetArchetype->entityIDs.size();
+
+            if (!unknownComponents.empty()) {
+                dormantData[index] = std::move(unknownComponents);
+                data.hasUnknownComponents = true;
+            } else {
+                data.hasUnknownComponents = false;
+            }
+
+            targetArchetype->entityIDs.push_back(id);
+
+            // 2. Second Pass: Deserialize ONLY known component data
+            for (const auto& sc : knownComponents) {
+                Engine::IComponentSerializer* serializer = componentSerializationRegistry.GetSerializer(sc.typeID);
+
+                if (!serializer) continue;
+
+                auto compArrayIt = targetArchetype->componentArrays.find(sc.typeID);
+                if (compArrayIt != targetArchetype->componentArrays.end() && compArrayIt->second != nullptr) {
+                    serializer->DeserializeAndAdd(compArrayIt->second.get(), sc.data);
+                }
+            }
+        }
+
+        // Rebuild free list
+        size_t freeCount = 0;
+        for (size_t i = 0; i < entityLookup.size(); ++i) {
+            if (!entityLookup[i].archetypePtr) {
+                freeIndices.push_back(i);
+                freeCount++;
+            }
+        }
+
+        if (!dormantData.empty()) {
+            LOG_WARN("World Load: " + std::to_string(dormantData.size()) + " entities still have unknown components.");
+        }
+
+        LOG_INFO("World Load: Memory load complete. " + std::to_string(freeCount) + " free indices.");
+
+    } catch (const std::exception& e) {
+        LOG_ERROR("World Load from Memory: Exception: " + std::string(e.what()));
+    }
+}
+
+inline void World::ReloadAndHeal() {
+    LOG_INFO("=== ReloadAndHeal: Starting recovery of dormant components ===");
+
+    // 1. Serialize the entire world to a JSON snapshot in memory
+    nlohmann::json snapshot = SerializeToMemory();
+
+    // 2. Wipe the world (but keep the registry since DLL is now loaded)
+    entityLookup.clear();
+    freeIndices.clear();
+    archetypes.clear();
+    dormantData.clear();
+
+    // 3. Re-load from the snapshot
+    // Since the DLL is now loaded, previously unknown components will be recognized
+    LoadFromMemory(snapshot);
+
+    if (dormantData.empty()) {
+        LOG_INFO("=== ReloadAndHeal: Complete! All components recovered. ===");
+    } else {
+        LOG_WARN("=== ReloadAndHeal: Some components still unknown (" + std::to_string(dormantData.size()) + " entities affected) ===");
+    }
 }

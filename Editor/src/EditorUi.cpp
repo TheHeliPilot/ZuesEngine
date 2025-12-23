@@ -40,6 +40,11 @@ static std::unordered_map<std::string, ImVec2> g_WindowPosCache;
 static std::unordered_map<std::string, ImVec2> g_WindowSizeCache;
 bool EditorUi::isPlayMode = false;
 std::string EditorUi::savedWorldState = "";
+std::string EditorUi::currentWorldName = "Untitled";
+bool EditorUi::isWorldUnsaved = false;
+
+// Static flag for the modal popup (must be declared before DrawWindowUi)
+static bool s_ShowCannotPlayModal = false;
 
 static ImVec2 FromImVec2(const ImVec2& v) { return {v.x, v.y}; }
 
@@ -320,7 +325,7 @@ static void DrawCustomTitleBar() {
     if (ImGui::BeginPopup("file_popup")) {
         if (ImGui::Selectable("New Project")) { /* action */ }
         if (ImGui::Selectable("Load World"))   { /* action */ }
-        if (ImGui::Selectable("Save World"))  {  }
+        if (ImGui::Selectable("Save World"))  { EditorUi::SaveWorld(); }
         ImGui::EndPopup();
     }
 
@@ -610,6 +615,11 @@ void EditorUi::DrawWindowUi() {
 
     HandleWindowResize();
 
+    // Handle Ctrl+S for saving the world
+    if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false)) {
+        SaveWorld();
+    }
+
     static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     constexpr float title_bar_height = 35.0f;
@@ -646,6 +656,30 @@ void EditorUi::DrawWindowUi() {
     //TextureCutterUI::TextureCutterWindow(); //TODO: fix implementation to actually work
     Editor::HotReloadUI::Draw(); // Hot-reload panel
     //ImGui::ShowDemoWindow();
+
+    // Modal for "Cannot Play" warning when entities have unknown components
+    if (s_ShowCannotPlayModal) {
+        ImGui::OpenPopup("Cannot Enter Play Mode");
+        s_ShowCannotPlayModal = false;
+    }
+
+    if (ImGui::BeginPopupModal("Cannot Enter Play Mode", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "Cannot enter Play Mode!");
+        ImGui::Separator();
+        ImGui::Text("Some entities have unknown components (shown in red in Hierarchy).");
+        ImGui::Text("This typically happens when the Game DLL is not loaded.");
+        ImGui::Spacing();
+        ImGui::Text("To fix this:");
+        ImGui::BulletText("Build the Game DLL (press Build button)");
+        ImGui::BulletText("Ensure the DLL loads successfully");
+        ImGui::BulletText("Unknown components will be automatically recovered");
+        ImGui::Spacing();
+
+        if (ImGui::Button("OK", ImVec2(120, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0,0});
 
@@ -715,10 +749,15 @@ bool EditorUi::IsEntitySelected(const EntityID &entityID)
 void EditorUi::EnterPlayMode() {
       if (isPlayMode) return;
 
-      LOG_INFO("Entering Play Mode...");
-
-      // Save the current world state to a temporary string
+      // Check for entities with unknown components - prevent play mode
       World* world = Engine::Core::GetCurrentWorld();
+      if (world && world->HasAnyEntitiesWithUnknownComponents()) {
+          LOG_ERROR("Cannot enter Play Mode: Some entities have unknown components. Build and load the Game DLL first.");
+          s_ShowCannotPlayModal = true;
+          return;
+      }
+
+      LOG_INFO("Entering Play Mode...");
       if (world) {
           // Save to a temporary file
           const std::string tempPath = "temp_editor_state.json";
@@ -777,4 +816,31 @@ void EditorUi::EnterPlayMode() {
 
       isPlayMode = false;
   }
+
+void EditorUi::SaveWorld() {
+    World* world = Engine::Core::GetCurrentWorld();
+    if (!world) {
+        LOG_ERROR("Cannot save: No active world");
+        return;
+    }
+
+    // Default save path (you can make this more sophisticated later)
+    std::string savePath = projectDir.string() + "/Worlds/" + currentWorldName + ".json";
+
+    // Create Worlds directory if it doesn't exist
+    std::filesystem::create_directories(projectDir.string() + "/Worlds");
+
+    if (world->SaveToJson(savePath)) {
+        isWorldUnsaved = false;
+        LOG_INFO("World saved successfully: " + savePath);
+    } else {
+        LOG_ERROR("Failed to save world: " + savePath);
+    }
+}
+
+void EditorUi::MarkWorldAsModified() {
+    if (!isPlayMode) {
+        isWorldUnsaved = true;
+    }
+}
 

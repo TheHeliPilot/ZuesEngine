@@ -55,11 +55,11 @@ namespace Editor {
         void CheckForChanges(); // Call every frame to check for source changes
 
         // Game DLL interface
-        void CallInit(World* world);
-        void CallUpdate(float deltaTime);
-        void CallShutdown();
-        void CallRegisterComponents();
-        void CallRegisterSystems(World* world);
+        void CallInit(World* world, std::map<Engine::ECS::Component::TypeID, Engine::ECS::Component::ComponentCreator> *compReg) const;
+        void CallUpdate(float deltaTime) const;
+        void CallShutdown() const;
+        void CallRegisterComponents() const;
+        void CallRegisterSystems(World* world) const;
 
         // Status and info
         GameDLLStatus GetStatus() const { return m_Status; }
@@ -84,11 +84,11 @@ namespace Editor {
         // Platform-specific loading
         bool LoadLibrary(const std::filesystem::path& path);
         void FreeLibrary();
-        void* GetSymbol(const char* name);
+        void* GetSymbol(const char* name) const;
 
         // Hot-reload helpers
         bool CopyDLLForLoading();  // Copy DLL to temp location (Windows can't overwrite loaded DLLs)
-        void CleanupTempDLLs();
+        void CleanupTempDLLs() const;
         bool CheckSourceModified();
         void SaveGameState();
         void RestoreGameState();

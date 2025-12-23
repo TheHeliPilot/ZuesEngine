@@ -121,7 +121,7 @@ void World::MoveEntity(const EntityID id, Archetype* currentArchetype, Archetype
     const EntityID entityToSwapID = currentArchetype->entityIDs.back();
 
     // a) Perform Swap-and-Pop for all component arrays in the current archetype.
-    for (auto const& [typeID, arrayPtr] : currentArchetype->componentArrays) {
+    for (const auto &arrayPtr: currentArchetype->componentArrays | std::views::values) {
         arrayPtr->RemoveComponent(indexInCurrent);
     }
 
@@ -144,31 +144,50 @@ void World::MoveEntity(const EntityID id, Archetype* currentArchetype, Archetype
 
 
 Archetype* World::GetOrCreateArchetype(const ComponentSignature& signature) {
-    // 1. Try to find an existing archetype with the exact signature
-    const auto it = archetypes.find(signature);
-    if (it != archetypes.end()) {
+    // 1. Try to find an existing archetype
+    if (const auto it = archetypes.find(signature); it != archetypes.end()) {
         return it->second.get();
     }
 
-    // 2. If not found, create a new one
+    // 2. Create new archetype
     auto newArchetype = std::make_unique<Archetype>();
     newArchetype->signature = signature;
 
-    // 3. For every component type set in the signature, initialize its storage array
+    // 3. Initialize storage arrays
     for (size_t i = 0; i < MAX_COMPONENTS; ++i) {
         if (signature.test(i)) {
-            auto regIt = Engine::ECS::Component::componentRegistry.find(i);
-            if (regIt == Engine::ECS::Component::componentRegistry.end()) {
-                 throw std::runtime_error("Attempted to create Archetype for unregistered component TypeID. Did you forget to call Engine::ECS::Component::RegisterComponent<T>()?");
+            if (auto regIt = Engine::ECS::Component::componentRegistry.find(i); regIt != Engine::ECS::Component::componentRegistry.end()) {
+                // Component is registered (Engine or loaded DLL)
+                newArchetype->componentArrays[i] = regIt->second();
+            } else {
+                // DLL is likely currently unloaded.
+                // We keep the bit in the signature, but leave the array slot null for now.
+                // Our Save/Load fix using 'typeName' handles the data recovery.
+                LOG_WARN("Archetype requires Component ID " + std::to_string(i) + " but no creator found. Skipping array creation until DLL reload.");
+                newArchetype->componentArrays[i] = nullptr;
             }
-
-            // Call the factory function to create the correct ComponentArray<T>
-            newArchetype->componentArrays[i] = regIt->second();
         }
     }
 
     Archetype* rawPtr = newArchetype.get();
     archetypes[signature] = std::move(newArchetype);
-
     return rawPtr;
+}
+
+void World::RemoveDLLComponents(const uint32_t startID) {
+    for (const auto &archetype: archetypes | std::views::values) {
+        // 1. Remove the actual data arrays
+        auto it = archetype->componentArrays.lower_bound(startID);
+        while (it != archetype->componentArrays.end()) {
+            it = archetype->componentArrays.erase(it);
+        }
+
+        // 2. Update the signature inside the archetype instance
+        // We modify 'archetype->signature' because 'mapKey' is const
+        for (uint32_t i = startID; i < MAX_COMPONENTS; ++i) {
+            if (archetype->signature.test(i)) {
+                archetype->signature.set(i, false); // No longer missing const qualifier
+            }
+        }
+    }
 }

@@ -23,7 +23,7 @@ typedef int (*GameDLL_GetVersion_t)();
 
 // Called to initialize game systems
 // world: The ECS world to register components and systems with
-typedef void (*GameDLL_Init_t)(World* world);
+typedef void (*GameDLL_Init_t)(World* world, std::map<Engine::ECS::Component::TypeID, Engine::ECS::Component::ComponentCreator> *compReg);
 
 // Called every frame during play mode
 // deltaTime: Time since last frame in seconds

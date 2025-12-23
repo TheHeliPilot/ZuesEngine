@@ -111,6 +111,8 @@ namespace Engine {
         Engine::ECS::Component::RegisterComponent<ECS::Component::CircleColliderComponent>();
         world->RegisterComponent<ECS::Component::CircleColliderComponent>("Circle Collider");
 
+        world->GetComponentRegistry().MarkEngineRegistrationComplete();
+
         LOG_INFO("Engine components registered successfully");
     }
 

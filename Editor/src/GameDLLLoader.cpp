@@ -6,6 +6,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstdio>
+#include <EditorUi.h>
 
 #if defined(_WIN32) || defined(_WIN64)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -21,21 +22,17 @@ namespace Editor {
         return instance;
     }
 
-    GameDLLLoader::~GameDLLLoader() {
-        Shutdown();
-    }
-
     bool GameDLLLoader::Initialize(const std::filesystem::path& projectPath) {
         m_ProjectPath = projectPath;
 
         // The game DLL will be in the project's build directory (in Debug subdirectory)
-        #if defined(_WIN32) || defined(_WIN64)
-            m_DLLPath = projectPath / "Builds" / "Debug" / "libGameDLL.dll";
-        #elif defined(__APPLE__)
-            m_DLLPath = projectPath / "Builds" / "Debug" / "libGameDLL.dylib";
-        #else
-            m_DLLPath = projectPath / "Builds" / "Debug" / "libGameDLL.so";
-        #endif
+#if defined(_WIN32) || defined(_WIN64)
+        m_DLLPath = projectPath / "Builds" / "Debug" / "libGameDLL.dll";
+#elif defined(__APPLE__)
+        m_DLLPath = projectPath / "Builds" / "Debug" / "libGameDLL.dylib";
+#else
+        m_DLLPath = projectPath / "Builds" / "Debug" / "libGameDLL.so";
+#endif
 
         m_LastSourceCheck = std::chrono::system_clock::now();
         LOG_INFO("GameDLLLoader initialized for project: " + projectPath.string());
@@ -103,8 +100,8 @@ namespace Editor {
         int dllVersion = m_Functions.GetVersion();
         if (dllVersion != GAME_DLL_INTERFACE_VERSION) {
             m_LastError = "Game DLL version mismatch. Expected: " +
-                         std::to_string(GAME_DLL_INTERFACE_VERSION) +
-                         ", Got: " + std::to_string(dllVersion);
+                          std::to_string(GAME_DLL_INTERFACE_VERSION) +
+                          ", Got: " + std::to_string(dllVersion);
             LOG_ERROR(m_LastError);
             FreeLibrary();
             m_Status = GameDLLStatus::Error;
@@ -116,31 +113,69 @@ namespace Editor {
         LOG_INFO("Game DLL loaded successfully!");
 
         World* world = Engine::Core::GetCurrentWorld();
-        CallInit(world);
+        CallInit(world, &Engine::ECS::Component::componentRegistry);
+
         CallRegisterComponents();
         CallRegisterSystems(world);
         LOG_INFO("Game DLL initialization and registration complete.");
+
+        // Heal any entities that had dormant components from the previously unloaded DLL
+        if (world && world->HasAnyEntitiesWithUnknownComponents()) {
+            LOG_INFO("Detected entities with unknown components. Attempting to heal...");
+            world->ReloadAndHeal();
+        }
 
         return true;
     }
 
     bool GameDLLLoader::UnloadDLL() {
-        if (m_Status != GameDLLStatus::Loaded) {
-            return true;
+        if (m_Status != GameDLLStatus::Loaded) return true;
+
+        EditorWindows::EditorUi::isReloading = true;
+        if (m_Functions.Shutdown) m_Functions.Shutdown();
+
+        if (World* world = Engine::Core::GetCurrentWorld()) {
+            // 1. Remove systems (stops the logic from running/crashing)
+            world->ClearSystems();
+            Engine::RegisterSystems(world); // Re-add core engine systems
+
+            // 2. CRITICAL: Serialize the world to memory BEFORE clearing serializers
+            // This converts DLL components to dormant data so they survive the unload
+            nlohmann::json snapshot = world->SerializeToMemory();
+
+            // 3. Clear creators but NOT the data
+            auto& creatorMap = Engine::ECS::Component::componentRegistry;
+            const uint32_t startID = world->GetComponentRegistry().engineComponentCount;
+
+            for (auto it = creatorMap.lower_bound(startID); it != creatorMap.end(); ) {
+                it = creatorMap.erase(it);
+            }
+
+            // 4. Clear DLL-specific Serializers (but keep typeNames for reload!)
+            auto& registry = world->GetComponentRegistry();
+
+            // Remove serializers for IDs >= startID
+            for (auto it = registry.serializers.lower_bound(startID); it != registry.serializers.end(); ) {
+                it = registry.serializers.erase(it);
+            }
+
+            // NOTE: We intentionally DO NOT erase typeNames here!
+            // Keeping them allows the reload to recognize components by name
+
+            // 5. Reload world from snapshot - DLL components become dormant
+            world->LoadFromMemory(snapshot);
         }
 
-        LOG_INFO("Unloading game DLL...");
-
-        // Call shutdown if available
-        if (m_Functions.Shutdown) {
-            m_Functions.Shutdown();
+        if (m_Handle) {
+            ::FreeLibrary((HMODULE)m_Handle);
+            m_Handle = nullptr;
         }
 
-        FreeLibrary();
-        m_Functions = GameDLLFunctions{}; // Reset function pointers
+        m_Functions = GameDLLFunctions{};
         m_Status = GameDLLStatus::NotLoaded;
+        EditorWindows::EditorUi::isReloading = false;
 
-        LOG_INFO("Game DLL unloaded.");
+        LOG_INFO("Game DLL unloaded successfully (Data Persisted).");
         return true;
     }
 
@@ -148,33 +183,34 @@ namespace Editor {
         LOG_INFO("=== Hot-Reload Started ===");
         m_Status = GameDLLStatus::Reloading;
 
-        // Save game state if the DLL supports it
+        // 1. Lock the UI
+        EditorWindows::EditorUi::isReloading = true;
+
         SaveGameState();
 
-        // Unload current DLL
+        // 2. Unload current DLL (invalidates pointers)
         if (!UnloadDLL()) {
             m_LastError = "Failed to unload current DLL";
             m_Status = GameDLLStatus::Error;
-            if (m_ReloadCallback) m_ReloadCallback(false, m_LastError);
+            EditorWindows::EditorUi::isReloading = false;
             return false;
         }
 
-        // Small delay to ensure file handles are released
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        // Load new DLL
+        // 3. Load new DLL (This triggers CallRegisterComponents)
         if (!LoadDLL()) {
-            if (m_ReloadCallback) m_ReloadCallback(false, m_LastError);
+            // Guard stays on if load fails so we don't crash
             return false;
         }
 
-        // Restore game state if supported
         RestoreGameState();
+
+        // 4. Safe to draw again
+        EditorWindows::EditorUi::isReloading = false;
 
         m_ReloadCount++;
         LOG_INFO("=== Hot-Reload Complete (Reload #" + std::to_string(m_ReloadCount) + ") ===");
-
-        if (m_ReloadCallback) m_ReloadCallback(true, "Hot-reload successful!");
         return true;
     }
 
@@ -193,6 +229,101 @@ namespace Editor {
             BuildThread();
             return m_Status != GameDLLStatus::Error;
         }
+    }
+
+    void GameDLLLoader::CheckForChanges() {
+        if (!m_AutoReloadEnabled || m_IsBuildInProgress) return;
+
+        auto now = std::chrono::system_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_LastSourceCheck);
+
+        // Check every 500ms
+        if (elapsed.count() < 500) return;
+        m_LastSourceCheck = now;
+
+        if (CheckSourceModified()) {
+            LOG_INFO("Source file changes detected, triggering rebuild...");
+            BuildGameDLL(true);
+        }
+    }
+
+    void GameDLLLoader::CallInit(World* world, std::map<Engine::ECS::Component::TypeID, Engine::ECS::Component::ComponentCreator> *compReg) const {
+        if (m_Functions.Init && m_Status == GameDLLStatus::Loaded) {
+            m_Functions.Init(world, compReg);
+        }
+    }
+
+    void GameDLLLoader::CallUpdate(float deltaTime) const {
+        if (m_Functions.Update && m_Status == GameDLLStatus::Loaded) {
+            m_Functions.Update(deltaTime);
+        }
+    }
+
+    void GameDLLLoader::CallShutdown() const {
+        if (m_Functions.Shutdown && m_Status == GameDLLStatus::Loaded) {
+            m_Functions.Shutdown();
+        }
+    }
+
+    void GameDLLLoader::CallRegisterComponents() const {
+        if (m_Functions.RegisterComponents && m_Status == GameDLLStatus::Loaded) {
+            m_Functions.RegisterComponents();
+        }
+    }
+
+    void GameDLLLoader::CallRegisterSystems(World* world) const {
+        if (m_Functions.RegisterSystems && m_Status == GameDLLStatus::Loaded) {
+            m_Functions.RegisterSystems(world);
+        }
+    }
+
+    std::string GameDLLLoader::GetStatusString() const {
+        switch (m_Status) {
+            case GameDLLStatus::NotLoaded: return "Not Loaded";
+            case GameDLLStatus::Loading: return "Loading...";
+            case GameDLLStatus::Loaded: return "Loaded";
+            case GameDLLStatus::Building: return "Building...";
+            case GameDLLStatus::Reloading: return "Reloading...";
+            case GameDLLStatus::Error: return "Error";
+            default: return "Unknown";
+        }
+    }
+
+    GameDLLLoader::~GameDLLLoader() {
+        Shutdown();
+    }
+
+    bool GameDLLLoader::CheckSourceModified() {
+        std::filesystem::path sourcePath = m_ProjectPath / "Source";
+
+        if (!std::filesystem::exists(sourcePath)) return false;
+
+        std::chrono::system_clock::time_point latestModify{};
+
+        try {
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(sourcePath)) {
+                if (entry.is_regular_file()) {
+                    auto ext = entry.path().extension().string();
+                    if (ext == ".cpp" || ext == ".h" || ext == ".hpp") {
+                        auto modTime = std::chrono::clock_cast<std::chrono::system_clock>(
+                            entry.last_write_time());
+                        if (modTime > latestModify) {
+                            latestModify = modTime;
+                        }
+                    }
+                }
+            }
+        } catch (const std::exception& e) {
+            LOG_WARN("Error checking source files: " + std::string(e.what()));
+            return false;
+        }
+
+        if (latestModify > m_LastSourceModifyTime) {
+            m_LastSourceModifyTime = latestModify;
+            return m_ReloadCount > 0; // Only trigger if we've loaded at least once
+        }
+
+        return false;
     }
 
     void GameDLLLoader::BuildThread() {
@@ -377,97 +508,6 @@ namespace Editor {
         }
     }
 
-    void GameDLLLoader::CheckForChanges() {
-        if (!m_AutoReloadEnabled || m_IsBuildInProgress) return;
-
-        auto now = std::chrono::system_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_LastSourceCheck);
-
-        // Check every 500ms
-        if (elapsed.count() < 500) return;
-        m_LastSourceCheck = now;
-
-        if (CheckSourceModified()) {
-            LOG_INFO("Source file changes detected, triggering rebuild...");
-            BuildGameDLL(true);
-        }
-    }
-
-    bool GameDLLLoader::CheckSourceModified() {
-        std::filesystem::path sourcePath = m_ProjectPath / "Source";
-
-        if (!std::filesystem::exists(sourcePath)) return false;
-
-        std::chrono::system_clock::time_point latestModify{};
-
-        try {
-            for (const auto& entry : std::filesystem::recursive_directory_iterator(sourcePath)) {
-                if (entry.is_regular_file()) {
-                    auto ext = entry.path().extension().string();
-                    if (ext == ".cpp" || ext == ".h" || ext == ".hpp") {
-                        auto modTime = std::chrono::clock_cast<std::chrono::system_clock>(
-                            entry.last_write_time());
-                        if (modTime > latestModify) {
-                            latestModify = modTime;
-                        }
-                    }
-                }
-            }
-        } catch (const std::exception& e) {
-            LOG_WARN("Error checking source files: " + std::string(e.what()));
-            return false;
-        }
-
-        if (latestModify > m_LastSourceModifyTime) {
-            m_LastSourceModifyTime = latestModify;
-            return m_ReloadCount > 0; // Only trigger if we've loaded at least once
-        }
-
-        return false;
-    }
-
-    void GameDLLLoader::CallInit(World* world) {
-        if (m_Functions.Init && m_Status == GameDLLStatus::Loaded) {
-            m_Functions.Init(world);
-        }
-    }
-
-    void GameDLLLoader::CallUpdate(float deltaTime) {
-        if (m_Functions.Update && m_Status == GameDLLStatus::Loaded) {
-            m_Functions.Update(deltaTime);
-        }
-    }
-
-    void GameDLLLoader::CallShutdown() {
-        if (m_Functions.Shutdown && m_Status == GameDLLStatus::Loaded) {
-            m_Functions.Shutdown();
-        }
-    }
-
-    void GameDLLLoader::CallRegisterComponents() {
-        if (m_Functions.RegisterComponents && m_Status == GameDLLStatus::Loaded) {
-            m_Functions.RegisterComponents();
-        }
-    }
-
-    void GameDLLLoader::CallRegisterSystems(World* world) {
-        if (m_Functions.RegisterSystems && m_Status == GameDLLStatus::Loaded) {
-            m_Functions.RegisterSystems(world);
-        }
-    }
-
-    std::string GameDLLLoader::GetStatusString() const {
-        switch (m_Status) {
-            case GameDLLStatus::NotLoaded: return "Not Loaded";
-            case GameDLLStatus::Loading: return "Loading...";
-            case GameDLLStatus::Loaded: return "Loaded";
-            case GameDLLStatus::Building: return "Building...";
-            case GameDLLStatus::Reloading: return "Reloading...";
-            case GameDLLStatus::Error: return "Error";
-            default: return "Unknown";
-        }
-    }
-
     // Platform-specific implementations
 
     #if defined(_WIN32) || defined(_WIN64)
@@ -490,7 +530,7 @@ namespace Editor {
         }
     }
 
-    void* GameDLLLoader::GetSymbol(const char* name) {
+    void* GameDLLLoader::GetSymbol(const char* name) const {
         if (!m_Handle) return nullptr;
         return (void*)::GetProcAddress(m_Handle, name);
     }
@@ -512,7 +552,7 @@ namespace Editor {
         return true;
     }
 
-    void GameDLLLoader::CleanupTempDLLs() {
+    void GameDLLLoader::CleanupTempDLLs() const {
         try {
             std::filesystem::path buildsDir = m_ProjectPath / "Builds" / "Debug";
             if (!std::filesystem::exists(buildsDir)) return;

@@ -18,12 +18,16 @@ namespace EditorWindows
 {
     class EditorUi final {
     public:
+        static inline bool isReloading = false;
+
         static std::filesystem::path projectDir;
         static Engine::Math::Vec2 viewportMousePos;
         static Engine::Math::Vec2 viewportSize;
         static std::vector<EntityID> selectedEntities;
         static bool isPlayMode;
         static std::string savedWorldState;
+        static std::string currentWorldName;
+        static bool isWorldUnsaved;
 
         static void HandleWindowResize();
 
@@ -35,6 +39,9 @@ namespace EditorWindows
 
         // NEW: Function to initiate a manual project build
         static void BuildProject(bool play);
+
+        static void SaveWorld();
+        static void MarkWorldAsModified();
 
         static inline Engine::Math::Vec2 FromImVec2(const ImVec2& v) {
             return { v.x, v.y };

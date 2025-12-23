@@ -90,7 +90,19 @@ namespace Engine {
 
     struct SerializedComponent {
         ECS::Component::TypeID typeID;
+        std::string typeName;
         json data;
+
+        friend void to_json(nlohmann::json& j, const SerializedComponent& sc) {
+            j = nlohmann::json{{"typeID", sc.typeID}, {"typeName", sc.typeName}, {"data", sc.data}};
+        }
+
+        friend void from_json(const nlohmann::json& j, SerializedComponent& sc) {
+            j.at("typeID").get_to(sc.typeID);
+            // Use value() to handle old save files that might not have typeName yet
+            sc.typeName = j.value("typeName", "");
+            j.at("data").get_to(sc.data);
+        }
     };
 
     struct SerializedEntity {
@@ -111,16 +123,6 @@ namespace Engine {
     inline void from_json(const json& j, EntityID& id) {
         j.at("entityId").get_to(id.id);
         id.name = j["entityName"].get<std::string>();
-    }
-
-    inline void to_json(json& j, const SerializedComponent& sc) {
-        j["typeID"] = sc.typeID;
-        j["data"] = sc.data;
-    }
-
-    inline void from_json(const json& j, SerializedComponent& sc) {
-        j.at("typeID").get_to(sc.typeID);
-        j.at("data").get_to(sc.data);
     }
 
     inline void to_json(json& j, const SerializedEntity& se) {
@@ -202,7 +204,18 @@ namespace Engine {
         std::map<ECS::Component::TypeID, std::unique_ptr<IComponentSerializer>> serializers;
         std::map<ECS::Component::TypeID, std::string> typeNames;
 
+        // The watermark: IDs below this are Engine, IDs at or above are DLL
+        uint32_t engineComponentCount = 0;
+
+        // Call this once after the Engine registers Transform, Sprite, etc.
+        void MarkEngineRegistrationComplete() {
+            engineComponentCount = static_cast<uint32_t>(serializers.size());
+        }
+
         // --- Helper Methods for Hot-Reload & DLLs ---
+        std::map<Engine::ECS::Component::TypeID, std::unique_ptr<IComponentSerializer>>& GetSerializers() {
+            return serializers;
+        }
 
         bool HasName(const std::string& name) const {
             for (auto const& [id, n] : typeNames) {
@@ -247,10 +260,14 @@ namespace Engine {
             typeNames[id] = typeName;
         }
 
-        IComponentSerializer* GetSerializer(const ECS::Component::TypeID id) const {
+        std::map<Engine::ECS::Component::TypeID, std::unique_ptr<IComponentSerializer>>& GetSerializersMutable() {
+            return serializers;
+        }
+
+        IComponentSerializer* GetSerializer(const Engine::ECS::Component::TypeID id) const {
             const auto it = serializers.find(id);
             if (it == serializers.end()) {
-                throw std::runtime_error("Component TypeID not found in registry.");
+                return nullptr;
             }
             return it->second.get();
         }

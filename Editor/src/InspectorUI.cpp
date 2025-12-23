@@ -14,6 +14,12 @@ static int selectedComponentTypeID = -1;
 void InspectorUI::InspectorWindow() {
     ImGui::Begin("Inspector");
 
+    if (EditorUi::isReloading) {
+        ImGui::Text("Hot-Reloading Game DLL...");
+        ImGui::End();
+        return;
+    }
+
     if (EditorUi::selectedEntities.empty()) {
         ImGui::Text("No entity selected");
         ImGui::End();
@@ -52,6 +58,22 @@ void InspectorUI::InspectorWindow() {
             const auto* serializer = registry.GetSerializer(typeID);
             const std::string& compName = registry.GetTypeName(typeID);
 
+            // If serializer is null, the DLL is missing for this component
+            if (!serializer) {
+                ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.4f, 0.1f, 0.1f, 1.0f)); // Subtle red
+                if (ImGui::CollapsingHeader((compName + " (Inactive)").c_str())) {
+                    ImGui::TextColored(ImVec4(1, 0.8f, 0.2f, 1), "Code for this component is not loaded.");
+                    ImGui::Text("Data is preserved in memory.");
+
+                    if (ImGui::Button("Remove Component")) {
+                        world->RemoveComponentByType(entity, typeID);
+                        EditorUi::MarkWorldAsModified();
+                    }
+                }
+                ImGui::PopStyleColor();
+                continue; // Skip the rest of the drawing for this component
+            }
+
             nlohmann::json j = serializer->SerializeFromPointer(compPtr);
 
             ImGui::PushID(typeID);
@@ -62,11 +84,13 @@ void InspectorUI::InspectorWindow() {
 
                 if (inspector->OnGui(compName.c_str(), j)) {
                     serializer->DeserializeIntoPointer(compPtr, j);
+                    EditorUi::MarkWorldAsModified();
                 }
             }
             else {
                 if (DrawJsonComponentEditor(compName.c_str(), j, typeID)) {
                     serializer->DeserializeIntoPointer(compPtr, j);
+                    EditorUi::MarkWorldAsModified();
                 }
             }
 
@@ -74,6 +98,36 @@ void InspectorUI::InspectorWindow() {
         }
         catch (const std::exception& ex) {
             ImGui::Text("Inspector error: %s", ex.what());
+        }
+    }
+
+    // Display dormant (unknown) components for this entity
+    if (world->HasDormantComponents(entity)) {
+        ImGui::Separator();
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.2f, 1.0f));
+        ImGui::Text("UNKNOWN COMPONENTS");
+        ImGui::PopStyleColor();
+        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Load DLL to recover data");
+
+        const auto& dormantComps = world->GetDormantComponents(entity);
+        for (const auto& dormantComp : dormantComps) {
+            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.5f, 0.15f, 0.15f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.6f, 0.2f, 0.2f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.7f, 0.25f, 0.25f, 1.0f));
+
+            std::string headerLabel = dormantComp.typeName.empty()
+                ? "Unknown Component (ID: " + std::to_string(dormantComp.typeID) + ")"
+                : dormantComp.typeName + " (Missing DLL)";
+
+            if (ImGui::CollapsingHeader(headerLabel.c_str())) {
+                ImGui::Indent();
+                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Component data preserved in memory");
+                ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Type: %s", dormantComp.typeName.c_str());
+                ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Build and reload the game DLL to restore this component.");
+                ImGui::Unindent();
+            }
+
+            ImGui::PopStyleColor(3);
         }
     }
 
@@ -88,17 +142,51 @@ void InspectorUI::InspectorWindow() {
     }
 
     if (ImGui::BeginPopup("AddComponentPopup")) {
-        for (const auto &typeID: registry.GetAllSerializers() | std::views::keys) {
-            const std::string& compName = registry.GetTypeName(typeID);
+        auto& reg = world->GetComponentRegistry();
 
-            if (world->HasComponent(entity, typeID))
-                continue;
-
-            if (ImGui::MenuItem(compName.c_str())) {
-                world->AddComponentByType(entity, typeID);
-                ImGui::CloseCurrentPopup();
+        // --- SECTION 1: Engine Components ---
+        ImGui::SeparatorText("Engine");
+        for (const auto& [id, name] : reg.typeNames) {
+            // Only show built-in engine components here
+            if (id < reg.engineComponentCount) {
+                if (!world->HasComponent(entity, id) && ImGui::MenuItem(name.c_str())) {
+                    world->AddComponentByType(entity, id);
+                    EditorUi::MarkWorldAsModified();
+                }
             }
         }
+
+        ImGui::Spacing();
+
+        // --- SECTION 2: Game Project (DLL) ---
+        ImGui::SeparatorText("Game Project");
+        bool gameCompFound = false;
+        for (const auto& [id, name] : reg.typeNames) {
+            // IDs equal to or greater than engineComponentCount are user-defined
+            if (id >= reg.engineComponentCount) {
+                gameCompFound = true;
+
+                // Check if logic is currently loaded from the DLL
+                bool isLoaded = reg.GetSerializer(id) != nullptr;
+                bool alreadyHas = world->HasComponent(entity, id);
+
+                // Enable the menu item only if the DLL is loaded and the entity doesn't have it
+                if (ImGui::MenuItem(name.c_str(), nullptr, false, isLoaded && !alreadyHas)) {
+                    world->AddComponentByType(entity, id);
+                    EditorUi::MarkWorldAsModified();
+                }
+
+                // Provide a helpful tooltip if the DLL is missing
+                if (!isLoaded && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    ImGui::SetTooltip("DLL Logic not loaded. Rebuild the project.");
+                }
+            }
+        }
+
+        if (!gameCompFound) {
+            ImGui::TextDisabled("  (No game components found)");
+        }
+
         ImGui::EndPopup();
     }
 
@@ -124,6 +212,7 @@ bool InspectorUI::DrawJsonComponentEditor(
                     EditorUi::selectedEntities[0],
                     componentTypeID
                 );
+                EditorUi::MarkWorldAsModified();
             }
             ImGui::CloseCurrentPopup();
         }
