@@ -27,7 +27,6 @@ namespace Engine::Math {
 }
 
 namespace Engine {
-
     inline void to_json(json& j, const Math::Vec2& v) {
         j = {{"x", v.x}, {"y", v.y}};
     }
@@ -90,7 +89,7 @@ namespace Engine {
     }
 
     struct SerializedComponent {
-        Engine::ECS::Component::TypeID typeID;
+        ECS::Component::TypeID typeID;
         json data;
     };
 
@@ -200,35 +199,70 @@ namespace Engine {
     };
 
     struct ComponentRegistry {
-        std::map<Engine::ECS::Component::TypeID, std::unique_ptr<IComponentSerializer>> serializers;
-        std::map<Engine::ECS::Component::TypeID, std::string> typeNames;
+        std::map<ECS::Component::TypeID, std::unique_ptr<IComponentSerializer>> serializers;
+        std::map<ECS::Component::TypeID, std::string> typeNames;
+
+        // --- Helper Methods for Hot-Reload & DLLs ---
+
+        bool HasName(const std::string& name) const {
+            for (auto const& [id, n] : typeNames) {
+                if (n == name) return true;
+            }
+            return false;
+        }
+
+        ECS::Component::TypeID GetIDByName(const std::string& name) const {
+            for (auto const& [id, n] : typeNames) {
+                if (n == name) return id;
+            }
+            return 0;
+        }
+
+        size_t GetTotalRegisteredCount() const {
+            return serializers.size();
+        }
+
+        template<typename T>
+        void AddSerializer(ECS::Component::TypeID id, const std::string& typeName) {
+            serializers[id] = std::make_unique<ComponentSerializer<T>>();
+            typeNames[id] = typeName;
+        }
+
+        template<typename T>
+        void UpdateSerializer(ECS::Component::TypeID id, const std::string& typeName) {
+            // Just replace the unique_ptr. This updates the function pointers
+            // to the ones inside the newly loaded DLL.
+            serializers[id] = std::make_unique<ComponentSerializer<T>>();
+            typeNames[id] = typeName;
+        }
+
+        // --- Original Methods ---
 
         template<typename T>
         void RegisterComponent(const std::string& typeName) {
-            Engine::ECS::Component::TypeID id = Engine::ECS::Component::GetTypeID<T>();
-            if (serializers.find(id) != serializers.end()) return;
+            const ECS::Component::TypeID id = ECS::Component::GetTypeID<T>();
+            if (serializers.contains(id)) return;
 
             serializers[id] = std::make_unique<ComponentSerializer<T>>();
             typeNames[id] = typeName;
         }
 
-        IComponentSerializer* GetSerializer(const Engine::ECS::Component::TypeID id) const {
-            auto it = serializers.find(id);
+        IComponentSerializer* GetSerializer(const ECS::Component::TypeID id) const {
+            const auto it = serializers.find(id);
             if (it == serializers.end()) {
-                throw std::runtime_error("Component TypeID not found in registry. Did you forget to register it?");
+                throw std::runtime_error("Component TypeID not found in registry.");
             }
             return it->second.get();
         }
 
-        const std::string& GetTypeName(Engine::ECS::Component::TypeID id) const {
+        const std::string& GetTypeName(ECS::Component::TypeID id) const {
             static std::string unknown = "Unknown Component";
             auto it = typeNames.find(id);
             return (it != typeNames.end()) ? it->second : unknown;
         }
 
-        const std::map<Engine::ECS::Component::TypeID, std::unique_ptr<IComponentSerializer>>& GetAllSerializers() const {
+        const std::map<ECS::Component::TypeID, std::unique_ptr<IComponentSerializer>>& GetAllSerializers() const {
             return serializers;
         }
     };
-
 } // namespace Engine

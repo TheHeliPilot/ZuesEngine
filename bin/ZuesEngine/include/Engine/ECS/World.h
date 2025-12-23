@@ -80,7 +80,31 @@ public:
     EntityID CreateEntity(const std::string &name);
     void DestroyEntity(EntityID entityID);
 
-    template<typename T> void RegisterComponent(const std::string& typeName);
+    // --- Component Registration ---
+
+    template<typename T>
+    void RegisterComponent(const std::string& typeName);
+
+    /**
+     * Safe Registration for Hot-Reloading and DLLs.
+     * Prevents TypeID collisions between different memory spaces.
+     */
+    template<typename T>
+    void RegisterComponentSafe(const std::string& typeName) {
+        // 1. Check if name exists. If so, update it for Hot-Reload.
+        if (componentSerializationRegistry.HasName(typeName)) {
+            Engine::ECS::Component::TypeID existingID = componentSerializationRegistry.GetIDByName(typeName);
+            componentSerializationRegistry.UpdateSerializer<T>(existingID, typeName);
+            return;
+        }
+
+        // 2. If new, get the ID from the Registry's count, NOT the static template counter
+        Engine::ECS::Component::TypeID newID = componentSerializationRegistry.GetTotalRegisteredCount();
+        componentSerializationRegistry.AddSerializer<T>(newID, typeName);
+    }
+
+    // --- Entity Manipulation ---
+
     template<typename T> void AddComponent(EntityID entityID, const T& component);
     template<typename T> void RemoveComponent(EntityID entityID);
     template<typename T> T& GetComponent(EntityID entityID);
@@ -89,9 +113,9 @@ public:
 
     void AddComponentByType(EntityID entityID, Engine::ECS::Component::TypeID typeID);
 
-    // NEW: Inspector API
-    std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> GetAllComponents(EntityID entityID) const;
+    // --- Inspector / Tools API ---
 
+    std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> GetAllComponents(EntityID entityID) const;
     std::vector<std::pair<Engine::ECS::Component::TypeID, void*>> GetAllComponents(EntityID entityID);
 
     const Engine::ComponentRegistry& GetComponentRegistry() const {
@@ -101,11 +125,12 @@ public:
     std::set<EntityID> GetEntityChildren(EntityID parentID) const;
 
     void RemoveComponentByType(EntityID entityID, Engine::ECS::Component::TypeID typeID);
-
     bool HasComponent(EntityID entityID, Engine::ECS::Component::TypeID typeID) const;
 
     template<typename... TArgs>
     ComponentSignature CalculateSignature() const;
+
+    // --- Systems ---
 
     void RegisterSystem(std::unique_ptr<System> system);
     void UpdateSystems(float deltaTime, System::SystemRole currentMode);
@@ -113,8 +138,12 @@ public:
     template<typename T>
     bool IsComponentRegistered();
 
+    // --- Persistence ---
+
     bool SaveToJson(const std::string& filename) const;
     bool LoadFromJson(const std::string& filename);
+
+    // --- Iteration ---
 
     template<class ... TArgs, class Func>
     void ForEach(Func &&func);
@@ -132,6 +161,7 @@ private:
     std::unordered_map<ComponentSignature, std::unique_ptr<Archetype>> archetypes;
     std::vector<std::unique_ptr<System>> systems;
 
+    // This handles the mapping between TypeIDs and Serializers
     Engine::ComponentRegistry componentSerializationRegistry;
 
     Archetype* GetOrCreateArchetype(const ComponentSignature& signature);

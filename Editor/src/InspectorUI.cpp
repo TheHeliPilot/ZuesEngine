@@ -79,7 +79,11 @@ void InspectorUI::InspectorWindow() {
 
     ImGui::Separator();
 
+    ImGui::Text("Registered Comps: %zu", world->GetComponentRegistry().GetAllSerializers().size());
     if (ImGui::Button("Add Component")) {
+        for (const auto& all = world->GetComponentRegistry().GetAllSerializers(); auto const& [id, ser] : all) {
+            LOG_INFO("Registry contains ID: " + std::to_string(id) + " Name: " + world->GetComponentRegistry().GetTypeName(id));
+        }
         ImGui::OpenPopup("AddComponentPopup");
     }
 

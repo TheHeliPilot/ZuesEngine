@@ -30,7 +30,7 @@ namespace Editor {
 
         // The game DLL will be in the project's build directory (in Debug subdirectory)
         #if defined(_WIN32) || defined(_WIN64)
-            m_DLLPath = projectPath / "Builds" / "Debug" / "GameDLL.dll";
+            m_DLLPath = projectPath / "Builds" / "Debug" / "libGameDLL.dll";
         #elif defined(__APPLE__)
             m_DLLPath = projectPath / "Builds" / "Debug" / "libGameDLL.dylib";
         #else
@@ -114,6 +114,13 @@ namespace Editor {
         m_Status = GameDLLStatus::Loaded;
         m_LastReloadTime = std::chrono::system_clock::now();
         LOG_INFO("Game DLL loaded successfully!");
+
+        World* world = Engine::Core::GetCurrentWorld();
+        CallInit(world);
+        CallRegisterComponents();
+        CallRegisterSystems(world);
+        LOG_INFO("Game DLL initialization and registration complete.");
+
         return true;
     }
 
@@ -189,14 +196,38 @@ namespace Editor {
     }
 
     void GameDLLLoader::BuildThread() {
-        LOG_INFO("Building game DLL...");
+        LOG_INFO("Building game DLL with portable toolchain...");
 
         if (m_BuildProgressCallback) m_BuildProgressCallback("Configuring...", 0.1f);
+
+        // 1. Precise path setup
+        std::filesystem::path executableDir = std::filesystem::current_path();
+        std::filesystem::path toolchainRoot = executableDir / "Tools";
+        std::filesystem::path toolchainBin = toolchainRoot / "bin";
+
+        // Most MinGW distributions have the actual libs in a subfolder like this:
+        std::filesystem::path mingwInternal = toolchainRoot / "x86_64-w64-mingw32";
+
+        std::string gccPath = (toolchainBin / "gcc.exe").string();
+        std::string gppPath = (toolchainBin / "g++.exe").string();
+        std::string makePath = (toolchainBin / "mingw32-make.exe").string();
+
+        auto fixPath = [](std::string p) {
+            std::replace(p.begin(), p.end(), '\\', '/');
+            return p;
+        };
+
+        if (!std::filesystem::exists(gccPath)) {
+            m_LastError = "Portable Compiler not found! Checked: " + gccPath;
+            LOG_ERROR(m_LastError);
+            m_IsBuildInProgress = false;
+            m_Status = GameDLLStatus::Error;
+            return;
+        }
 
         std::filesystem::path sourcePath = m_ProjectPath / "Source";
         std::filesystem::path buildDir = m_ProjectPath / "TempBuild";
 
-        // Create/clean build directory
         try {
             if (std::filesystem::exists(buildDir)) {
                 std::filesystem::remove_all(buildDir);
@@ -210,10 +241,13 @@ namespace Editor {
             return;
         }
 
-        // Helper lambda to execute command and capture output to logger (no window)
-        auto executeAndLog = [](const std::string& command) -> int {
+        // 2. executeAndLog with Path Injection
+        auto executeAndLog = [this, toolchainBin](const std::string& command) -> int {
 #if defined(_WIN32) || defined(_WIN64)
-            // Create pipes for stdout/stderr
+            std::string pathVar = "PATH=" + toolchainBin.string() + ";";
+            if (char* oldPath = getenv("PATH")) pathVar += oldPath;
+            _putenv(pathVar.c_str());
+
             SECURITY_ATTRIBUTES sa;
             sa.nLength = sizeof(SECURITY_ATTRIBUTES);
             sa.bInheritHandle = TRUE;
@@ -226,7 +260,6 @@ namespace Editor {
             }
             SetHandleInformation(hStdOutRead, HANDLE_FLAG_INHERIT, 0);
 
-            // Set up process info
             STARTUPINFOA si = {};
             si.cb = sizeof(si);
             si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
@@ -235,32 +268,16 @@ namespace Editor {
             si.hStdError = hStdOutWrite;
 
             PROCESS_INFORMATION pi = {};
-
-            // Redirect stderr to stdout in command
             std::string fullCommand = "cmd /c " + command + " 2>&1";
 
-            // Create process with no window
-            if (!CreateProcessA(
-                    nullptr,
-                    const_cast<char*>(fullCommand.c_str()),
-                    nullptr,
-                    nullptr,
-                    TRUE,
-                    CREATE_NO_WINDOW,
-                    nullptr,
-                    nullptr,
-                    &si,
-                    &pi)) {
+            if (!CreateProcessA(nullptr, const_cast<char*>(fullCommand.c_str()), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
                 LOG_ERROR("Failed to execute command: " + command);
                 CloseHandle(hStdOutWrite);
                 CloseHandle(hStdOutRead);
                 return -1;
             }
 
-            // Close write end of pipe (we only read)
             CloseHandle(hStdOutWrite);
-
-            // Read output
             char buffer[256];
             DWORD bytesRead;
             std::string lineBuffer;
@@ -268,18 +285,11 @@ namespace Editor {
             while (ReadFile(hStdOutRead, buffer, sizeof(buffer) - 1, &bytesRead, nullptr) && bytesRead > 0) {
                 buffer[bytesRead] = '\0';
                 lineBuffer += buffer;
-
-                // Process complete lines
                 size_t pos;
                 while ((pos = lineBuffer.find('\n')) != std::string::npos) {
                     std::string line = lineBuffer.substr(0, pos);
                     lineBuffer = lineBuffer.substr(pos + 1);
-
-                    // Remove trailing \r if present
-                    if (!line.empty() && line.back() == '\r') {
-                        line.pop_back();
-                    }
-
+                    if (!line.empty() && line.back() == '\r') line.pop_back();
                     if (!line.empty()) {
                         if (line.find("error") != std::string::npos || line.find("Error") != std::string::npos) {
                             LOG_ERROR("[Build] " + line);
@@ -291,29 +301,14 @@ namespace Editor {
                     }
                 }
             }
-
-            // Process any remaining content
-            if (!lineBuffer.empty()) {
-                if (lineBuffer.find("error") != std::string::npos || lineBuffer.find("Error") != std::string::npos) {
-                    LOG_ERROR("[Build] " + lineBuffer);
-                } else if (lineBuffer.find("warning") != std::string::npos || lineBuffer.find("Warning") != std::string::npos) {
-                    LOG_WARN("[Build] " + lineBuffer);
-                } else {
-                    LOG_INFO("[Build] " + lineBuffer);
-                }
-            }
+            if (!lineBuffer.empty()) LOG_INFO("[Build] " + lineBuffer);
 
             CloseHandle(hStdOutRead);
-
-            // Wait for process to finish
             WaitForSingleObject(pi.hProcess, INFINITE);
-
             DWORD exitCode;
             GetExitCodeProcess(pi.hProcess, &exitCode);
-
             CloseHandle(pi.hProcess);
             CloseHandle(pi.hThread);
-
             return static_cast<int>(exitCode);
 #else
             return std::system(command.c_str());
@@ -322,13 +317,33 @@ namespace Editor {
 
         if (m_BuildProgressCallback) m_BuildProgressCallback("Running CMake...", 0.3f);
 
-        // CMake configure command - use BUILD_AS_DLL=ON for the game project template
-        // Uses system default generator (Visual Studio on Windows)
-        std::string configureCmd = "cmake -S \"" + sourcePath.string() + "\" -B \"" + buildDir.string() +
-                                   "\" -DBUILD_AS_DLL=ON -DCMAKE_BUILD_TYPE=Debug";
+        // Ensure these paths are clean for the command line
+        std::string binDir = fixPath(toolchainBin.string());
+        std::string libDir = fixPath((mingwInternal / "lib").string());
+        std::string sysRoot = fixPath(toolchainRoot.string());
+
+        // 3. Configure with absolute precision
+        // We add -L to flags to solve "cannot find -lkernel32"
+        // We add -B to flags to solve "cannot find dllcrt2.o"
+        std::string extraFlags = "-B\"" + libDir + "/\" -L\"" + libDir + "/\"";
+
+        std::string configureCmd = "cmake -G \"MinGW Makefiles\" "
+                                   "-DCMAKE_C_COMPILER=\"" + fixPath(gccPath) + "\" "
+                                   "-DCMAKE_CXX_COMPILER=\"" + fixPath(gppPath) + "\" "
+                                   "-DCMAKE_MAKE_PROGRAM=\"" + fixPath(makePath) + "\" "
+                                   "-DCMAKE_C_COMPILER_WORKS=1 "
+                                   "-DCMAKE_CXX_COMPILER_WORKS=1 "
+                                   "-DCMAKE_SYSROOT=\"" + sysRoot + "\" "
+                                   "-DCMAKE_C_FLAGS=\"" + extraFlags + "\" "
+                                   "-DCMAKE_CXX_FLAGS=\"" + extraFlags + "\" "
+                                   "-DCMAKE_EXE_LINKER_FLAGS=\"" + extraFlags + "\" "
+                                   "-DCMAKE_SHARED_LINKER_FLAGS=\"" + extraFlags + "\" "
+                                   "-S \"" + sourcePath.string() + "\" -B \"" + buildDir.string() + "\" "
+                                   "-DBUILD_AS_DLL=ON -DCMAKE_BUILD_TYPE=Debug";
 
         LOG_INFO("Executing: " + configureCmd);
         int result = executeAndLog(configureCmd);
+
         if (result != 0) {
             m_LastError = "CMake configure failed with exit code " + std::to_string(result);
             LOG_ERROR(m_LastError);
@@ -339,9 +354,8 @@ namespace Editor {
 
         if (m_BuildProgressCallback) m_BuildProgressCallback("Compiling...", 0.6f);
 
-        // CMake build command - build GameDLL target
-        std::string buildCmd = "cmake --build \"" + buildDir.string() + "\" --target GameDLL --config Debug";
-
+        // 4. Build
+        std::string buildCmd = "cmake --build \"" + buildDir.string() + "\" --target GameDLL";
         LOG_INFO("Executing: " + buildCmd);
         result = executeAndLog(buildCmd);
         if (result != 0) {
@@ -353,11 +367,9 @@ namespace Editor {
         }
 
         if (m_BuildProgressCallback) m_BuildProgressCallback("Done!", 1.0f);
-
         LOG_INFO("Game DLL built successfully!");
         m_IsBuildInProgress = false;
 
-        // If auto-reload is enabled and DLL was previously loaded, reload it
         if (m_AutoReloadEnabled && m_Status == GameDLLStatus::Building) {
             ReloadDLL();
         } else {
