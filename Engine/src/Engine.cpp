@@ -116,13 +116,34 @@ namespace Engine {
         LOG_INFO("Engine components registered successfully");
     }
 
+    // Helper to create a system with proper metadata and add to registry
+    template<typename T>
+    static void RegisterSystemWithMetadata(World* world, const std::string& name, System::SystemRole role, bool isRequired) {
+        // Register in the system registry for UI/serialization
+        world->GetSystemRegistry().RegisterSystem<T>(name, role, isRequired, false);
+
+        // Create and add the actual system instance
+        auto system = std::make_unique<T>();
+        system->systemName = name;
+        system->role = role;
+        system->isRequired = isRequired;
+        world->RegisterSystem(std::move(system));
+    }
+
     void RegisterSystems(World* s_World) {
-        s_World->RegisterSystem(std::make_unique<HierarchySystem>());
-        s_World->RegisterSystem(std::make_unique<PhysicsSystem>());
-        s_World->RegisterSystem(std::make_unique<CameraSystem>());
-        s_World->RegisterSystem(std::make_unique<RenderingSystem>());
-        s_World->RegisterSystem(std::make_unique<TextRenderingSystem>());
-        s_World->RegisterSystem(std::make_unique<TestObjectMoverSystem>());
+        // Required engine systems (cannot be disabled)
+        RegisterSystemWithMetadata<HierarchySystem>(s_World, "Hierarchy", System::SystemRole::Shared, true);
+        RegisterSystemWithMetadata<PhysicsSystem>(s_World, "Physics", System::SystemRole::Game, true);
+        RegisterSystemWithMetadata<CameraSystem>(s_World, "Camera", System::SystemRole::Shared, true);
+        RegisterSystemWithMetadata<RenderingSystem>(s_World, "Rendering", System::SystemRole::Shared, true);
+        RegisterSystemWithMetadata<TextRenderingSystem>(s_World, "Text Rendering", System::SystemRole::Shared, true);
+
+        // Optional engine systems (can be disabled)
+        RegisterSystemWithMetadata<TestObjectMoverSystem>(s_World, "Test Object Mover", System::SystemRole::Game, false);
+
+        // Mark engine systems as complete
+        s_World->GetSystemRegistry().MarkEngineRegistrationComplete();
+
         s_World->UpdateSystems(0, System::SystemRole::Shared);
     }
 

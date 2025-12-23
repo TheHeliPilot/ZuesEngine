@@ -266,6 +266,9 @@ inline bool World::SaveToJson(const std::string& filename) const {
         }
     }
 
+    // Save active system states (non-required systems only)
+    snapshot.activeSystems = GetActiveSystemStates();
+
     try {
         json j = snapshot;
         std::ofstream ofs(filename);
@@ -403,6 +406,12 @@ inline bool World::LoadFromJson(const std::string& filename) {
         // Log summary of dormant data
         if (!dormantData.empty()) {
             LOG_WARN("World Load: " + std::to_string(dormantData.size()) + " entities have unknown components. Load the DLL to recover.");
+        }
+
+        // Apply system states from the snapshot
+        if (!snapshot.activeSystems.empty()) {
+            ApplySystemStates(snapshot.activeSystems);
+            LOG_INFO("World Load: Applied " + std::to_string(snapshot.activeSystems.size()) + " system states.");
         }
 
         LOG_INFO("World Load: Finished. Recalculated " + std::to_string(freeCount) + " free indices.");

@@ -96,6 +96,16 @@ if(ZUES_BUILD_EDITOR)
         Editor/src/ViewportCameraSystem.cpp
         Editor/src/GameDLLLoader.cpp
         Editor/src/HotReloadUI.cpp
+        # Custom component inspectors
+        Editor/src/TransformInspector.cpp
+        Editor/src/CameraInspector.cpp
+        Editor/src/RigidbodyInspector.cpp
+        Editor/src/ColliderInspector.cpp
+        Editor/src/TextInspector.cpp
+        # Systems management UI
+        Editor/src/SystemsUI.cpp
+        # Collider gizmo for visual editing
+        Editor/src/ColliderGizmo.cpp
     )
 
     add_executable(ZuesEditor ${EDITOR_SRC})

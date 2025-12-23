@@ -22,29 +22,66 @@
 // YOUR GAME CODE - Add your custom components and systems here
 // ============================================================================
 
-// Example custom component (uncomment and modify):
+// ============================================================================
+// CUSTOM COMPONENT EXAMPLE
+// Components are data containers attached to entities. They are automatically
+// serialized using nlohmann::json when you implement to_json/from_json.
+// ============================================================================
+//
 // namespace Game {
 //     struct PlayerComponent {
 //         float health = 100.0f;
 //         float speed = 5.0f;
 //         int score = 0;
+//
+//         // JSON serialization - required for save/load and inspector
+//         friend void to_json(nlohmann::json& j, const PlayerComponent& p) {
+//             j = nlohmann::json{
+//                 {"health", p.health},
+//                 {"speed", p.speed},
+//                 {"score", p.score}
+//             };
+//         }
+//
+//         friend void from_json(const nlohmann::json& j, PlayerComponent& p) {
+//             p.health = j.value("health", 100.0f);
+//             p.speed = j.value("speed", 5.0f);
+//             p.score = j.value("score", 0);
+//         }
 //     };
 // }
 
-// Example custom system (uncomment and modify):
+// ============================================================================
+// CUSTOM SYSTEM EXAMPLE
+// Systems contain game logic that operates on entities with specific components.
+// Use SystemBase<ComponentTypes...> to automatically query matching entities.
+// ============================================================================
+//
 // class PlayerMovementSystem : public SystemBase<
 //     Engine::ECS::Component::TransformComponent*,
 //     Game::PlayerComponent*
 // > {
 // public:
-//     PlayerMovementSystem() { role = SystemRole::Game; }
+//     PlayerMovementSystem() {
+//         // Set the role: Game = runs in play mode, Shared = runs always
+//         role = SystemRole::Game;
+//     }
 //
 //     void Update(float deltaTime,
 //                 Engine::ECS::Component::TransformComponent* transform,
 //                 Game::PlayerComponent* player) override {
-//         // Your movement logic here
+//         // Movement logic - runs for each entity with Transform + Player
 //         if (Engine::Input::IsKeyPressed(GLFW_KEY_W)) {
 //             transform->worldPosition.y += player->speed * deltaTime;
+//         }
+//         if (Engine::Input::IsKeyPressed(GLFW_KEY_S)) {
+//             transform->worldPosition.y -= player->speed * deltaTime;
+//         }
+//         if (Engine::Input::IsKeyPressed(GLFW_KEY_A)) {
+//             transform->worldPosition.x -= player->speed * deltaTime;
+//         }
+//         if (Engine::Input::IsKeyPressed(GLFW_KEY_D)) {
+//             transform->worldPosition.x += player->speed * deltaTime;
 //         }
 //     }
 // };
@@ -54,12 +91,16 @@
 // ============================================================================
 #ifdef GAME_DLL_EXPORTS
 
+// Pointer to the world - set during Init for use in registration
+static World* s_World = nullptr;
+
 GAME_API_C int GameDLL_GetVersion() {
     return GAME_DLL_INTERFACE_VERSION;
 }
 
-GAME_API_C void GameDLL_Init(World* world) {
+GAME_API_C void GameDLL_Init(World* world, std::map<Engine::ECS::Component::TypeID, Engine::ECS::Component::ComponentCreator>* compReg) {
     std::cout << "[{{PROJECT_NAME}}] Game initialized\n";
+    s_World = world;
     // Called when the DLL is loaded in the editor
     // Add any initialization code here
 }
@@ -71,20 +112,56 @@ GAME_API_C void GameDLL_Update(float deltaTime) {
 
 GAME_API_C void GameDLL_Shutdown() {
     std::cout << "[{{PROJECT_NAME}}] Game shutdown\n";
+    s_World = nullptr;
     // Called when the DLL is about to be unloaded
     // Clean up any resources here
 }
 
 GAME_API_C void GameDLL_RegisterComponents() {
     std::cout << "[{{PROJECT_NAME}}] Registering components\n";
-    // Register your custom components here:
-    // Engine::ECS::Component::RegisterComponent<Game::PlayerComponent>();
+    if (!s_World) return;
+
+    // ============================================================================
+    // REGISTER YOUR CUSTOM COMPONENTS HERE
+    // Use RegisterComponentSafe for hot-reload support (preserves component data)
+    // ============================================================================
+    //
+    // s_World->RegisterComponentSafe<Game::PlayerComponent>("PlayerComponent");
+    //
+    // Note: The string name must be unique and consistent across reloads.
+    // This is how the engine tracks components during hot-reload.
+}
+
+// Helper to register a system with proper metadata for the Systems UI
+template<typename T>
+static void RegisterGameSystem(World* world, const std::string& name, System::SystemRole role, bool isRequired = false) {
+    // Register in the system registry for UI/serialization
+    world->GetSystemRegistry().RegisterSystem<T>(name, role, isRequired, true /* isFromDLL */);
+
+    // Create and add the actual system instance
+    auto system = std::make_unique<T>();
+    system->systemName = name;
+    system->role = role;
+    system->isRequired = isRequired;
+    world->RegisterSystem(std::move(system));
 }
 
 GAME_API_C void GameDLL_RegisterSystems(World* world) {
     std::cout << "[{{PROJECT_NAME}}] Registering systems\n";
-    // Register your custom systems here:
-    // world->RegisterSystem(std::make_unique<PlayerMovementSystem>());
+
+    // ============================================================================
+    // REGISTER YOUR CUSTOM SYSTEMS HERE
+    // Use RegisterGameSystem helper for proper hot-reload and UI support
+    // ============================================================================
+    //
+    // RegisterGameSystem<PlayerMovementSystem>(world, "PlayerMovement", System::SystemRole::Game);
+    //
+    // System roles:
+    //   - Game: Only runs during play mode
+    //   - Shared: Runs in both editor and play mode
+    //   - Editor: Only runs in editor mode (not recommended for game DLL)
+    //
+    // isRequired: If true, the system cannot be disabled in the Systems UI
 }
 
 // Optional: State preservation for hot-reload

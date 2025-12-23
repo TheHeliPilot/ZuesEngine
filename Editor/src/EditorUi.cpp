@@ -17,6 +17,7 @@
 #include "../include/TextureCutterUI.h"
 #include "../include/HotReloadUI.h"
 #include "../include/GameDLLLoader.h"
+#include "../include/SystemsUI.h"
 
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
@@ -655,6 +656,7 @@ void EditorUi::DrawWindowUi() {
     AssetBrowserUI::AssetBrowserWindow();
     //TextureCutterUI::TextureCutterWindow(); //TODO: fix implementation to actually work
     Editor::HotReloadUI::Draw(); // Hot-reload panel
+    SystemsUI::SystemsWindow(); // Systems management window
     //ImGui::ShowDemoWindow();
 
     // Modal for "Cannot Play" warning when entities have unknown components

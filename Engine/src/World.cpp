@@ -191,3 +191,93 @@ void World::RemoveDLLComponents(const uint32_t startID) {
         }
     }
 }
+
+// --- System Management Methods ---
+
+bool World::AddSystemByName(const std::string& systemName) {
+    // Check if already active
+    if (HasActiveSystem(systemName)) {
+        LOG_WARN("System '" + systemName + "' is already active.");
+        return false;
+    }
+
+    // Try to create from registry
+    auto system = systemSerializationRegistry.CreateSystem(systemName);
+    if (!system) {
+        LOG_ERROR("Failed to create system '" + systemName + "' - not found in registry.");
+        return false;
+    }
+
+    LOG_INFO("Adding system: " + systemName);
+    systems.push_back(std::move(system));
+    return true;
+}
+
+bool World::RemoveSystemByName(const std::string& systemName) {
+    for (auto it = systems.begin(); it != systems.end(); ++it) {
+        if ((*it)->systemName == systemName) {
+            if ((*it)->isRequired) {
+                LOG_WARN("Cannot remove required system: " + systemName);
+                return false;
+            }
+            LOG_INFO("Removing system: " + systemName);
+            systems.erase(it);
+            return true;
+        }
+    }
+    LOG_WARN("System '" + systemName + "' not found in active systems.");
+    return false;
+}
+
+bool World::HasActiveSystem(const std::string& systemName) const {
+    for (const auto& system : systems) {
+        if (system->systemName == systemName) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool World::SetSystemActive(const std::string& systemName, bool active) {
+    for (auto& system : systems) {
+        if (system->systemName == systemName) {
+            system->isActive = active;
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<Engine::SerializedSystem> World::GetActiveSystemStates() const {
+    std::vector<Engine::SerializedSystem> states;
+    for (const auto& system : systems) {
+        // Skip required systems - they don't need to be serialized
+        if (system->isRequired) continue;
+        // Skip systems without names (legacy systems)
+        if (system->systemName.empty()) continue;
+
+        Engine::SerializedSystem ss;
+        ss.systemName = system->systemName;
+        ss.isActive = system->isActive;
+        states.push_back(ss);
+    }
+    return states;
+}
+
+void World::ApplySystemStates(const std::vector<Engine::SerializedSystem>& states) {
+    for (const auto& state : states) {
+        // Check if the system is in our registry
+        if (systemSerializationRegistry.HasSystem(state.systemName)) {
+            // If not already active, add it
+            if (!HasActiveSystem(state.systemName)) {
+                AddSystemByName(state.systemName);
+            }
+            // Apply active state
+            SetSystemActive(state.systemName, state.isActive);
+        } else {
+            // System is not in registry (DLL not loaded) - store as dormant
+            LOG_WARN("System '" + state.systemName + "' not found in registry. Storing as dormant.");
+            dormantSystems.push_back(state);
+        }
+    }
+}

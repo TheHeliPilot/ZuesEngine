@@ -39,6 +39,23 @@ set(EDITOR_SRC
         include/CustomInspectors/SpriteInspector.h
         src/InspectorRegistry.cpp
         include/CustomInspectors/InspectorRegistry.h
+        # Custom component inspectors
+        src/TransformInspector.cpp
+        include/CustomInspectors/TransformInspector.h
+        src/CameraInspector.cpp
+        include/CustomInspectors/CameraInspector.h
+        src/RigidbodyInspector.cpp
+        include/CustomInspectors/RigidbodyInspector.h
+        src/ColliderInspector.cpp
+        include/CustomInspectors/ColliderInspector.h
+        src/TextInspector.cpp
+        include/CustomInspectors/TextInspector.h
+        # Systems management UI
+        src/SystemsUI.cpp
+        include/SystemsUI.h
+        # Collider gizmo for visual editing
+        src/ColliderGizmo.cpp
+        include/ColliderGizmo.h
         # Moved from Engine
         src/ProjectManager.cpp
         include/ProjectManager.h

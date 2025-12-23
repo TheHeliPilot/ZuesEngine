@@ -24,10 +24,16 @@
 #include "SceneSetup.h"
 #include "../include/HierarchyOperations.h"
 #include "../include/customInspectors/SpriteInspector.h"
+#include "../include/customInspectors/TransformInspector.h"
+#include "../include/customInspectors/CameraInspector.h"
+#include "../include/customInspectors/RigidbodyInspector.h"
+#include "../include/customInspectors/ColliderInspector.h"
+#include "../include/customInspectors/TextInspector.h"
 #include "../include/HotReloadUI.h"
 #include "../include/GameDLLLoader.h"
 #include "../include/ProjectManager.h"
 #include "../include/ViewportCameraSystem.h"
+#include "../include/ColliderGizmo.h"
 #include "stb/stb_image.h"
 
 using namespace EditorWindows;
@@ -268,9 +274,46 @@ void DrawEditionStuff() {
 }
 
 static void RegisterBuiltInInspectors() {
+    // Transform (cannot be removed)
+    InspectorRegistry::Register(
+        Engine::ECS::Component::GetTypeID<Engine::ECS::Component::TransformComponent>(),
+        std::make_unique<TransformInspector>()
+    );
+
+    // Sprite
     InspectorRegistry::Register(
         Engine::ECS::Component::GetTypeID<Engine::ECS::Component::SpriteComponent>(),
         std::make_unique<SpriteInspector>()
+    );
+
+    // Camera
+    InspectorRegistry::Register(
+        Engine::ECS::Component::GetTypeID<Engine::ECS::Component::CameraComponent>(),
+        std::make_unique<CameraInspector>()
+    );
+
+    // Rigidbody
+    InspectorRegistry::Register(
+        Engine::ECS::Component::GetTypeID<Engine::ECS::Component::RigidbodyComponent>(),
+        std::make_unique<RigidbodyInspector>()
+    );
+
+    // Box Collider
+    InspectorRegistry::Register(
+        Engine::ECS::Component::GetTypeID<Engine::ECS::Component::BoxColliderComponent>(),
+        std::make_unique<BoxColliderInspector>()
+    );
+
+    // Circle Collider
+    InspectorRegistry::Register(
+        Engine::ECS::Component::GetTypeID<Engine::ECS::Component::CircleColliderComponent>(),
+        std::make_unique<CircleColliderInspector>()
+    );
+
+    // Text
+    InspectorRegistry::Register(
+        Engine::ECS::Component::GetTypeID<Engine::ECS::Component::TextComponent>(),
+        std::make_unique<TextInspector>()
     );
 }
 
@@ -444,6 +487,10 @@ int main(int argc, char* argv[]) {
         if (!EditorUi::isPlayMode) {
             DrawEditionStuff();
             HierarchyOperations::DoHierarchyOperations();
+
+            // Collider gizmos - draw and handle input
+            Editor::ColliderGizmo::Update();
+            Editor::ColliderGizmo::Draw();
         }
 
         Engine::Renderer::EndBatch();

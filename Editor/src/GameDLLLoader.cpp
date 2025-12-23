@@ -125,6 +125,20 @@ namespace Editor {
             world->ReloadAndHeal();
         }
 
+        // Restore dormant system states (systems that were active before DLL unload)
+        if (world && !world->GetDormantSystems().empty()) {
+            LOG_INFO("Restoring " + std::to_string(world->GetDormantSystems().size()) + " dormant system states...");
+            for (const auto& dormantState : world->GetDormantSystems()) {
+                if (dormantState.isActive && world->GetSystemRegistry().HasSystem(dormantState.systemName)) {
+                    if (!world->HasActiveSystem(dormantState.systemName)) {
+                        world->AddSystemByName(dormantState.systemName);
+                        LOG_INFO("Restored system: " + dormantState.systemName);
+                    }
+                }
+            }
+            world->GetDormantSystems().clear();
+        }
+
         return true;
     }
 
@@ -135,15 +149,34 @@ namespace Editor {
         if (m_Functions.Shutdown) m_Functions.Shutdown();
 
         if (World* world = Engine::Core::GetCurrentWorld()) {
-            // 1. Remove systems (stops the logic from running/crashing)
+            // 1. Save current active system states before removing them
+            auto activeSystemStates = world->GetActiveSystemStates();
+
+            // 2. Save DLL system states to dormant storage
+            auto& dormantSystems = world->GetDormantSystems();
+            dormantSystems.clear();
+            for (const auto& state : activeSystemStates) {
+                // Only save non-required game/shared systems from DLL
+                if (world->GetSystemRegistry().HasSystem(state.systemName)) {
+                    const auto* info = world->GetSystemRegistry().GetSystemInfo(state.systemName);
+                    if (info && info->isFromDLL) {
+                        dormantSystems.push_back(state);
+                    }
+                }
+            }
+
+            // 3. Remove systems (stops the logic from running/crashing)
             world->ClearSystems();
             Engine::RegisterSystems(world); // Re-add core engine systems
 
-            // 2. CRITICAL: Serialize the world to memory BEFORE clearing serializers
+            // 4. Clear DLL systems from the registry
+            world->GetSystemRegistry().ClearDLLSystems();
+
+            // 5. CRITICAL: Serialize the world to memory BEFORE clearing serializers
             // This converts DLL components to dormant data so they survive the unload
             nlohmann::json snapshot = world->SerializeToMemory();
 
-            // 3. Clear creators but NOT the data
+            // 6. Clear creators but NOT the data
             auto& creatorMap = Engine::ECS::Component::componentRegistry;
             const uint32_t startID = world->GetComponentRegistry().engineComponentCount;
 
@@ -151,7 +184,7 @@ namespace Editor {
                 it = creatorMap.erase(it);
             }
 
-            // 4. Clear DLL-specific Serializers (but keep typeNames for reload!)
+            // 7. Clear DLL-specific Serializers (but keep typeNames for reload!)
             auto& registry = world->GetComponentRegistry();
 
             // Remove serializers for IDs >= startID
@@ -162,7 +195,7 @@ namespace Editor {
             // NOTE: We intentionally DO NOT erase typeNames here!
             // Keeping them allows the reload to recognize components by name
 
-            // 5. Reload world from snapshot - DLL components become dormant
+            // 8. Reload world from snapshot - DLL components become dormant
             world->LoadFromMemory(snapshot);
         }
 

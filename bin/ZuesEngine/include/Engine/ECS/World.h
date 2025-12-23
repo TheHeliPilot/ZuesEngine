@@ -91,6 +91,31 @@ public:
     void ClearSystems() {
         systems.clear(); // This deletes the unique_ptrs, which is safe IF done before FreeLibrary
     }
+
+    // --- System Registry Access ---
+    Engine::SystemRegistry& GetSystemRegistry() { return systemSerializationRegistry; }
+    const Engine::SystemRegistry& GetSystemRegistry() const { return systemSerializationRegistry; }
+
+    // Get list of active systems (for UI)
+    const std::vector<std::unique_ptr<System>>& GetSystems() const { return systems; }
+
+    // Add a system by name from the registry (for UI/serialization)
+    bool AddSystemByName(const std::string& systemName);
+
+    // Remove a system by name (for UI)
+    bool RemoveSystemByName(const std::string& systemName);
+
+    // Check if a system is active by name
+    bool HasActiveSystem(const std::string& systemName) const;
+
+    // Set system active state by name
+    bool SetSystemActive(const std::string& systemName, bool active);
+
+    // Get active system states for serialization (excludes required systems)
+    std::vector<Engine::SerializedSystem> GetActiveSystemStates() const;
+
+    // Apply system states from serialization
+    void ApplySystemStates(const std::vector<Engine::SerializedSystem>& states);
     /**
      * Safe Registration for Hot-Reloading and DLLs.
      * Prevents TypeID collisions between different memory spaces.
@@ -190,10 +215,22 @@ private:
     // This handles the mapping between TypeIDs and Serializers
     Engine::ComponentRegistry componentSerializationRegistry;
 
+    // This handles the mapping between system names and creators
+    Engine::SystemRegistry systemSerializationRegistry;
+
     // Storage for component data from unloaded DLLs (dormant components)
     // Key: Entity index, Value: Vector of serialized components with unknown types
     std::map<EntityIndex, std::vector<Engine::SerializedComponent>> dormantData;
 
+    // Storage for system names from unloaded DLLs (dormant systems)
+    std::vector<Engine::SerializedSystem> dormantSystems;
+
+public:
+    // Access dormant systems for UI
+    const std::vector<Engine::SerializedSystem>& GetDormantSystems() const { return dormantSystems; }
+    std::vector<Engine::SerializedSystem>& GetDormantSystems() { return dormantSystems; }
+
+private:
     Archetype* GetOrCreateArchetype(const ComponentSignature& signature);
 
     void MoveEntity(EntityID id, Archetype* currentArchetype, Archetype* nextArchetype);

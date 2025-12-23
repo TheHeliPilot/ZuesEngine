@@ -5,6 +5,7 @@
 #include "Component.h"
 #include "ECSConfig.h"
 #include <bitset>
+#include <string>
 #include <type_traits> // For std::remove_pointer_t
 
 class World; // Forward declaration
@@ -14,6 +15,8 @@ public:
     enum class SystemRole { Shared, Editor, Game };
 
     bool isActive = true;
+    bool isRequired = false;  // Required systems cannot be disabled/removed from UI
+    std::string systemName;   // Human-readable name for the system (used for serialization)
 
     virtual ~System() = default;
     virtual void Run(World* world, float deltaTime) = 0; // The base execution function

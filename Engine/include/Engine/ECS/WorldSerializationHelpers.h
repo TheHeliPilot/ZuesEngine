@@ -4,6 +4,7 @@
 #include "Component.h"
 #include "Entity.h"
 #include "ECSConfig.h"
+#include "System.h"  // For System::SystemRole and System base class
 
 #include <tuple>
 #include <string>
@@ -110,9 +111,25 @@ namespace Engine {
         std::vector<SerializedComponent> components;
     };
 
+    // Serialized system info for persistence
+    struct SerializedSystem {
+        std::string systemName;
+        bool isActive = true;
+
+        friend void to_json(nlohmann::json& j, const SerializedSystem& ss) {
+            j = nlohmann::json{{"systemName", ss.systemName}, {"isActive", ss.isActive}};
+        }
+
+        friend void from_json(const nlohmann::json& j, SerializedSystem& ss) {
+            j.at("systemName").get_to(ss.systemName);
+            ss.isActive = j.value("isActive", true);
+        }
+    };
+
     struct WorldSnapshot {
         int version = 1;
         std::vector<SerializedEntity> entities;
+        std::vector<SerializedSystem> activeSystems;  // Optional: tracks which systems are active
     };
 
     inline void to_json(json& j, const EntityID& id) {
@@ -139,6 +156,9 @@ namespace Engine {
     inline void to_json(json& j, const WorldSnapshot& ws) {
         j["version"] = ws.version;
         j["entities"] = ws.entities;
+        if (!ws.activeSystems.empty()) {
+            j["activeSystems"] = ws.activeSystems;
+        }
     }
 
     inline void from_json(const json& j, WorldSnapshot& ws) {
@@ -146,6 +166,9 @@ namespace Engine {
             j.at("version").get_to(ws.version);
         }
         j.at("entities").get_to(ws.entities);
+        if (j.contains("activeSystems")) {
+            j.at("activeSystems").get_to(ws.activeSystems);
+        }
     }
 
     // ======================================================================
@@ -280,6 +303,90 @@ namespace Engine {
 
         const std::map<ECS::Component::TypeID, std::unique_ptr<IComponentSerializer>>& GetAllSerializers() const {
             return serializers;
+        }
+    };
+
+    // ======================================================================
+    // SYSTEM REGISTRY - Tracks available systems for the UI and hot-reload
+    // ======================================================================
+
+    // System creator function type - used to instantiate systems
+    using SystemCreator = std::function<std::unique_ptr<class System>()>;
+
+    struct SystemInfo {
+        std::string name;
+        SystemCreator creator;
+        System::SystemRole role = System::SystemRole::Game;
+        bool isRequired = false;        // Required systems cannot be removed
+        bool isFromDLL = false;         // True if this system came from the game DLL
+    };
+
+    struct SystemRegistry {
+        std::map<std::string, SystemInfo> registeredSystems;
+
+        // The watermark: systems registered before this are engine systems
+        size_t engineSystemCount = 0;
+
+        // Call after registering engine systems
+        void MarkEngineRegistrationComplete() {
+            engineSystemCount = registeredSystems.size();
+        }
+
+        // Register a new system (with creator function)
+        template<typename T>
+        void RegisterSystem(const std::string& name, System::SystemRole role, bool isRequired = false, bool isFromDLL = false) {
+            SystemInfo info;
+            info.name = name;
+            info.role = role;
+            info.isRequired = isRequired;
+            info.isFromDLL = isFromDLL;
+            info.creator = []() -> std::unique_ptr<System> {
+                auto sys = std::make_unique<T>();
+                return sys;
+            };
+            registeredSystems[name] = std::move(info);
+        }
+
+        // Check if a system is registered by name
+        bool HasSystem(const std::string& name) const {
+            return registeredSystems.contains(name);
+        }
+
+        // Get system info by name
+        const SystemInfo* GetSystemInfo(const std::string& name) const {
+            auto it = registeredSystems.find(name);
+            return (it != registeredSystems.end()) ? &it->second : nullptr;
+        }
+
+        // Create a system instance by name
+        std::unique_ptr<System> CreateSystem(const std::string& name) const {
+            auto it = registeredSystems.find(name);
+            if (it != registeredSystems.end() && it->second.creator) {
+                auto sys = it->second.creator();
+                if (sys) {
+                    sys->systemName = name;
+                    sys->isRequired = it->second.isRequired;
+                    sys->role = it->second.role;
+                }
+                return sys;
+            }
+            return nullptr;
+        }
+
+        // Get all registered systems (for UI)
+        const std::map<std::string, SystemInfo>& GetAllSystems() const {
+            return registeredSystems;
+        }
+
+        // Clear DLL-registered systems (for hot-reload)
+        void ClearDLLSystems() {
+            for (auto it = registeredSystems.begin(); it != registeredSystems.end(); ) {
+                if (it->second.isFromDLL) {
+                    it = registeredSystems.erase(it);
+                } else {
+                    ++it;
+                }
+            }
         }
     };
 } // namespace Engine
