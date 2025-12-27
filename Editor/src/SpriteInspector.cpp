@@ -8,9 +8,11 @@
 bool SpriteInspector::OnGui(const char* label, nlohmann::json& j) {
     bool changed = false;
 
+    ImGui::PushID("SpriteComponent");
+
     bool headerOpen = ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen);
 
-    if (ImGui::BeginPopupContextItem()) {
+    if (ImGui::BeginPopupContextItem("SpriteComponentContext")) {
         if (ImGui::MenuItem("Remove Component")) {
             World* world = Engine::Core::GetCurrentWorld();
             if (world && !EditorWindows::EditorUi::selectedEntities.empty()) {
@@ -32,24 +34,29 @@ bool SpriteInspector::OnGui(const char* label, nlohmann::json& j) {
         if (j.contains("spriteName")) {
             const auto current = j["spriteName"].get<std::string>();
 
-            if (ImGui::BeginCombo("Sprite", current.empty() ? "(none)" : current.c_str())) {
+            if (ImGui::BeginCombo("##SpriteDropdown", current.empty() ? "(none)" : current.c_str())) {
                 // Option to clear sprite
-                if (ImGui::Selectable("(none)", current.empty())) {
+                if (ImGui::Selectable("(none)##SpriteNone", current.empty())) {
                     j["spriteName"] = "";
                     changed = true;
                 }
 
+                int spriteIdx = 0;
                 for (const auto& texName : Engine::TextureManager::GetAllSpriteNames()) {
                     const bool selected = (texName == current);
+                    ImGui::PushID(spriteIdx++);
                     if (ImGui::Selectable(texName.c_str(), selected)) {
                         j["spriteName"] = texName;
                         changed = true;
                     }
                     if (selected)
                         ImGui::SetItemDefaultFocus();
+                    ImGui::PopID();
                 }
                 ImGui::EndCombo();
             }
+            ImGui::SameLine();
+            ImGui::TextUnformatted("Sprite");
         }
 
         // Size
@@ -112,5 +119,6 @@ bool SpriteInspector::OnGui(const char* label, nlohmann::json& j) {
         ImGui::Unindent();
     }
 
+    ImGui::PopID();
     return changed;
 }

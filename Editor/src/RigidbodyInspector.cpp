@@ -6,9 +6,11 @@
 bool RigidbodyInspector::OnGui(const char* label, nlohmann::json& j) {
     bool changed = false;
 
+    ImGui::PushID("RigidbodyComponent");
+
     bool headerOpen = ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen);
 
-    if (ImGui::BeginPopupContextItem()) {
+    if (ImGui::BeginPopupContextItem("RigidbodyComponentContext")) {
         if (ImGui::MenuItem("Remove Component")) {
             ImGui::CloseCurrentPopup();
         }
@@ -69,5 +71,6 @@ bool RigidbodyInspector::OnGui(const char* label, nlohmann::json& j) {
         ImGui::Unindent();
     }
 
+    ImGui::PopID();
     return changed;
 }

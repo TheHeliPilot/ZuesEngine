@@ -5,6 +5,8 @@
 #include "../include/HierarchyOperations.h"
 #include "../include/HierarchyOperations.h"
 
+#include <GLFW/glfw3.h>
+
 #include "Core.h"
 #include "../include/EditorUi.h"
 

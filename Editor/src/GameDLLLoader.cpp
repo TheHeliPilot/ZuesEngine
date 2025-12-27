@@ -8,6 +8,11 @@
 #include <cstdio>
 #include <EditorUi.h>
 
+// --- FIX: Include these for ID Reset Logic ---
+#include "../include/Engine/ECS/Component.h"
+#include "../include/Engine/Core.h"
+// ---------------------------------------------
+
 #if defined(_WIN32) || defined(_WIN64)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -71,6 +76,14 @@ namespace Editor {
             m_Status = GameDLLStatus::Error;
             return false;
         }
+
+        // --- FIX: Reset Component ID Counter ---
+        // Force the DLL to start generating IDs AFTER the Engine components.
+        // This ensures PlayerComponent always gets the same ID (e.g., 11) on every reload.
+        if (World* world = Engine::Core::GetCurrentWorld()) {
+             Engine::ECS::Component::GetGlobalComponentIDCounter() = world->GetComponentRegistry().engineComponentCount;
+        }
+        // ---------------------------------------
 
         // Load the library
         if (!LoadLibrary(m_LoadedDLLPath)) {

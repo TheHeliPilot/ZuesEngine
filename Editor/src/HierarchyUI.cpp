@@ -4,6 +4,8 @@
 
 #include "../include/HierarchyUI.h"
 
+#include <GLFW/glfw3.h>
+
 #include "Core.h"
 #include "imgui.h"
 #include "../include/EditorUi.h"
@@ -189,6 +191,11 @@ void HierarchyUI::HierarchyWindow()
    ImGui::Begin("Hierarchy");
 
    World* world = Engine::Core::GetCurrentWorld();
+   if (!world) {
+      ImGui::Text("No active world");
+      ImGui::End();
+      return;
+   }
 
    // --- World Header (styled, not a tree node) ---
    {
@@ -271,10 +278,6 @@ void HierarchyUI::HierarchyWindow()
       if (ImGui::MenuItem("Empty Entity"))
       {
          const EntityID emptyEntity = world->CreateEntity("Empty Entity");
-         world->AddComponent<Engine::ECS::Component::TransformComponent>(emptyEntity, {
-            .worldPosition = {0.0f, 0.0f},
-            .worldRotation = 0.0f
-         });
          EditorUi::selectedEntities.clear();
          EditorUi::selectedEntities.push_back(emptyEntity);
          EditorUi::MarkWorldAsModified();
@@ -282,10 +285,6 @@ void HierarchyUI::HierarchyWindow()
       if (ImGui::MenuItem("Sprite"))
       {
          const EntityID spriteEntity = world->CreateEntity("Sprite");
-         world->AddComponent<Engine::ECS::Component::TransformComponent>(spriteEntity, {
-            .worldPosition = {0.0f, 0.0f},
-            .worldRotation = 0.0f
-         });
          world->AddComponent<Engine::ECS::Component::SpriteComponent>(spriteEntity, {
             .spriteName = "",
             .size = {1.0f, 1.0f},
@@ -298,10 +297,6 @@ void HierarchyUI::HierarchyWindow()
       if (ImGui::MenuItem("Camera"))
       {
          const EntityID cameraEntity = world->CreateEntity("Camera");
-         world->AddComponent<Engine::ECS::Component::TransformComponent>(cameraEntity, {
-            .worldPosition = {0.0f, 0.0f},
-            .worldRotation = 0.0f
-         });
          world->AddComponent<Engine::ECS::Component::CameraComponent>(cameraEntity, {
             .halfHeight = 10.0f
          });
@@ -312,10 +307,6 @@ void HierarchyUI::HierarchyWindow()
       if (ImGui::MenuItem("Text"))
       {
          const EntityID textEntity = world->CreateEntity("Text");
-         world->AddComponent<Engine::ECS::Component::TransformComponent>(textEntity, {
-            .worldPosition = {0.0f, 0.0f},
-            .worldRotation = 0.0f
-         });
          world->AddComponent<Engine::ECS::Component::TextComponent>(textEntity, {
             .text = "Hello World",
             .color = {1.0f, 1.0f, 1.0f, 1.0f},
@@ -344,11 +335,8 @@ void HierarchyUI::HierarchyWindow()
          if (ImGui::MenuItem("Empty"))
          {
             const EntityID childEntity = world->CreateEntity("Empty");
-            world->AddComponent<Engine::ECS::Component::TransformComponent>(childEntity, {
-               .worldPosition = {0.0f, 0.0f},
-               .worldRotation = 0.0f,
-               .parent = lastRightClickedEntity
-            });
+            world->GetComponent<Engine::ECS::Component::TransformComponent>(childEntity).parent = lastRightClickedEntity;
+            Engine::ECS::Hierarchy::BuildCache(world);
             EditorUi::selectedEntities.clear();
             EditorUi::selectedEntities.push_back(childEntity);
             EditorUi::MarkWorldAsModified();
@@ -356,16 +344,13 @@ void HierarchyUI::HierarchyWindow()
          if (ImGui::MenuItem("Sprite"))
          {
             const EntityID childEntity = world->CreateEntity("Sprite");
-            world->AddComponent<Engine::ECS::Component::TransformComponent>(childEntity, {
-               .worldPosition = {0.0f, 0.0f},
-               .worldRotation = 0.0f,
-               .parent = lastRightClickedEntity
-            });
+            world->GetComponent<Engine::ECS::Component::TransformComponent>(childEntity).parent = lastRightClickedEntity;
             world->AddComponent<Engine::ECS::Component::SpriteComponent>(childEntity, {
                .spriteName = "",
                .size = {1.0f, 1.0f},
                .color = {1.0f, 1.0f, 1.0f, 1.0f},
             });
+            Engine::ECS::Hierarchy::BuildCache(world);
             EditorUi::selectedEntities.clear();
             EditorUi::selectedEntities.push_back(childEntity);
             EditorUi::MarkWorldAsModified();
@@ -447,8 +432,8 @@ void HierarchyUI::HierarchyWindow()
 
       if (ImGui::Button("OK", ImVec2(80, 0)) || enterPressed)
       {
-         if (strlen(entityNameBuffer) > 0) {
-            lastRightClickedEntity.name = std::string(entityNameBuffer);
+         if (strlen(entityNameBuffer) > 0 && world) {
+            world->RenameEntity(lastRightClickedEntity, std::string(entityNameBuffer));
             EditorUi::MarkWorldAsModified();
          }
          ImGui::CloseCurrentPopup();

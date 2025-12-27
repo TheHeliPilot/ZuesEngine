@@ -6,6 +6,8 @@
 bool TransformInspector::OnGui(const char* label, nlohmann::json& j) {
     bool changed = false;
 
+    ImGui::PushID("TransformComponent");
+
     bool headerOpen = ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen);
 
     // Transform cannot be removed - no context menu
@@ -99,5 +101,6 @@ bool TransformInspector::OnGui(const char* label, nlohmann::json& j) {
         ImGui::Unindent();
     }
 
+    ImGui::PopID();
     return changed;
 }

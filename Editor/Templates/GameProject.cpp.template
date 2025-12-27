@@ -36,9 +36,9 @@
 //         float speed = 5.0f;
 //         int score = 0;
 //     };
+//     ZUES_COMPONENT_JSON(PlayerComponent, health, speed, score)
 // }
-// // Tolerant serialization - must be OUTSIDE namespace for ADL to work
-// ZUES_COMPONENT_JSON(Game::PlayerComponent, health, speed, score)
+//
 
 // ============================================================================
 // CUSTOM SYSTEM EXAMPLE

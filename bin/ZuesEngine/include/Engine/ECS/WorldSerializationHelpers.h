@@ -263,9 +263,8 @@ struct ComponentSerializer final : public IComponentSerializer {
     T component{};
 
     if (!data.empty()) {
-      // Use nlohmann's ADL-based deserialization (finds to_json/from_json via ADL)
-      // This allows game components to use ZUES_COMPONENT_JSON or NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE
-      component = data.get<T>();
+      // Use nlohmann's adl_serializer which properly handles ADL across namespaces
+      nlohmann::adl_serializer<T>::from_json(data, component);
     }
 
     specificArray->data.push_back(std::move(component));
@@ -275,22 +274,26 @@ struct ComponentSerializer final : public IComponentSerializer {
     const ComponentArray<T> *specificArray =
         static_cast<const ComponentArray<T> *>(array);
     const T &component = specificArray->data.at(index);
-    // Use nlohmann's ADL-based serialization
-    return json(component);
+    // Use nlohmann's adl_serializer which properly handles ADL across namespaces
+    json j;
+    nlohmann::adl_serializer<T>::to_json(j, component);
+    return j;
   }
 
   // NEW: Inspector methods
   json SerializeFromPointer(void *componentPtr) const override {
     const T *component = static_cast<const T *>(componentPtr);
-    // Use nlohmann's ADL-based serialization
-    return json(*component);
+    // Use nlohmann's adl_serializer which properly handles ADL across namespaces
+    json j;
+    nlohmann::adl_serializer<T>::to_json(j, *component);
+    return j;
   }
 
   void DeserializeIntoPointer(void *componentPtr,
                               const json &data) const override {
     T *component = static_cast<T *>(componentPtr);
-    // Use nlohmann's ADL-based deserialization
-    *component = data.get<T>();
+    // Use nlohmann's adl_serializer which properly handles ADL across namespaces
+    nlohmann::adl_serializer<T>::from_json(data, *component);
   }
 };
 

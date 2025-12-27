@@ -16,6 +16,8 @@ add_library(ZuesEngine SHARED
         src/Engine.cpp
         src/Network.cpp
         src/Renderer.cpp
+        src/Debug.cpp
+        include/Engine/Debug.h
         src/Log.cpp
         include/Engine/Log.h
         src/EventSystem.cpp

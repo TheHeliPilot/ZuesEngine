@@ -43,9 +43,14 @@ bool EditorUi::isPlayMode = false;
 std::string EditorUi::savedWorldState = "";
 std::string EditorUi::currentWorldName = "Untitled";
 bool EditorUi::isWorldUnsaved = false;
+bool EditorUi::showProjectSettings = false;
+bool EditorUi::showWorldSettings = false;
+std::string EditorUi::currentWorldPath = "";
 
 // Static flag for the modal popup (must be declared before DrawWindowUi)
 static bool s_ShowCannotPlayModal = false;
+static bool s_ShowSaveAsPopup = false;
+static char s_SaveAsNameBuffer[256] = "";
 
 static ImVec2 FromImVec2(const ImVec2& v) { return {v.x, v.y}; }
 
@@ -325,8 +330,35 @@ static void DrawCustomTitleBar() {
 
     if (ImGui::BeginPopup("file_popup")) {
         if (ImGui::Selectable("New Project")) { /* action */ }
-        if (ImGui::Selectable("Load World"))   { /* action */ }
-        if (ImGui::Selectable("Save World"))  { EditorUi::SaveWorld(); }
+        ImGui::Separator();
+        if (ImGui::Selectable("New World")) { EditorUi::NewWorld(); }
+        if (ImGui::BeginMenu("Load World")) {
+            // List available worlds in project
+            std::string worldsDir = EditorUi::projectDir.string() + "/Worlds";
+            if (std::filesystem::exists(worldsDir)) {
+                bool hasWorlds = false;
+                for (const auto& entry : std::filesystem::directory_iterator(worldsDir)) {
+                    if (entry.path().extension() == ".json") {
+                        std::string worldName = entry.path().stem().string();
+                        hasWorlds = true;
+                        if (ImGui::Selectable(worldName.c_str())) {
+                            EditorUi::LoadWorld(worldName);
+                        }
+                    }
+                }
+                if (!hasWorlds) {
+                    ImGui::TextDisabled("No worlds found");
+                }
+            } else {
+                ImGui::TextDisabled("Worlds folder not found");
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::Separator();
+        if (ImGui::Selectable("Save World", false, EditorUi::currentWorldPath.empty() ? ImGuiSelectableFlags_Disabled : 0)) {
+            EditorUi::SaveWorld();
+        }
+        if (ImGui::Selectable("Save World As...")) { EditorUi::SaveWorldAs(); }
         ImGui::EndPopup();
     }
 
@@ -340,7 +372,10 @@ static void DrawCustomTitleBar() {
 
     if (ImGui::BeginPopup("edit_popup")) {
         if (ImGui::Selectable("Undo")) { /* action */ }
-        if (ImGui::Selectable("Redo"))   { /* action */ }
+        if (ImGui::Selectable("Redo")) { /* action */ }
+        ImGui::Separator();
+        if (ImGui::Selectable("Project Settings...")) { EditorUi::showProjectSettings = true; }
+        if (ImGui::Selectable("World Settings...")) { EditorUi::showWorldSettings = true; }
         ImGui::EndPopup();
     }
 
@@ -656,8 +691,186 @@ void EditorUi::DrawWindowUi() {
     AssetBrowserUI::AssetBrowserWindow();
     //TextureCutterUI::TextureCutterWindow(); //TODO: fix implementation to actually work
     Editor::HotReloadUI::Draw(); // Hot-reload panel
-    SystemsUI::SystemsWindow(); // Systems management window
+    // SystemsUI removed - systems are managed in World Settings
     //ImGui::ShowDemoWindow();
+
+    // --- Save As Popup ---
+    if (s_ShowSaveAsPopup) {
+        ImGui::OpenPopup("Save World As");
+        s_ShowSaveAsPopup = false;
+    }
+
+    if (ImGui::BeginPopupModal("Save World As", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Enter world name:");
+        ImGui::Separator();
+
+        static bool firstOpen = true;
+        if (firstOpen) {
+            ImGui::SetKeyboardFocusHere();
+            firstOpen = false;
+        }
+
+        bool enterPressed = ImGui::InputText("##save_as_input", s_SaveAsNameBuffer, sizeof(s_SaveAsNameBuffer),
+            ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+
+        ImGui::Spacing();
+
+        if (ImGui::Button("Save", ImVec2(80, 0)) || enterPressed) {
+            if (strlen(s_SaveAsNameBuffer) > 0) {
+                std::string newName = s_SaveAsNameBuffer;
+                std::string savePath = projectDir.string() + "/Worlds/" + newName + ".json";
+
+                // Create Worlds directory if it doesn't exist
+                std::filesystem::create_directories(projectDir.string() + "/Worlds");
+
+                World* world = Engine::Core::GetCurrentWorld();
+                if (world && world->SaveToJson(savePath)) {
+                    currentWorldName = newName;
+                    currentWorldPath = savePath;
+                    isWorldUnsaved = false;
+                    LOG_INFO("World saved as: " + savePath);
+                } else {
+                    LOG_ERROR("Failed to save world: " + savePath);
+                }
+                firstOpen = true;
+                ImGui::CloseCurrentPopup();
+            }
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Cancel", ImVec2(80, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            firstOpen = true;
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+
+    // --- Project Settings Window ---
+    if (showProjectSettings) {
+        ImGui::SetNextWindowSize(ImVec2(500, 400), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Project Settings", &showProjectSettings)) {
+            Engine::Project* project = Engine::ProjectManager::GetCurrent();
+            ImGui::Text("Project: %s", project ? project->Name.c_str() : "None");
+            ImGui::Separator();
+
+            if (ImGui::CollapsingHeader("Startup", ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::Text("Startup World:");
+                ImGui::SameLine();
+
+                // Get current startup world from project
+                std::string currentStartupWorld = project ? project->StartupWorld : "";
+                if (currentStartupWorld.empty()) currentStartupWorld = "(None)";
+
+                if (ImGui::BeginCombo("##startup_world", currentStartupWorld.c_str())) {
+                    // Option to clear startup world
+                    if (ImGui::Selectable("(None)", currentStartupWorld == "(None)")) {
+                        if (project) {
+                            Engine::ProjectManager::SetStartupWorld("");
+                        }
+                    }
+
+                    std::string worldsDir = projectDir.string() + "/Worlds";
+                    if (std::filesystem::exists(worldsDir)) {
+                        for (const auto& entry : std::filesystem::directory_iterator(worldsDir)) {
+                            if (entry.path().extension() == ".json") {
+                                std::string worldName = entry.path().stem().string();
+                                bool isSelected = (project && project->StartupWorld == worldName);
+                                if (ImGui::Selectable(worldName.c_str(), isSelected)) {
+                                    Engine::ProjectManager::SetStartupWorld(worldName);
+                                }
+                                if (isSelected) {
+                                    ImGui::SetItemDefaultFocus();
+                                }
+                            }
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::TextDisabled("The world that loads when opening the project");
+            }
+
+            if (ImGui::CollapsingHeader("Build Settings")) {
+                ImGui::Text("Build configuration options will go here");
+                // TODO: Add build settings
+            }
+
+            if (ImGui::CollapsingHeader("Engine Settings")) {
+                ImGui::Text("Engine configuration options will go here");
+                // TODO: Add engine settings
+            }
+        }
+        ImGui::End();
+    }
+
+    // --- World Settings Window ---
+    if (showWorldSettings) {
+        ImGui::SetNextWindowSize(ImVec2(500, 500), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("World Settings", &showWorldSettings)) {
+            ImGui::Text("World: %s%s", currentWorldName.c_str(), isWorldUnsaved ? " *" : "");
+            ImGui::Separator();
+
+            World* world = Engine::Core::GetCurrentWorld();
+
+            if (ImGui::CollapsingHeader("Active Systems", ImGuiTreeNodeFlags_DefaultOpen)) {
+                if (world) {
+                    auto& registry = world->GetSystemRegistry();
+                    const auto& systems = registry.GetAllSystems();
+
+                    ImGui::TextDisabled("Toggle systems on/off for this world");
+                    ImGui::Spacing();
+
+                    for (const auto& [name, info] : systems) {
+                        if (info.isRequired) {
+                            // Show required systems as disabled
+                            ImGui::BeginDisabled();
+                            bool active = true;
+                            ImGui::Checkbox(name.c_str(), &active);
+                            ImGui::EndDisabled();
+                            ImGui::SameLine();
+                            ImGui::TextDisabled("(required)");
+                        } else {
+                            bool isActive = world->HasActiveSystem(name);
+                            if (ImGui::Checkbox(name.c_str(), &isActive)) {
+                                if (isActive) {
+                                    world->AddSystemByName(name);
+                                } else {
+                                    world->RemoveSystemByName(name);
+                                }
+                                MarkWorldAsModified();
+                            }
+
+                            // Show system role
+                            ImGui::SameLine();
+                            const char* roleStr = "Game";
+                            if (info.role == System::SystemRole::Shared) roleStr = "Shared";
+                            else if (info.role == System::SystemRole::Editor) roleStr = "Editor";
+                            ImGui::TextDisabled("(%s)", roleStr);
+                        }
+                    }
+
+                    // Show dormant systems (from unloaded DLL)
+                    const auto& dormant = world->GetDormantSystems();
+                    if (!dormant.empty()) {
+                        ImGui::Spacing();
+                        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.0f, 1.0f), "Dormant Systems (DLL not loaded):");
+                        for (const auto& ds : dormant) {
+                            ImGui::BulletText("%s", ds.systemName.c_str());
+                        }
+                    }
+                } else {
+                    ImGui::Text("No world loaded");
+                }
+            }
+
+            if (ImGui::CollapsingHeader("World Properties")) {
+                ImGui::Text("World properties will go here");
+                // TODO: Add world properties like physics settings, etc.
+            }
+        }
+        ImGui::End();
+    }
 
     // Modal for "Cannot Play" warning when entities have unknown components
     if (s_ShowCannotPlayModal) {
@@ -704,6 +917,9 @@ void EditorUi::DrawWindowUi() {
 
     const ImVec2 contentSize = ImGui::GetContentRegionAvail();
     g_WindowSizeCache["Viewport"] = contentSize;
+
+    // Update the static viewportSize for camera/gizmo calculations
+    viewportSize = {contentSize.x, contentSize.y};
 
     // Only render if we have a valid size (avoid ImGui assertion on zero size)
     if (contentSize.x > 0.0f && contentSize.y > 0.0f) {
@@ -819,6 +1035,22 @@ void EditorUi::EnterPlayMode() {
       isPlayMode = false;
   }
 
+void EditorUi::EnsureWorldExists() {
+    World* world = Engine::Core::GetCurrentWorld();
+    if (!world) {
+        LOG_WARN("No world exists, this shouldn't happen as Core::Init creates one");
+        return;
+    }
+
+    // Check if world has any entities (besides the viewport camera which may exist)
+    // If no entities exist, we consider it a fresh/empty world
+    if (currentWorldPath.empty() && currentWorldName == "Untitled") {
+        // Create editor viewport camera if it doesn't exist
+        Engine::SpawnEditorViewportCamera(world);
+        LOG_INFO("Created new empty world");
+    }
+}
+
 void EditorUi::SaveWorld() {
     World* world = Engine::Core::GetCurrentWorld();
     if (!world) {
@@ -826,17 +1058,75 @@ void EditorUi::SaveWorld() {
         return;
     }
 
-    // Default save path (you can make this more sophisticated later)
-    std::string savePath = projectDir.string() + "/Worlds/" + currentWorldName + ".json";
+    // If world hasn't been saved before, use Save As
+    if (currentWorldPath.empty()) {
+        SaveWorldAs();
+        return;
+    }
 
-    // Create Worlds directory if it doesn't exist
-    std::filesystem::create_directories(projectDir.string() + "/Worlds");
-
-    if (world->SaveToJson(savePath)) {
+    if (world->SaveToJson(currentWorldPath)) {
         isWorldUnsaved = false;
-        LOG_INFO("World saved successfully: " + savePath);
+        LOG_INFO("World saved successfully: " + currentWorldPath);
     } else {
-        LOG_ERROR("Failed to save world: " + savePath);
+        LOG_ERROR("Failed to save world: " + currentWorldPath);
+    }
+}
+
+void EditorUi::SaveWorldAs() {
+    World* world = Engine::Core::GetCurrentWorld();
+    if (!world) {
+        LOG_ERROR("Cannot save: No active world");
+        return;
+    }
+
+    // Open the Save As popup
+    s_ShowSaveAsPopup = true;
+    strncpy(s_SaveAsNameBuffer, currentWorldName.c_str(), sizeof(s_SaveAsNameBuffer) - 1);
+    s_SaveAsNameBuffer[sizeof(s_SaveAsNameBuffer) - 1] = '\0';
+}
+
+void EditorUi::NewWorld() {
+    // TODO: Ask to save current world if modified
+
+    // Re-initialize core to create a fresh world
+    Engine::Core::Shutdown();
+    Engine::Core::Init(true);
+
+    World* world = Engine::Core::GetCurrentWorld();
+    if (world) {
+        // Create editor viewport camera
+        Engine::SpawnEditorViewportCamera(world);
+    }
+
+    // Reset world state
+    currentWorldName = "Untitled";
+    currentWorldPath = "";
+    isWorldUnsaved = false;
+    selectedEntities.clear();
+
+    LOG_INFO("Created new world");
+}
+
+void EditorUi::LoadWorld(const std::string& worldName) {
+    // TODO: Ask to save current world if modified
+
+    std::string worldPath = projectDir.string() + "/Worlds/" + worldName + ".json";
+
+    if (Engine::Core::LoadWorld(worldPath)) {
+        currentWorldName = worldName;
+        currentWorldPath = worldPath;
+        isWorldUnsaved = false;
+        selectedEntities.clear();
+
+        // Spawn editor viewport camera after loading (it's not saved with the world)
+        World* world = Engine::Core::GetCurrentWorld();
+        if (world) {
+            Engine::SpawnEditorViewportCamera(world);
+        }
+
+        LOG_INFO("Loaded world: " + worldName);
+    } else {
+        LOG_ERROR("Failed to load world: " + worldPath);
     }
 }
 

@@ -263,8 +263,8 @@ struct ComponentSerializer final : public IComponentSerializer {
     T component{};
 
     if (!data.empty()) {
-      // Call from_json directly using ADL
-      from_json(data, component);
+      // Use nlohmann's adl_serializer which properly handles ADL across namespaces
+      nlohmann::adl_serializer<T>::from_json(data, component);
     }
 
     specificArray->data.push_back(std::move(component));
@@ -274,26 +274,26 @@ struct ComponentSerializer final : public IComponentSerializer {
     const ComponentArray<T> *specificArray =
         static_cast<const ComponentArray<T> *>(array);
     const T &component = specificArray->data.at(index);
-    // Call to_json directly using ADL
+    // Use nlohmann's adl_serializer which properly handles ADL across namespaces
     json j;
-    to_json(j, component);
+    nlohmann::adl_serializer<T>::to_json(j, component);
     return j;
   }
 
   // NEW: Inspector methods
   json SerializeFromPointer(void *componentPtr) const override {
     const T *component = static_cast<const T *>(componentPtr);
-    // Call to_json directly using ADL
+    // Use nlohmann's adl_serializer which properly handles ADL across namespaces
     json j;
-    to_json(j, *component);
+    nlohmann::adl_serializer<T>::to_json(j, *component);
     return j;
   }
 
   void DeserializeIntoPointer(void *componentPtr,
                               const json &data) const override {
     T *component = static_cast<T *>(componentPtr);
-    // Call from_json directly using ADL
-    from_json(data, *component);
+    // Use nlohmann's adl_serializer which properly handles ADL across namespaces
+    nlohmann::adl_serializer<T>::from_json(data, *component);
   }
 };
 

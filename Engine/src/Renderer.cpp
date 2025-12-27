@@ -389,6 +389,14 @@ namespace Engine {
         return id;
     }
 
+    float Renderer::GetViewportWidth() {
+        return (s_Data != nullptr) ? s_Data->ViewportWidth : 0.0f;
+    }
+
+    float Renderer::GetViewportHeight() {
+        return (s_Data != nullptr) ? s_Data->ViewportHeight : 0.0f;
+    }
+
     // --- Batching Implementations ---
 
     // CRITICAL FIX 4: Remove the StartBatch() stub, as it causes 'no declaration matches' error
@@ -754,6 +762,26 @@ namespace Engine {
         return { world.x, world.y };
     }
 
+    float Renderer::ScreenToWorldSize(float screenPixels) {
+        if (!s_Data) return 0.1f;
+        if (s_Data->ViewportHeight <= 0.0f) return 0.1f;
+
+        // Use the camera's half-height and zoom from the view-projection matrix
+        // The vertical extent in world units = 2 * halfHeight / zoom
+        // The viewport shows ViewportHeight pixels
+        // So: worldUnitsPerPixel = (2 * halfHeight) / (ViewportHeight * zoom)
+
+        // We can derive this from the projection matrix:
+        // For orthographic: elements[1 + 1*4] = 1 / halfHeight (scaled by zoom)
+        // So halfHeight / zoom = 1 / elements[5]
+        float projY = s_Data->ViewProjectionMatrix.elements[1 + 1 * 4]; // elements[5]
+        if (projY == 0.0f) return 0.1f;
+        float halfHeightOverZoom = 1.0f / projY;
+        float worldUnitsPerPixel = (2.0f * halfHeightOverZoom) / s_Data->ViewportHeight;
+
+        return screenPixels * worldUnitsPerPixel;
+    }
+
     void Renderer::SubmitTextQuad(
             float x0, float y0,  // Bottom-Left
             float x1, float y1,  // Bottom-Right
@@ -909,8 +937,16 @@ namespace Engine {
         newFont.Size = pixelHeight;
         newFont.FontBuffer = fontBuffer;
 
+        // Extract font name from path (filename without extension)
+        size_t lastSlash = fontPath.find_last_of("/\\");
+        size_t lastDot = fontPath.find_last_of('.');
+        if (lastSlash == std::string::npos) lastSlash = 0;
+        else lastSlash++;
+        if (lastDot == std::string::npos || lastDot < lastSlash) lastDot = fontPath.length();
+        newFont.Name = fontPath.substr(lastSlash, lastDot - lastSlash);
+
         uint32_t fontID = s_Fonts.size();
-        LOG_INFO("LoadFont: Font loaded successfully with ID " + std::to_string(fontID) + ", texture ID: " + std::to_string(newFont.AtlasTextureID));
+        LOG_INFO("LoadFont: Font '" + newFont.Name + "' loaded successfully with ID " + std::to_string(fontID) + ", texture ID: " + std::to_string(newFont.AtlasTextureID));
 
         return fontID;
     }

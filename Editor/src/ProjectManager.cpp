@@ -18,6 +18,7 @@ namespace Engine {
     Project* ProjectManager::s_CurrentProject = nullptr;
     const std::string ProjectManager::CONFIG_FILE_NAME = "project.zues";
     const std::string ProjectManager::ENGINE_INCLUDE_KEY = "EngineIncludePath=";
+    const std::string STARTUP_WORLD_KEY = "StartupWorld=";
 
     std::atomic<bool> ProjectManager::s_IsBuilding = false;
     std::mutex ProjectManager::s_BuildMutex;
@@ -102,21 +103,36 @@ namespace Engine {
 
         WriteEnginePathToConfig(configPath, currentEngineIncludePath);
 
+        // Read settings from config file
+        std::string startupWorld;
+        std::ifstream configFile(configPath);
+        std::string line;
+        while (std::getline(configFile, line)) {
+            if (line.rfind(STARTUP_WORLD_KEY, 0) == 0) {
+                startupWorld = line.substr(STARTUP_WORLD_KEY.length());
+            }
+        }
+        configFile.close();
+
         s_CurrentProject = new Project{
             .Name = projectName,
             .RootPath = projectPath,
             .ConfigFilePath = configPath,
-            .EngineIncludePath = currentEngineIncludePath
+            .EngineIncludePath = currentEngineIncludePath,
+            .StartupWorld = startupWorld
         };
 
         LOG_INFO("Project loaded successfully: " + projectName);
-        if (!Core::LoadWorld(projectPath.string() + "/Worlds/World.json")) {
-            LOG_WARN("Failed to load world at " + projectPath.string() + "/Worlds/World.json. Starting with empty world.");
-            // TODO: Fix DLL boundary issues with world serialization before re-enabling save
-            // if (!Core::SaveWorld(projectPath.string() + "/Worlds/")) {
-            //     LOG_ERROR("Failed to save world!");
-            // }
-        }else LOG_INFO("Loaded world " + projectPath.string() + "/Worlds/World.json");
+
+        // Load startup world if set, otherwise try default World.json
+        std::string worldToLoad = startupWorld.empty() ? "World" : startupWorld;
+        std::string worldPath = projectPath.string() + "/Worlds/" + worldToLoad + ".json";
+
+        if (!Core::LoadWorld(worldPath)) {
+            LOG_WARN("Failed to load world at " + worldPath + ". Starting with empty world.");
+        } else {
+            LOG_INFO("Loaded world: " + worldToLoad);
+        }
         return true;
     }
 
@@ -502,6 +518,54 @@ namespace Engine {
         const std::filesystem::path zuesEngineRoot = currentPath.parent_path().parent_path().parent_path();
         const std::filesystem::path engineRoot = zuesEngineRoot / "Engine";
         return engineRoot / "extern/glad/include";
+    }
+
+    void ProjectManager::SetStartupWorld(const std::string& worldName) {
+        if (!s_CurrentProject) {
+            LOG_WARN("Cannot set startup world: No project loaded");
+            return;
+        }
+        s_CurrentProject->StartupWorld = worldName;
+        SaveProjectSettings();
+    }
+
+    void ProjectManager::SaveProjectSettings() {
+        if (!s_CurrentProject) {
+            LOG_WARN("Cannot save project settings: No project loaded");
+            return;
+        }
+
+        const std::filesystem::path& configPath = s_CurrentProject->ConfigFilePath;
+
+        // Read existing config
+        std::vector<std::string> lines;
+        bool startupWorldFound = false;
+
+        std::ifstream inFile(configPath);
+        std::string line;
+        while (std::getline(inFile, line)) {
+            if (line.rfind(STARTUP_WORLD_KEY, 0) == 0) {
+                lines.push_back(STARTUP_WORLD_KEY + s_CurrentProject->StartupWorld);
+                startupWorldFound = true;
+            } else {
+                lines.push_back(line);
+            }
+        }
+        inFile.close();
+
+        // Add startup world key if not found
+        if (!startupWorldFound && !s_CurrentProject->StartupWorld.empty()) {
+            lines.push_back(STARTUP_WORLD_KEY + s_CurrentProject->StartupWorld);
+        }
+
+        // Write back
+        std::ofstream outFile(configPath, std::ios::trunc);
+        for (const auto& l : lines) {
+            outFile << l << "\n";
+        }
+        outFile.close();
+
+        LOG_INFO("Project settings saved");
     }
 
 }

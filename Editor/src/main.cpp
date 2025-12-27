@@ -34,6 +34,7 @@
 #include "../include/ProjectManager.h"
 #include "../include/ViewportCameraSystem.h"
 #include "../include/ColliderGizmo.h"
+#include "Debug.h"
 #include "stb/stb_image.h"
 
 using namespace EditorWindows;
@@ -186,6 +187,76 @@ void ApplyDarkMinimalTheme()
     }
 }
 
+void DrawEditorGrid() {
+    World* world = Engine::Core::GetCurrentWorld();
+    if (!world) return;
+
+    // Get camera info for grid bounds
+    float zoom = 1.0f;
+    float halfHeight = 10.0f;
+    Engine::Math::Vec2 cameraPos = {0, 0};
+
+    world->ForEach<Engine::ECS::Component::TransformComponent*, Engine::ECS::Component::CameraComponent*, Engine::ECS::Component::ViewportCameraTag*>(
+        [&](EntityID entity, Engine::ECS::Component::TransformComponent* transform,
+            Engine::ECS::Component::CameraComponent* cam, Engine::ECS::Component::ViewportCameraTag* tag) {
+            zoom = cam->zoom;
+            halfHeight = cam->halfHeight;
+            cameraPos = transform->worldPosition;
+        }
+    );
+
+    // Calculate visible area
+    float aspect = EditorUi::viewportSize.x / std::max(1.0f, EditorUi::viewportSize.y);
+    float visibleHeight = (halfHeight * 2.0f) / zoom;
+    float visibleWidth = visibleHeight * aspect;
+
+    // Grid settings
+    constexpr float SMALL_GRID_SIZE = 1.0f;
+    constexpr float LARGE_GRID_SIZE = 10.0f;
+    constexpr float SMALL_GRID_THICKNESS = 1.0f;   // screen pixels
+    constexpr float LARGE_GRID_THICKNESS = 1.5f;   // screen pixels
+
+    // Calculate alpha for small grid based on zoom (fade out when zoomed out)
+    // When zoom < 0.3, small grid fades out; when zoom > 0.5, fully visible
+    float smallGridAlpha = std::clamp((zoom - 0.2f) / 0.3f, 0.0f, 1.0f) * 0.15f;
+    float largeGridAlpha = 0.25f;
+
+    // Colors
+    Engine::Math::Vec4 smallGridColor = {1.0f, 1.0f, 1.0f, smallGridAlpha};
+    Engine::Math::Vec4 largeGridColor = {1.0f, 1.0f, 1.0f, largeGridAlpha};
+
+    // Calculate grid bounds (extend beyond visible area)
+    float margin = LARGE_GRID_SIZE * 2;
+    float left = std::floor((cameraPos.x - visibleWidth / 2 - margin) / LARGE_GRID_SIZE) * LARGE_GRID_SIZE;
+    float right = std::ceil((cameraPos.x + visibleWidth / 2 + margin) / LARGE_GRID_SIZE) * LARGE_GRID_SIZE;
+    float bottom = std::floor((cameraPos.y - visibleHeight / 2 - margin) / LARGE_GRID_SIZE) * LARGE_GRID_SIZE;
+    float top = std::ceil((cameraPos.y + visibleHeight / 2 + margin) / LARGE_GRID_SIZE) * LARGE_GRID_SIZE;
+
+    float smallThickness = Engine::Renderer::ScreenToWorldSize(SMALL_GRID_THICKNESS);
+    float largeThickness = Engine::Renderer::ScreenToWorldSize(LARGE_GRID_THICKNESS);
+
+    // Draw small grid (1 unit) - only if visible enough
+    if (smallGridAlpha > 0.01f) {
+        for (float x = left; x <= right; x += SMALL_GRID_SIZE) {
+            // Skip lines that will be drawn by large grid
+            if (std::fmod(std::abs(x), LARGE_GRID_SIZE) < 0.01f) continue;
+            Engine::Renderer::DrawLine({x, bottom}, {x, top}, smallGridColor, smallThickness);
+        }
+        for (float y = bottom; y <= top; y += SMALL_GRID_SIZE) {
+            if (std::fmod(std::abs(y), LARGE_GRID_SIZE) < 0.01f) continue;
+            Engine::Renderer::DrawLine({left, y}, {right, y}, smallGridColor, smallThickness);
+        }
+    }
+
+    // Draw large grid (10 units) - always visible
+    for (float x = left; x <= right; x += LARGE_GRID_SIZE) {
+        Engine::Renderer::DrawLine({x, bottom}, {x, top}, largeGridColor, largeThickness);
+    }
+    for (float y = bottom; y <= top; y += LARGE_GRID_SIZE) {
+        Engine::Renderer::DrawLine({left, y}, {right, y}, largeGridColor, largeThickness);
+    }
+}
+
 void DrawEditionStuff() {
 
     if (EditorUi::selectedEntities.empty()) {
@@ -201,51 +272,73 @@ void DrawEditionStuff() {
     }
 
     // --- 1. Define Selection State (SIMULATION) ---
-    // In your real code, these would be member variables or properties of the drawn objects
     static bool isArrow1Selected = false;
     static bool isArrow2Selected = false;
     static bool isCircleSelected = false;
     static bool isMoveSquareSelected = false;
 
-    // --- 2. Define Color Pairs (Using the suggested contrast colors) ---
-
-    // Green (Success/Info)
+    // --- 2. Define Color Pairs ---
+    // Green (Y-Axis)
     constexpr auto GREEN_UNSELECTED = ImVec4(0.460f, 0.668f, 0.460f, 0.4f);
     constexpr auto GREEN_SELECTED   = ImVec4(0.233f, 1.000f, 0.233f, 0.6f);
 
-    // Red (Error/Warning)
+    // Red (X-Axis)
     constexpr auto RED_UNSELECTED   = ImVec4(0.598f, 0.460f, 0.460f, 0.4f);
     constexpr auto RED_SELECTED     = ImVec4(1.000f, 0.233f, 0.233f, 0.6f);
 
-    // Blue (Accent/Primary)
+    // Blue (Rotate/Move XY)
     constexpr auto BLUE_UNSELECTED  = ImVec4(0.362f, 0.382f, 0.510f, 0.4f);
     constexpr auto BLUE_SELECTED    = ImVec4(0.233f, 0.260f, 1.000f, 0.6f);
 
-
     Engine::Math::Vec2 mousePos = Engine::Renderer::ScreenToWorld(EditorUi::GetMousePositionInWindow("Viewport"));
+    Engine::Math::Vec2 origin = selectedTransforms[0].worldPosition;
 
-    // Arrow 1 (Green/Z-Axis)
-    // Select color: If selected, use GREEN_SELECTED, otherwise GREEN_UNSELECTED.
+    // Gizmo sizes in screen pixels
+    constexpr float ARROW_LENGTH_PX = 80.0f;
+    constexpr float ARROW_THICKNESS_PX = 2.0f;
+    constexpr float ARROW_HEAD_PX = 10.0f;
+    constexpr float CIRCLE_RADIUS_PX = 70.0f;
+    constexpr float CIRCLE_THICKNESS_PX = 2.0f;
+    constexpr float SQUARE_SIZE_PX = 20.0f;
+    constexpr float HIT_TOLERANCE_PX = 8.0f;
+
+    // Convert to world units for positioning
+    float arrowLength = Engine::Renderer::ScreenToWorldSize(ARROW_LENGTH_PX);
+    float hitTolerance = Engine::Renderer::ScreenToWorldSize(HIT_TOLERANCE_PX);
+    float circleRadius = Engine::Renderer::ScreenToWorldSize(CIRCLE_RADIUS_PX);
+    float squareSize = Engine::Renderer::ScreenToWorldSize(SQUARE_SIZE_PX);
+    float arrowThickness = Engine::Renderer::ScreenToWorldSize(ARROW_THICKNESS_PX);
+    float circleThickness = Engine::Renderer::ScreenToWorldSize(CIRCLE_THICKNESS_PX);
+
+    // Arrow 1 (Green/Y-Axis)
     ImVec4 c1 = isArrow1Selected ? GREEN_SELECTED : GREEN_UNSELECTED;
     Engine::Math::Vec4 color1 = {c1.x, c1.y, c1.z, c1.w};
-    Engine::Arrow a1 = Engine::Renderer::DrawArrow(selectedTransforms[0].worldPosition, selectedTransforms[0].worldPosition + Engine::Math::Vec2{0,3}, color1, .05f);
-    isArrow1Selected = isMoveSquareSelected || Engine::HitTest::Arrow(mousePos, a1, .2f) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::MoveY;
+    Engine::Math::Vec2 arrowEnd1 = origin + Engine::Math::Vec2{0, arrowLength};
+    Engine::Debug::DrawArrow(origin, arrowEnd1, color1, ARROW_THICKNESS_PX, ARROW_HEAD_PX);
+    Engine::Arrow a1 = {origin, arrowEnd1, arrowThickness};
+    isArrow1Selected = isMoveSquareSelected || Engine::HitTest::Arrow(mousePos, a1, hitTolerance) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::MoveY;
 
     // Arrow 2 (Red/X-Axis)
     ImVec4 c2 = isArrow2Selected ? RED_SELECTED : RED_UNSELECTED;
     Engine::Math::Vec4 color2 = {c2.x, c2.y, c2.z, c2.w};
-    Engine::Arrow a2 = Engine::Renderer::DrawArrow(selectedTransforms[0].worldPosition, selectedTransforms[0].worldPosition + Engine::Math::Vec2{3,0}, color2, .05f);
-    isArrow2Selected = isMoveSquareSelected || Engine::HitTest::Arrow(mousePos, a2, .2f) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::MoveX;
+    Engine::Math::Vec2 arrowEnd2 = origin + Engine::Math::Vec2{arrowLength, 0};
+    Engine::Debug::DrawArrow(origin, arrowEnd2, color2, ARROW_THICKNESS_PX, ARROW_HEAD_PX);
+    Engine::Arrow a2 = {origin, arrowEnd2, arrowThickness};
+    isArrow2Selected = isMoveSquareSelected || Engine::HitTest::Arrow(mousePos, a2, hitTolerance) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::MoveX;
 
-    // Circle (Blue)
+    // Circle (Blue/Rotation)
     ImVec4 c3 = isCircleSelected ? BLUE_SELECTED : BLUE_UNSELECTED;
     Engine::Math::Vec4 color3 = {c3.x, c3.y, c3.z, c3.w};
-    Engine::Circle c = Engine::Renderer::DrawCircle(selectedTransforms[0].worldPosition, 3, color3, 50, true, .05f);
-    isCircleSelected = Engine::HitTest::Circle(mousePos, c, .2f) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::Rotate;
+    Engine::Debug::DrawCircle(origin, circleRadius, color3, 50, CIRCLE_THICKNESS_PX);
+    Engine::Circle c = {origin, circleRadius, true, circleThickness};
+    isCircleSelected = Engine::HitTest::Circle(mousePos, c, hitTolerance) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::Rotate;
 
+    // Square (Blue/Move XY)
     ImVec4 s1 = isMoveSquareSelected ? BLUE_SELECTED : BLUE_UNSELECTED;
     Engine::Math::Vec4 color4 = {s1.x, s1.y, s1.z, s1.w};
-    Engine::Rect r1 = Engine::Renderer::DrawRect(selectedTransforms[0].worldPosition + Engine::Math::Vec2{.5f,.5f}, {1,1}, color4, 0);
+    Engine::Math::Vec2 squareCenter = origin + Engine::Math::Vec2{squareSize * 0.5f, squareSize * 0.5f};
+    Engine::Debug::DrawFilledRect(squareCenter, SQUARE_SIZE_PX, SQUARE_SIZE_PX, color4, 0);
+    Engine::Rect r1 = {squareCenter, {squareSize, squareSize}};
     isMoveSquareSelected = Engine::HitTest::Rect(mousePos, r1) || HierarchyOperations::draggingStatus == HierarchyOperations::DraggingOperation::MoveXY;
 
     if (Engine::Input::IsMouseButtonPressed(0)) {
@@ -366,7 +459,6 @@ int main(int argc, char* argv[]) {
         return -1;
     }
     g_MainWindow = window;
-    Engine::Input::SetWindow(window);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(0); // vsync
 
@@ -394,11 +486,22 @@ int main(int argc, char* argv[]) {
     Engine::Initialize(true, true, "0.0.0.0", 7777, true);
     Engine::IEventSystem->Subscribe<Engine::LogEvent>(LoggerUI::GetLogEvent);
 
+    // Register ViewportCameraSystem as a proper ECS system
     Engine::Core::GetCurrentWorld()->RegisterSystem(std::make_unique<ViewportCameraSystem>());
 
     if (!Engine::ProjectManager::OpenOrCreate(EditorUi::projectDir)) {
         LOG_ERROR("Failed to open or create project at " + EditorUi::projectDir.string());
         return -1;
+    }
+
+    // Sync EditorUi world state with what ProjectManager loaded
+    if (Engine::ProjectManager::GetCurrent()) {
+        std::string startupWorld = Engine::ProjectManager::GetCurrent()->StartupWorld;
+        if (!startupWorld.empty()) {
+            EditorUi::currentWorldName = startupWorld;
+            EditorUi::currentWorldPath = EditorUi::projectDir.string() + "/Worlds/" + startupWorld + ".json";
+            EditorUi::isWorldUnsaved = false;
+        }
     }
 
     Engine::SpawnEditorViewportCamera(Engine::Core::GetCurrentWorld());
@@ -408,6 +511,15 @@ int main(int argc, char* argv[]) {
     } else {
         GameDLLLoader::Get().EnableAutoReload(true);
         LOG_INFO("Game DLL hot-reload system initialized");
+
+        // Try to load the DLL if it already exists
+        if (GameDLLLoader::Get().LoadDLL()) {
+            LOG_INFO("Game DLL loaded successfully on startup");
+        } else {
+            // DLL doesn't exist yet - try to build it
+            LOG_INFO("Game DLL not found, attempting to build...");
+            GameDLLLoader::Get().BuildGameDLL(true);
+        }
     }
 
     Engine::TextureManager::ScanAndRegisterAllSprites(EditorUi::projectDir.string());
@@ -463,13 +575,43 @@ int main(int argc, char* argv[]) {
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
+    // Set up scroll callback for input injection
+    glfwSetScrollCallback(window, [](GLFWwindow* w, double xoffset, double yoffset) {
+        Engine::Input::AddScrollDelta(static_cast<float>(yoffset));
+        // Also forward to ImGui
+        ImGui_ImplGlfw_ScrollCallback(w, xoffset, yoffset);
+    });
+
     LOG_INFO("Editor started successfully.");
 
     int display_w, display_h;
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
-        Engine::Input::UpdateState();
+
+        // --- Inject input state from Editor (GLFW) into Engine ---
+        Engine::Input::BeginFrame();
+
+        // Inject mouse position
+        double mx, my;
+        glfwGetCursorPos(window, &mx, &my);
+        Engine::Input::SetMousePosition(static_cast<float>(mx), static_cast<float>(my));
+
+        // Inject mouse button states
+        for (int btn = GLFW_MOUSE_BUTTON_1; btn <= GLFW_MOUSE_BUTTON_8; ++btn) {
+            Engine::Input::SetMouseButtonState(btn, glfwGetMouseButton(window, btn) == GLFW_PRESS);
+        }
+
+        // Inject key states (common range)
+        for (int key = 32; key <= 348; ++key) {
+            int state = glfwGetKey(window, key);
+            if (state == GLFW_PRESS || state == GLFW_REPEAT) {
+                Engine::Input::SetKeyState(key, true);
+            } else {
+                Engine::Input::SetKeyState(key, false);
+            }
+        }
+
         GameDLLLoader::Get().CheckForChanges();
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -480,6 +622,11 @@ int main(int argc, char* argv[]) {
 
         Engine::Renderer::Render();
         Engine::Renderer::BeginBatch();
+
+        // Draw editor grid first (behind everything)
+        if (!EditorUi::isPlayMode) {
+            DrawEditorGrid();
+        }
 
         const System::SystemRole updateMode = EditorUi::isPlayMode ? System::SystemRole::Game : System::SystemRole::Editor;
         Engine::Update(updateMode);

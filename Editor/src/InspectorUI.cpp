@@ -41,9 +41,36 @@ void InspectorUI::InspectorWindow() {
 
     const EntityID entity = EditorUi::selectedEntities[0];
 
-    char name[32] = {};
-    strncpy(name, entity.name.c_str(), sizeof(name) - 1);
-    ImGui::InputText("Entity Name", name, IM_ARRAYSIZE(name));
+    // Validate entity still exists
+    if (!entity.IsValid()) {
+        ImGui::Text("Invalid entity selected");
+        ImGui::End();
+        return;
+    }
+
+    static char nameBuffer[256] = {};
+    static EntityID lastEditedEntity;
+
+    // Reset buffer when selecting a different entity
+    if (lastEditedEntity.id != entity.id) {
+        strncpy(nameBuffer, entity.name.c_str(), sizeof(nameBuffer) - 1);
+        nameBuffer[sizeof(nameBuffer) - 1] = '\0';
+        lastEditedEntity = entity;
+    }
+
+    if (ImGui::InputText("Entity Name", nameBuffer, sizeof(nameBuffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
+        if (strlen(nameBuffer) > 0) {
+            world->RenameEntity(entity, std::string(nameBuffer));
+            EditorUi::MarkWorldAsModified();
+        }
+    }
+    // Also save on deactivation (when clicking away)
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        if (strlen(nameBuffer) > 0) {
+            world->RenameEntity(entity, std::string(nameBuffer));
+            EditorUi::MarkWorldAsModified();
+        }
+    }
     ImGui::Separator();
 
     const auto& registry = world->GetComponentRegistry();
@@ -55,6 +82,10 @@ void InspectorUI::InspectorWindow() {
 
     for (auto& [typeID, compPtr] : components) {
         try {
+            if (!compPtr) {
+                continue; // Skip null component pointers
+            }
+
             const auto* serializer = registry.GetSerializer(typeID);
             const std::string& compName = registry.GetTypeName(typeID);
 
@@ -147,6 +178,9 @@ void InspectorUI::InspectorWindow() {
         // --- SECTION 1: Engine Components ---
         ImGui::SeparatorText("Engine");
         for (const auto& [id, name] : reg.typeNames) {
+
+            if (name == "Viewport Camera" || name == "ViewportCameraTag") continue;
+
             // Only show built-in engine components here
             if (id < reg.engineComponentCount) {
                 if (!world->HasComponent(entity, id) && ImGui::MenuItem(name.c_str())) {

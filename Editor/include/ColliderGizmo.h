@@ -12,8 +12,15 @@ namespace Editor {
         Right,
         Top,
         Bottom,
-        Radius  // For circle colliders
+        Radius,      // For circle collider edge
+        Center       // For circle collider offset movement
     };
+
+    // Accessor functions from ColliderInspector
+    bool IsColliderEditMode();
+    EntityID GetEditingColliderEntity();
+    bool IsEditingBoxCollider();
+    void ClearColliderEditMode();
 
     class ColliderGizmo {
     public:
@@ -23,15 +30,15 @@ namespace Editor {
         // Handle mouse input for collider editing
         static void Update();
 
-        // Check if we're currently editing a collider
-        static bool IsEditing() { return s_ActiveHandle != ColliderHandle::None; }
+        // Check if we're currently dragging a handle
+        static bool IsDragging() { return s_ActiveHandle != ColliderHandle::None; }
 
     private:
         // Draw box collider with edit handles
-        static void DrawBoxCollider(EntityID entity, const Engine::Math::Vec2& worldPos, float worldRotation);
+        static void DrawBoxCollider(EntityID entity, const Engine::Math::Vec2& worldPos, float worldRotation, bool isEditMode);
 
         // Draw circle collider with edit handle
-        static void DrawCircleCollider(EntityID entity, const Engine::Math::Vec2& worldPos, float worldRotation);
+        static void DrawCircleCollider(EntityID entity, const Engine::Math::Vec2& worldPos, float worldRotation, bool isEditMode);
 
         // Get handle at mouse position for box collider
         static ColliderHandle GetBoxHandleAtMouse(
@@ -41,8 +48,8 @@ namespace Editor {
             const Engine::Math::Vec2& mouseWorld
         );
 
-        // Get if mouse is on radius handle for circle collider
-        static bool IsOnRadiusHandle(
+        // Get handle at mouse position for circle collider
+        static ColliderHandle GetCircleHandleAtMouse(
             const Engine::Math::Vec2& colliderCenter,
             float radius,
             const Engine::Math::Vec2& mouseWorld

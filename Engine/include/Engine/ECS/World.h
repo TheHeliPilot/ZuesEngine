@@ -80,6 +80,7 @@ public:
 
     EntityID CreateEntity(const std::string &name);
     void DestroyEntity(EntityID entityID);
+    bool RenameEntity(EntityID entityID, const std::string& newName);
 
     // --- Component Registration ---
 

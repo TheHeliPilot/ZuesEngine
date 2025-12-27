@@ -164,7 +164,9 @@ bool World::IsComponentRegistered() {
 
 template<typename T>
 void World::RegisterComponent(const std::string& typeName) {
-    Engine::ECS::Component::TypeID id = Engine::ECS::Component::GetTypeID<T>();
+    // Register in the global component registry (for archetype creation)
+    Engine::ECS::Component::RegisterComponent<T>();
+    // Register the serializer (for save/load and inspector)
     componentSerializationRegistry.RegisterComponent<T>(typeName);
 }
 
@@ -215,9 +217,14 @@ inline bool World::SaveToJson(const std::string& filename) const {
 
     Engine::WorldSnapshot snapshot;
 
-    // Get the TypeID for ViewportCameraTag to skip editor-only entities
-    const Engine::ECS::Component::TypeID viewportCameraTagID =
-        Engine::ECS::Component::GetTypeID<Engine::ECS::Component::ViewportCameraTag>();
+    // Get the TypeID for ViewportCameraTag by name to skip editor-only entities
+    // Using name lookup instead of GetTypeID<> to ensure consistency across DLL boundaries
+    Engine::ECS::Component::TypeID viewportCameraTagID = 0;
+    bool hasViewportCameraTag = false;
+    if (componentSerializationRegistry.HasName("Viewport Camera")) {
+        viewportCameraTagID = componentSerializationRegistry.GetIDByName("Viewport Camera");
+        hasViewportCameraTag = true;
+    }
 
     for (EntityIndex i = 0; i < entityLookup.size(); ++i) {
         if (const auto&[generation, archetypePtr, archetypeIndex, hasUnknown] = entityLookup[i]; archetypePtr && generation == EntityID(i, generation).GetGeneration()) {
@@ -225,7 +232,7 @@ inline bool World::SaveToJson(const std::string& filename) const {
             auto currentArchetype = static_cast<Archetype*>(archetypePtr);
 
             // Skip editor-only entities (those with ViewportCameraTag)
-            if (currentArchetype->signature.test(viewportCameraTagID)) {
+            if (hasViewportCameraTag && currentArchetype->signature.test(viewportCameraTagID)) {
                 continue;
             }
 
@@ -588,9 +595,14 @@ inline bool World::HasAnyEntitiesWithUnknownComponents() const {
 inline nlohmann::json World::SerializeToMemory() const {
     Engine::WorldSnapshot snapshot;
 
-    // Get the TypeID for ViewportCameraTag to skip editor-only entities
-    const Engine::ECS::Component::TypeID viewportCameraTagID =
-        Engine::ECS::Component::GetTypeID<Engine::ECS::Component::ViewportCameraTag>();
+    // Get the TypeID for ViewportCameraTag by name to skip editor-only entities
+    // Using name lookup instead of GetTypeID<> to ensure consistency across DLL boundaries
+    Engine::ECS::Component::TypeID viewportCameraTagID = 0;
+    bool hasViewportCameraTag = false;
+    if (componentSerializationRegistry.HasName("Viewport Camera")) {
+        viewportCameraTagID = componentSerializationRegistry.GetIDByName("Viewport Camera");
+        hasViewportCameraTag = true;
+    }
 
     for (EntityIndex i = 0; i < entityLookup.size(); ++i) {
         if (const auto&[generation, archetypePtr, archetypeIndex, hasUnknown] = entityLookup[i];
@@ -599,7 +611,7 @@ inline nlohmann::json World::SerializeToMemory() const {
             auto currentArchetype = static_cast<Archetype*>(archetypePtr);
 
             // Skip editor-only entities
-            if (currentArchetype->signature.test(viewportCameraTagID)) {
+            if (hasViewportCameraTag && currentArchetype->signature.test(viewportCameraTagID)) {
                 continue;
             }
 

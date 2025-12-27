@@ -1,7 +1,12 @@
 #include "../include/customInspectors/ColliderInspector.h"
 #include "../include/EditorUi.h"
+#include "../include/ColliderGizmo.h"
 #include "imgui.h"
 #include "Core.h"
+
+// Track which collider is in edit mode
+static EntityID s_EditingColliderEntity = NullEntityID();
+static bool s_IsEditingBoxCollider = false;
 
 // Helper function for common collider properties
 static bool DrawColliderCommon(nlohmann::json& j, bool& changed) {
@@ -56,9 +61,24 @@ static bool DrawColliderCommon(nlohmann::json& j, bool& changed) {
 bool BoxColliderInspector::OnGui(const char* label, nlohmann::json& j) {
     bool changed = false;
 
+    ImGui::PushID("BoxColliderComponent");
+
+    // Check if this collider is being edited
+    EntityID currentEntity = EditorWindows::EditorUi::selectedEntities.empty()
+        ? NullEntityID()
+        : EditorWindows::EditorUi::selectedEntities[0];
+    bool isEditing = (s_EditingColliderEntity.id == currentEntity.id && s_IsEditingBoxCollider);
+
+    // Clear edit mode if entity was deselected
+    if (s_EditingColliderEntity.IsValid() &&
+        (EditorWindows::EditorUi::selectedEntities.empty() ||
+         !EditorWindows::EditorUi::IsEntitySelected(s_EditingColliderEntity))) {
+        s_EditingColliderEntity = NullEntityID();
+    }
+
     bool headerOpen = ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen);
 
-    if (ImGui::BeginPopupContextItem()) {
+    if (ImGui::BeginPopupContextItem("BoxColliderContext")) {
         if (ImGui::MenuItem("Remove Component")) {
             ImGui::CloseCurrentPopup();
         }
@@ -67,6 +87,30 @@ bool BoxColliderInspector::OnGui(const char* label, nlohmann::json& j) {
 
     if (headerOpen) {
         ImGui::Indent();
+
+        // Edit Collider button
+        if (isEditing) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.2f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.3f, 1.0f));
+            if (ImGui::Button("Done Editing")) {
+                s_EditingColliderEntity = NullEntityID();
+            }
+            ImGui::PopStyleColor(2);
+        } else {
+            if (ImGui::Button("Edit Collider")) {
+                s_EditingColliderEntity = currentEntity;
+                s_IsEditingBoxCollider = true;
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Click to edit collider shape in viewport");
+        }
+
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Drag edge handles to resize");
+        }
 
         // Size
         if (j.contains("size")) {
@@ -104,15 +148,31 @@ bool BoxColliderInspector::OnGui(const char* label, nlohmann::json& j) {
         ImGui::Unindent();
     }
 
+    ImGui::PopID();
     return changed;
 }
 
 bool CircleColliderInspector::OnGui(const char* label, nlohmann::json& j) {
     bool changed = false;
 
+    ImGui::PushID("CircleColliderComponent");
+
+    // Check if this collider is being edited
+    EntityID currentEntity = EditorWindows::EditorUi::selectedEntities.empty()
+        ? NullEntityID()
+        : EditorWindows::EditorUi::selectedEntities[0];
+    bool isEditing = (s_EditingColliderEntity.id == currentEntity.id && !s_IsEditingBoxCollider);
+
+    // Clear edit mode if entity was deselected
+    if (s_EditingColliderEntity.IsValid() &&
+        (EditorWindows::EditorUi::selectedEntities.empty() ||
+         !EditorWindows::EditorUi::IsEntitySelected(s_EditingColliderEntity))) {
+        s_EditingColliderEntity = NullEntityID();
+    }
+
     bool headerOpen = ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen);
 
-    if (ImGui::BeginPopupContextItem()) {
+    if (ImGui::BeginPopupContextItem("CircleColliderContext")) {
         if (ImGui::MenuItem("Remove Component")) {
             ImGui::CloseCurrentPopup();
         }
@@ -121,6 +181,30 @@ bool CircleColliderInspector::OnGui(const char* label, nlohmann::json& j) {
 
     if (headerOpen) {
         ImGui::Indent();
+
+        // Edit Collider button
+        if (isEditing) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.2f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.3f, 1.0f));
+            if (ImGui::Button("Done Editing")) {
+                s_EditingColliderEntity = NullEntityID();
+            }
+            ImGui::PopStyleColor(2);
+        } else {
+            if (ImGui::Button("Edit Collider")) {
+                s_EditingColliderEntity = currentEntity;
+                s_IsEditingBoxCollider = false;
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Click to edit collider shape in viewport");
+        }
+
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Drag edge to resize, drag center to move offset");
+        }
 
         // Radius
         if (j.contains("radius")) {
@@ -153,5 +237,25 @@ bool CircleColliderInspector::OnGui(const char* label, nlohmann::json& j) {
         ImGui::Unindent();
     }
 
+    ImGui::PopID();
     return changed;
+}
+
+// Accessor functions for the collider gizmo
+namespace Editor {
+    bool IsColliderEditMode() {
+        return s_EditingColliderEntity.IsValid();
+    }
+
+    EntityID GetEditingColliderEntity() {
+        return s_EditingColliderEntity;
+    }
+
+    bool IsEditingBoxCollider() {
+        return s_IsEditingBoxCollider;
+    }
+
+    void ClearColliderEditMode() {
+        s_EditingColliderEntity = NullEntityID();
+    }
 }

@@ -2,13 +2,16 @@
 #include "../include/EditorUi.h"
 #include "imgui.h"
 #include "Core.h"
+#include "Renderer.h"
 
 bool TextInspector::OnGui(const char* label, nlohmann::json& j) {
     bool changed = false;
 
+    ImGui::PushID("TextComponent");
+
     bool headerOpen = ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen);
 
-    if (ImGui::BeginPopupContextItem()) {
+    if (ImGui::BeginPopupContextItem("TextComponentContext")) {
         if (ImGui::MenuItem("Remove Component")) {
             ImGui::CloseCurrentPopup();
         }
@@ -25,19 +28,42 @@ bool TextInspector::OnGui(const char* label, nlohmann::json& j) {
             strncpy(buffer, text.c_str(), sizeof(buffer) - 1);
             buffer[sizeof(buffer) - 1] = '\0';
 
-            if (ImGui::InputTextMultiline("Text", buffer, sizeof(buffer), ImVec2(-1, 60))) {
+            if (ImGui::InputTextMultiline("##TextContent", buffer, sizeof(buffer), ImVec2(-1, 60))) {
                 j["text"] = std::string(buffer);
                 changed = true;
             }
         }
 
-        // Font ID (for now just a number, could be a dropdown later)
+        // Font dropdown
         if (j.contains("fontID")) {
             int fontID = j["fontID"].get<int>();
-            if (ImGui::InputInt("Font ID", &fontID)) {
-                if (fontID < 0) fontID = 0;
-                j["fontID"] = fontID;
-                changed = true;
+            const auto& fonts = Engine::Renderer::GetLoadedFonts();
+
+            // Build current font name
+            std::string currentFontName = "(None)";
+            if (fontID > 0 && static_cast<size_t>(fontID) <= fonts.size()) {
+                currentFontName = fonts[fontID - 1].Name;
+            }
+
+            if (ImGui::BeginCombo("Font", currentFontName.c_str())) {
+                // Option for no font / invalid
+                if (ImGui::Selectable("(None)", fontID == 0)) {
+                    j["fontID"] = 0;
+                    changed = true;
+                }
+
+                // List all loaded fonts
+                for (size_t i = 0; i < fonts.size(); i++) {
+                    const bool isSelected = (fontID == static_cast<int>(i + 1));
+                    if (ImGui::Selectable(fonts[i].Name.c_str(), isSelected)) {
+                        j["fontID"] = static_cast<int>(i + 1);
+                        changed = true;
+                    }
+                    if (isSelected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
             }
         }
 
@@ -103,5 +129,6 @@ bool TextInspector::OnGui(const char* label, nlohmann::json& j) {
         ImGui::Unindent();
     }
 
+    ImGui::PopID();
     return changed;
 }

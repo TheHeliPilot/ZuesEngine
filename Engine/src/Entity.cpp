@@ -8,8 +8,11 @@
 // Constructors
 // --------------------
 
+// Use UINT64_MAX as the null sentinel value (index 0 with generation 0 is valid!)
+static constexpr uint64_t NULL_ENTITY_ID = UINT64_MAX;
+
 EntityID::EntityID()
-    : id(0) {}
+    : id(NULL_ENTITY_ID) {}
 
 EntityID::EntityID(const EntityIndex index, const EntityGeneration generation)
     : id((static_cast<uint64_t>(generation) << 32) | index) {}
@@ -31,7 +34,7 @@ EntityGeneration EntityID::GetGeneration() const {
 }
 
 bool EntityID::IsValid() const {
-    return id != 0;
+    return id != NULL_ENTITY_ID;
 }
 
 bool EntityID::operator==(const EntityID& other) const {

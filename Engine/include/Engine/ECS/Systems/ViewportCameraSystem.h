@@ -1,9 +1,9 @@
-﻿// ViewportCameraSystem.h
+// ViewportCameraSystem.h
+// NOTE: This is a placeholder - the actual viewport camera is handled in the Editor
 
 #pragma once
 
 #include "../../ZuesAPI.h"
-#include "../../Input.h"
 #include "../System.h"
 #include "../Components.h"
 

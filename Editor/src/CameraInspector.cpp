@@ -6,9 +6,11 @@
 bool CameraInspector::OnGui(const char* label, nlohmann::json& j) {
     bool changed = false;
 
+    ImGui::PushID("CameraComponent");
+
     bool headerOpen = ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen);
 
-    if (ImGui::BeginPopupContextItem()) {
+    if (ImGui::BeginPopupContextItem("CameraComponentContext")) {
         if (ImGui::MenuItem("Remove Component")) {
             ImGui::CloseCurrentPopup();
         }
@@ -77,5 +79,6 @@ bool CameraInspector::OnGui(const char* label, nlohmann::json& j) {
         ImGui::Unindent();
     }
 
+    ImGui::PopID();
     return changed;
 }

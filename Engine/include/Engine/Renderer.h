@@ -68,6 +68,7 @@ namespace Engine {
         float Size = 0.0f; // The pixel height the font was rendered at
         stbtt_bakedchar BakedChars[CHAR_COUNT]; // stb_truetype character metrics
         uint8_t* FontBuffer = nullptr; // Raw font data buffer (must remain allocated)
+        std::string Name; // Display name (filename without extension)
     };
 
 
@@ -117,6 +118,8 @@ namespace Engine {
         // --- Editor Interface ---
         static uint32_t GetRenderTextureID();
         static void SetViewportSize(float width, float height);
+        static float GetViewportWidth();
+        static float GetViewportHeight();
         static uint32_t LoadTexture(const std::string& filePath);
         static void SetClearColor(const Math::Vec4& color);
 
@@ -127,6 +130,7 @@ namespace Engine {
 
         static Math::Vec2 WorldToScreen(const Math::Vec2 &worldPos);
         static Math::Vec2 ScreenToWorld(const Math::Vec2 &screenPos);
+        static float ScreenToWorldSize(float screenPixels);  // Convert screen pixel size to world units
 
         // --- Text Rendering ---
         static uint32_t LoadFont(const std::string& path, float pixelHeight);
@@ -137,6 +141,10 @@ namespace Engine {
                              float scale = 1.0f, // Scale parameter moved to the end, made optional
                              float worldScale = 0.01f,
                              float rotation = 0); // World units per pixel (default: 100 pixels = 1 world unit)
+
+        // Get list of loaded fonts (for editor dropdown)
+        static const std::vector<Font>& GetLoadedFonts() { return s_Fonts; }
+        static size_t GetFontCount() { return s_Fonts.size(); }
 
 
     private:

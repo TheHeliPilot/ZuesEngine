@@ -2,6 +2,7 @@
 #include "../include/EditorUi.h"
 #include "Core.h"
 #include "Renderer.h"
+#include "Debug.h"
 #include "Input.h"
 #include "ECS/Components.h"
 #include <cmath>
@@ -14,17 +15,53 @@ namespace Editor {
     Engine::Math::Vec2 ColliderGizmo::s_DragStart = {0, 0};
     bool ColliderGizmo::s_IsBoxCollider = true;
 
-    // Constants for gizmo appearance
-    static constexpr float HANDLE_SIZE = 0.15f;  // Size of the square handle in world units
-    static constexpr float HANDLE_HIT_SIZE = 0.25f;  // Larger hitbox for easier clicking
-    static constexpr float LINE_THICKNESS = 2.0f;
-    static constexpr float GIZMO_Z = 100.0f;  // Draw on top
+    // Constants for gizmo appearance (in screen pixels)
+    static constexpr float HANDLE_SCREEN_SIZE = 6.0f;      // Handle size in screen pixels
+    static constexpr float HANDLE_HIT_SCREEN_SIZE = 10.0f; // Hitbox size in screen pixels
+    static constexpr float LINE_SCREEN_THICKNESS = 1.5f;   // Line thickness in screen pixels
+    static constexpr float GIZMO_Z = 100.0f;               // Draw on top
 
-    // Colors
-    static const Engine::Math::Vec4 COLLIDER_COLOR = {0.0f, 1.0f, 0.0f, 0.8f};  // Green
-    static const Engine::Math::Vec4 HANDLE_COLOR = {1.0f, 1.0f, 1.0f, 1.0f};    // White
-    static const Engine::Math::Vec4 HANDLE_HOVER_COLOR = {1.0f, 1.0f, 0.0f, 1.0f};  // Yellow
-    static const Engine::Math::Vec4 TRIGGER_COLOR = {0.0f, 0.5f, 1.0f, 0.8f};   // Blue for triggers
+    // Colors - Clean, professional style
+    static const Engine::Math::Vec4 COLLIDER_COLOR = {0.0f, 0.9f, 0.4f, 0.8f};           // Bright green
+    static const Engine::Math::Vec4 COLLIDER_EDIT_COLOR = {0.0f, 1.0f, 0.5f, 1.0f};      // Brighter green in edit mode
+    static const Engine::Math::Vec4 TRIGGER_COLOR = {0.2f, 0.6f, 1.0f, 0.8f};            // Blue for triggers
+    static const Engine::Math::Vec4 TRIGGER_EDIT_COLOR = {0.3f, 0.7f, 1.0f, 1.0f};       // Brighter blue in edit mode
+    static const Engine::Math::Vec4 HANDLE_COLOR = {1.0f, 1.0f, 1.0f, 1.0f};             // White handles
+    static const Engine::Math::Vec4 HANDLE_HOVER_COLOR = {0.0f, 1.0f, 0.5f, 1.0f};       // Green when hovered
+    static const Engine::Math::Vec4 HANDLE_ACTIVE_COLOR = {1.0f, 0.9f, 0.0f, 1.0f};      // Yellow when dragging
+    static const Engine::Math::Vec4 HANDLE_OUTLINE_COLOR = {0.0f, 0.0f, 0.0f, 1.0f};     // Black outline
+
+    // Helper: use centralized Renderer function
+    static float ScreenToWorldSize(float screenPixels) {
+        return Engine::Renderer::ScreenToWorldSize(screenPixels);
+    }
+
+    // Helper function to draw a rotated rectangle outline (4 lines)
+    static void DrawRectOutline(const Engine::Math::Vec2& center, const Engine::Math::Vec2& size,
+                                 const Engine::Math::Vec4& color, float rotRad) {
+        float cosR = std::cos(rotRad);
+        float sinR = std::sin(rotRad);
+        float halfW = size.x / 2.0f;
+        float halfH = size.y / 2.0f;
+        float thickness = ScreenToWorldSize(LINE_SCREEN_THICKNESS);
+
+        auto rotatePoint = [&](float lx, float ly) -> Engine::Math::Vec2 {
+            return {
+                center.x + lx * cosR - ly * sinR,
+                center.y + lx * sinR + ly * cosR
+            };
+        };
+
+        Engine::Math::Vec2 tl = rotatePoint(-halfW, halfH);
+        Engine::Math::Vec2 tr = rotatePoint(halfW, halfH);
+        Engine::Math::Vec2 br = rotatePoint(halfW, -halfH);
+        Engine::Math::Vec2 bl = rotatePoint(-halfW, -halfH);
+
+        Engine::Renderer::DrawLine(tl, tr, color, thickness);
+        Engine::Renderer::DrawLine(tr, br, color, thickness);
+        Engine::Renderer::DrawLine(br, bl, color, thickness);
+        Engine::Renderer::DrawLine(bl, tl, color, thickness);
+    }
 
     void ColliderGizmo::Draw() {
         World* world = Engine::Core::GetCurrentWorld();
@@ -32,6 +69,10 @@ namespace Editor {
 
         // Only draw when not in play mode
         if (EditorWindows::EditorUi::isPlayMode) return;
+
+        // Check if we're in edit mode
+        bool editModeActive = IsColliderEditMode();
+        EntityID editingEntity = GetEditingColliderEntity();
 
         // Draw for all selected entities that have colliders
         for (const EntityID& entity : EditorWindows::EditorUi::selectedEntities) {
@@ -43,19 +84,24 @@ namespace Editor {
 
             const auto& transform = world->GetComponent<Engine::ECS::Component::TransformComponent>(entity);
 
+            // Determine if this entity is in edit mode
+            bool isThisEntityEditing = (editModeActive && editingEntity.id == entity.id);
+
             // Check for box collider
             if (world->HasComponent<Engine::ECS::Component::BoxColliderComponent>(entity)) {
-                DrawBoxCollider(entity, transform.worldPosition, transform.worldRotation);
+                bool showEditHandles = isThisEntityEditing && IsEditingBoxCollider();
+                DrawBoxCollider(entity, transform.worldPosition, transform.worldRotation, showEditHandles);
             }
 
             // Check for circle collider
             if (world->HasComponent<Engine::ECS::Component::CircleColliderComponent>(entity)) {
-                DrawCircleCollider(entity, transform.worldPosition, transform.worldRotation);
+                bool showEditHandles = isThisEntityEditing && !IsEditingBoxCollider();
+                DrawCircleCollider(entity, transform.worldPosition, transform.worldRotation, showEditHandles);
             }
         }
     }
 
-    void ColliderGizmo::DrawBoxCollider(EntityID entity, const Engine::Math::Vec2& worldPos, float worldRotation) {
+    void ColliderGizmo::DrawBoxCollider(EntityID entity, const Engine::Math::Vec2& worldPos, float worldRotation, bool isEditMode) {
         World* world = Engine::Core::GetCurrentWorld();
         if (!world) return;
 
@@ -75,16 +121,31 @@ namespace Editor {
             worldPos.y + offsetWorld.y
         };
 
-        // Choose color based on trigger state
-        Engine::Math::Vec4 color = collider.isTrigger ? TRIGGER_COLOR : COLLIDER_COLOR;
+        // Choose color based on trigger state and edit mode
+        Engine::Math::Vec4 color;
+        if (isEditMode) {
+            color = collider.isTrigger ? TRIGGER_EDIT_COLOR : COLLIDER_EDIT_COLOR;
+        } else {
+            color = collider.isTrigger ? TRIGGER_COLOR : COLLIDER_COLOR;
+        }
 
-        // Draw the collider outline
-        Engine::Renderer::DrawRect(center, collider.size, color, rotRad);
+        // Draw the collider outline (edges only)
+        DrawRectOutline(center, collider.size, color, rotRad);
+
+        // Only draw handles in edit mode
+        if (!isEditMode) return;
 
         // Get mouse position in world space
         Engine::Math::Vec2 mouseWorld = Engine::Renderer::ScreenToWorld(Engine::Input::GetMousePosition());
 
-        // Draw handles (squares on edge midpoints)
+        float halfW = collider.size.x / 2.0f;
+        float halfH = collider.size.y / 2.0f;
+
+        // Calculate world-space handle sizes (constant screen size regardless of zoom)
+        float handleSize = ScreenToWorldSize(HANDLE_SCREEN_SIZE);
+        float handleHitSize = ScreenToWorldSize(HANDLE_HIT_SCREEN_SIZE);
+
+        // Draw handles (small squares on edge midpoints)
         auto drawHandle = [&](ColliderHandle handle, Engine::Math::Vec2 localPos) {
             // Transform local position to world
             Engine::Math::Vec2 handleWorld;
@@ -96,20 +157,27 @@ namespace Editor {
             bool isHovered = false;
 
             if (s_ActiveHandle == ColliderHandle::None) {
-                // Check hover
+                // Check hover with screen-space hit size
                 float dx = mouseWorld.x - handleWorld.x;
                 float dy = mouseWorld.y - handleWorld.y;
-                isHovered = (std::abs(dx) < HANDLE_HIT_SIZE && std::abs(dy) < HANDLE_HIT_SIZE);
+                isHovered = (std::abs(dx) < handleHitSize && std::abs(dy) < handleHitSize);
             }
 
-            Engine::Math::Vec4 handleColor = (isActive || isHovered) ? HANDLE_HOVER_COLOR : HANDLE_COLOR;
+            Engine::Math::Vec4 handleColor;
+            if (isActive) {
+                handleColor = HANDLE_ACTIVE_COLOR;
+            } else if (isHovered) {
+                handleColor = HANDLE_HOVER_COLOR;
+            } else {
+                handleColor = HANDLE_COLOR;
+            }
 
+            // Draw handle outline (slightly larger black square behind)
+            float outlineSize = handleSize * 1.3f;
+            Engine::Renderer::SubmitQuad(handleWorld, rotRad, {outlineSize, outlineSize}, HANDLE_OUTLINE_COLOR, 0, GIZMO_Z + 0.5f);
             // Draw filled square handle
-            Engine::Renderer::SubmitQuad(handleWorld, rotRad, {HANDLE_SIZE, HANDLE_SIZE}, handleColor, 0, GIZMO_Z + 1);
+            Engine::Renderer::SubmitQuad(handleWorld, rotRad, {handleSize, handleSize}, handleColor, 0, GIZMO_Z + 1);
         };
-
-        float halfW = collider.size.x / 2.0f;
-        float halfH = collider.size.y / 2.0f;
 
         drawHandle(ColliderHandle::Left, {-halfW, 0});
         drawHandle(ColliderHandle::Right, {halfW, 0});
@@ -117,7 +185,7 @@ namespace Editor {
         drawHandle(ColliderHandle::Bottom, {0, -halfH});
     }
 
-    void ColliderGizmo::DrawCircleCollider(EntityID entity, const Engine::Math::Vec2& worldPos, float worldRotation) {
+    void ColliderGizmo::DrawCircleCollider(EntityID entity, const Engine::Math::Vec2& worldPos, float worldRotation, bool isEditMode) {
         World* world = Engine::Core::GetCurrentWorld();
         if (!world) return;
 
@@ -137,25 +205,100 @@ namespace Editor {
             worldPos.y + offsetWorld.y
         };
 
-        // Choose color based on trigger state
-        Engine::Math::Vec4 color = collider.isTrigger ? TRIGGER_COLOR : COLLIDER_COLOR;
+        // Choose color based on trigger state and edit mode
+        Engine::Math::Vec4 color;
+        if (isEditMode) {
+            color = collider.isTrigger ? TRIGGER_EDIT_COLOR : COLLIDER_EDIT_COLOR;
+        } else {
+            color = collider.isTrigger ? TRIGGER_COLOR : COLLIDER_COLOR;
+        }
 
-        // Draw the circle outline
-        Engine::Renderer::DrawCircle(center, collider.radius, color, 32, true, LINE_THICKNESS);
+        // Draw the circle outline (convert screen thickness to world)
+        float thickness = ScreenToWorldSize(LINE_SCREEN_THICKNESS);
+        Engine::Renderer::DrawCircle(center, collider.radius, color, 32, true, thickness);
+
+        // Only draw handles in edit mode
+        if (!isEditMode) return;
 
         // Get mouse position in world space
         Engine::Math::Vec2 mouseWorld = Engine::Renderer::ScreenToWorld(Engine::Input::GetMousePosition());
 
-        // Draw radius handle (on the right side of the circle)
-        Engine::Math::Vec2 handleWorld = {center.x + collider.radius, center.y};
+        // Calculate world-space handle sizes (constant screen size regardless of zoom)
+        float handleSize = ScreenToWorldSize(HANDLE_SCREEN_SIZE);
+        float handleHitSize = ScreenToWorldSize(HANDLE_HIT_SCREEN_SIZE);
+        float centerHandleSize = handleSize * 1.2f; // Slightly larger center handle
 
-        bool isActive = (s_ActiveEntity.id == entity.id && s_ActiveHandle == ColliderHandle::Radius);
-        bool isHovered = IsOnRadiusHandle(center, collider.radius, mouseWorld);
+        // Calculate radius handle position (closest point on circle to mouse)
+        float dx = mouseWorld.x - center.x;
+        float dy = mouseWorld.y - center.y;
+        float dist = std::sqrt(dx * dx + dy * dy);
 
-        Engine::Math::Vec4 handleColor = (isActive || isHovered) ? HANDLE_HOVER_COLOR : HANDLE_COLOR;
+        Engine::Math::Vec2 radiusHandlePos;
+        if (dist > 0.001f) {
+            // Normalize direction and place handle on circle edge
+            radiusHandlePos = {
+                center.x + (dx / dist) * collider.radius,
+                center.y + (dy / dist) * collider.radius
+            };
+        } else {
+            // Default to right side if mouse is at center
+            radiusHandlePos = {center.x + collider.radius, center.y};
+        }
 
-        // Draw filled square handle at radius edge
-        Engine::Renderer::SubmitQuad(handleWorld, 0, {HANDLE_SIZE, HANDLE_SIZE}, handleColor, 0, GIZMO_Z + 1);
+        // Check handle states
+        bool radiusActive = (s_ActiveEntity.id == entity.id && s_ActiveHandle == ColliderHandle::Radius);
+        bool centerActive = (s_ActiveEntity.id == entity.id && s_ActiveHandle == ColliderHandle::Center);
+
+        bool radiusHovered = false;
+        bool centerHovered = false;
+
+        if (s_ActiveHandle == ColliderHandle::None) {
+            // Check radius hover
+            float rdx = mouseWorld.x - radiusHandlePos.x;
+            float rdy = mouseWorld.y - radiusHandlePos.y;
+            radiusHovered = (std::abs(rdx) < handleHitSize && std::abs(rdy) < handleHitSize);
+
+            // Check center hover
+            float cdx = mouseWorld.x - center.x;
+            float cdy = mouseWorld.y - center.y;
+            centerHovered = (std::abs(cdx) < handleHitSize && std::abs(cdy) < handleHitSize);
+        }
+
+        // Draw center handle (for moving offset)
+        {
+            Engine::Math::Vec4 handleColor;
+            if (centerActive) {
+                handleColor = HANDLE_ACTIVE_COLOR;
+            } else if (centerHovered) {
+                handleColor = HANDLE_HOVER_COLOR;
+            } else {
+                handleColor = HANDLE_COLOR;
+            }
+
+            // Draw handle outline
+            float outlineSize = centerHandleSize * 1.3f;
+            Engine::Renderer::DrawCircle(center, outlineSize, HANDLE_OUTLINE_COLOR, 12, false, 0);
+            // Draw filled circle handle
+            Engine::Renderer::DrawCircle(center, centerHandleSize, handleColor, 12, false, 0);
+        }
+
+        // Draw radius handle (small circle on the edge)
+        {
+            Engine::Math::Vec4 handleColor;
+            if (radiusActive) {
+                handleColor = HANDLE_ACTIVE_COLOR;
+            } else if (radiusHovered) {
+                handleColor = HANDLE_HOVER_COLOR;
+            } else {
+                handleColor = HANDLE_COLOR;
+            }
+
+            // Draw handle outline
+            float outlineSize = handleSize * 1.3f;
+            Engine::Renderer::DrawCircle(radiusHandlePos, outlineSize, HANDLE_OUTLINE_COLOR, 12, false, 0);
+            // Draw filled circle handle
+            Engine::Renderer::DrawCircle(radiusHandlePos, handleSize, handleColor, 12, false, 0);
+        }
     }
 
     ColliderHandle ColliderGizmo::GetBoxHandleAtMouse(
@@ -178,28 +321,45 @@ namespace Editor {
         float halfW = colliderSize.x / 2.0f;
         float halfH = colliderSize.y / 2.0f;
 
+        // Use screen-relative hit size
+        float hitSize = ScreenToWorldSize(HANDLE_HIT_SCREEN_SIZE);
+
         // Check each handle
-        if (std::abs(localMouse.x - (-halfW)) < HANDLE_HIT_SIZE && std::abs(localMouse.y) < HANDLE_HIT_SIZE)
+        if (std::abs(localMouse.x - (-halfW)) < hitSize && std::abs(localMouse.y) < hitSize)
             return ColliderHandle::Left;
-        if (std::abs(localMouse.x - halfW) < HANDLE_HIT_SIZE && std::abs(localMouse.y) < HANDLE_HIT_SIZE)
+        if (std::abs(localMouse.x - halfW) < hitSize && std::abs(localMouse.y) < hitSize)
             return ColliderHandle::Right;
-        if (std::abs(localMouse.y - halfH) < HANDLE_HIT_SIZE && std::abs(localMouse.x) < HANDLE_HIT_SIZE)
+        if (std::abs(localMouse.y - halfH) < hitSize && std::abs(localMouse.x) < hitSize)
             return ColliderHandle::Top;
-        if (std::abs(localMouse.y - (-halfH)) < HANDLE_HIT_SIZE && std::abs(localMouse.x) < HANDLE_HIT_SIZE)
+        if (std::abs(localMouse.y - (-halfH)) < hitSize && std::abs(localMouse.x) < hitSize)
             return ColliderHandle::Bottom;
 
         return ColliderHandle::None;
     }
 
-    bool ColliderGizmo::IsOnRadiusHandle(
+    ColliderHandle ColliderGizmo::GetCircleHandleAtMouse(
         const Engine::Math::Vec2& colliderCenter,
         float radius,
         const Engine::Math::Vec2& mouseWorld
     ) {
-        Engine::Math::Vec2 handlePos = {colliderCenter.x + radius, colliderCenter.y};
-        float dx = mouseWorld.x - handlePos.x;
-        float dy = mouseWorld.y - handlePos.y;
-        return (std::abs(dx) < HANDLE_HIT_SIZE && std::abs(dy) < HANDLE_HIT_SIZE);
+        float dx = mouseWorld.x - colliderCenter.x;
+        float dy = mouseWorld.y - colliderCenter.y;
+        float dist = std::sqrt(dx * dx + dy * dy);
+
+        // Use screen-relative hit size
+        float hitSize = ScreenToWorldSize(HANDLE_HIT_SCREEN_SIZE);
+
+        // Check center handle first (higher priority)
+        if (std::abs(dx) < hitSize && std::abs(dy) < hitSize) {
+            return ColliderHandle::Center;
+        }
+
+        // Check radius handle (on the circle edge, closest to mouse)
+        if (std::abs(dist - radius) < hitSize) {
+            return ColliderHandle::Radius;
+        }
+
+        return ColliderHandle::None;
     }
 
     void ColliderGizmo::Update() {
@@ -208,6 +368,16 @@ namespace Editor {
 
         // Only update when not in play mode
         if (EditorWindows::EditorUi::isPlayMode) return;
+
+        // Only process if in edit mode
+        if (!IsColliderEditMode()) {
+            s_ActiveHandle = ColliderHandle::None;
+            s_ActiveEntity = NullEntityID();
+            return;
+        }
+
+        EntityID editingEntity = GetEditingColliderEntity();
+        if (!editingEntity.IsValid()) return;
 
         // Only handle if mouse is in viewport
         if (!EditorWindows::EditorUi::MouseInWindow("Viewport")) {
@@ -278,7 +448,7 @@ namespace Editor {
             else if (!s_IsBoxCollider && world->HasComponent<Engine::ECS::Component::CircleColliderComponent>(s_ActiveEntity)) {
                 auto& collider = world->GetComponent<Engine::ECS::Component::CircleColliderComponent>(s_ActiveEntity);
 
-                // Calculate collider center
+                // Calculate collider center in world
                 float rotRad = transform.worldRotation * static_cast<float>(M_PI) / 180.0f;
                 float cosR = std::cos(rotRad);
                 float sinR = std::sin(rotRad);
@@ -292,28 +462,42 @@ namespace Editor {
                     transform.worldPosition.y + offsetWorld.y
                 };
 
-                // Set radius based on distance from center to mouse
-                float dx = mouseWorld.x - center.x;
-                float dy = mouseWorld.y - center.y;
-                collider.radius = std::max(0.1f, std::sqrt(dx * dx + dy * dy));
+                if (s_ActiveHandle == ColliderHandle::Radius) {
+                    // Set radius based on distance from center to mouse
+                    float dx = mouseWorld.x - center.x;
+                    float dy = mouseWorld.y - center.y;
+                    collider.radius = std::max(0.1f, std::sqrt(dx * dx + dy * dy));
+                }
+                else if (s_ActiveHandle == ColliderHandle::Center) {
+                    // Move offset based on delta
+                    Engine::Math::Vec2 delta = {mouseWorld.x - s_DragStart.x, mouseWorld.y - s_DragStart.y};
+
+                    // Transform delta back to local space
+                    Engine::Math::Vec2 localDelta;
+                    localDelta.x = delta.x * cosR + delta.y * sinR;
+                    localDelta.y = -delta.x * sinR + delta.y * cosR;
+
+                    collider.offset.x += localDelta.x;
+                    collider.offset.y += localDelta.y;
+
+                    s_DragStart = mouseWorld;
+                }
             }
 
             return;
         }
 
-        // Check for new handle click
+        // Check for new handle click - only on the editing entity
         if (Engine::Input::IsMouseButtonJustPressed(0)) {
-            for (const EntityID& entity : EditorWindows::EditorUi::selectedEntities) {
-                if (!entity.IsValid()) continue;
+            if (!world->HasComponent<Engine::ECS::Component::TransformComponent>(editingEntity))
+                return;
 
-                if (!world->HasComponent<Engine::ECS::Component::TransformComponent>(entity))
-                    continue;
+            const auto& transform = world->GetComponent<Engine::ECS::Component::TransformComponent>(editingEntity);
 
-                const auto& transform = world->GetComponent<Engine::ECS::Component::TransformComponent>(entity);
-
+            if (IsEditingBoxCollider()) {
                 // Check box collider handles
-                if (world->HasComponent<Engine::ECS::Component::BoxColliderComponent>(entity)) {
-                    const auto& collider = world->GetComponent<Engine::ECS::Component::BoxColliderComponent>(entity);
+                if (world->HasComponent<Engine::ECS::Component::BoxColliderComponent>(editingEntity)) {
+                    const auto& collider = world->GetComponent<Engine::ECS::Component::BoxColliderComponent>(editingEntity);
 
                     float rotRad = transform.worldRotation * static_cast<float>(M_PI) / 180.0f;
                     float cosR = std::cos(rotRad);
@@ -331,16 +515,15 @@ namespace Editor {
                     ColliderHandle handle = GetBoxHandleAtMouse(center, collider.size, rotRad, mouseWorld);
                     if (handle != ColliderHandle::None) {
                         s_ActiveHandle = handle;
-                        s_ActiveEntity = entity;
+                        s_ActiveEntity = editingEntity;
                         s_DragStart = mouseWorld;
                         s_IsBoxCollider = true;
-                        return;
                     }
                 }
-
+            } else {
                 // Check circle collider handles
-                if (world->HasComponent<Engine::ECS::Component::CircleColliderComponent>(entity)) {
-                    const auto& collider = world->GetComponent<Engine::ECS::Component::CircleColliderComponent>(entity);
+                if (world->HasComponent<Engine::ECS::Component::CircleColliderComponent>(editingEntity)) {
+                    const auto& collider = world->GetComponent<Engine::ECS::Component::CircleColliderComponent>(editingEntity);
 
                     float rotRad = transform.worldRotation * static_cast<float>(M_PI) / 180.0f;
                     float cosR = std::cos(rotRad);
@@ -355,12 +538,12 @@ namespace Editor {
                         transform.worldPosition.y + offsetWorld.y
                     };
 
-                    if (IsOnRadiusHandle(center, collider.radius, mouseWorld)) {
-                        s_ActiveHandle = ColliderHandle::Radius;
-                        s_ActiveEntity = entity;
+                    ColliderHandle handle = GetCircleHandleAtMouse(center, collider.radius, mouseWorld);
+                    if (handle != ColliderHandle::None) {
+                        s_ActiveHandle = handle;
+                        s_ActiveEntity = editingEntity;
                         s_DragStart = mouseWorld;
                         s_IsBoxCollider = false;
-                        return;
                     }
                 }
             }

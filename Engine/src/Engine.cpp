@@ -8,12 +8,40 @@
 #include "../include/Engine/Network.h"
 #include "../include/Engine/ECS/Systems/Systems.h"
 #include <GLFW/glfw3.h>
+#include <unordered_map>
 
 namespace Engine {
 
     // Global subsystem pointers - MUST be exported for game DLLs
     ZUES_API EventSystem* IEventSystem = nullptr;
     ZUES_API Network* INetwork = nullptr;
+
+    namespace ECS::Component {
+        // The actual storage for the counter
+        TypeID& GetGlobalComponentIDCounter() {
+            static TypeID counter = 0;
+            return counter;
+        }
+
+        // Centralized type hash to ID mapping
+        // This ensures the same type gets the same ID across all DLLs and EXE
+        static std::unordered_map<size_t, TypeID>& GetTypeHashToIDMap() {
+            static std::unordered_map<size_t, TypeID> map;
+            return map;
+        }
+
+        TypeID GetOrAssignTypeID(size_t typeHash) {
+            auto& map = GetTypeHashToIDMap();
+            auto it = map.find(typeHash);
+            if (it != map.end()) {
+                return it->second;
+            }
+            // Assign a new ID from the global counter
+            TypeID newID = GetGlobalComponentIDCounter()++;
+            map[typeHash] = newID;
+            return newID;
+        }
+    }
 
     void Initialize(bool enableNetwork, const bool isHost, const std::string& address, const uint16_t port, const bool autoRegister) {
         IEventSystem = new EventSystem();

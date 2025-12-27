@@ -1,62 +1,69 @@
 #pragma once
 
 #include "ZuesAPI.h"
-
-#include <GLFW/glfw3.h>
 #include <map>
-#include <utility>
 
-namespace Engine { namespace Math { struct Vec2; } } // Forward declarations
+namespace Engine { namespace Math { struct Vec2; } }
 
 namespace Engine {
 
+    /**
+     * Input system for the Engine.
+     *
+     * IMPORTANT: This class does NOT poll GLFW directly.
+     * The host application (Editor or Game EXE) must call the Set* methods
+     * to inject input state each frame. This is necessary because GLFW state
+     * doesn't share properly across DLL boundaries on Windows.
+     *
+     * Usage from Editor/Game:
+     *   1. Poll GLFW in the host application
+     *   2. Call Engine::Input::BeginFrame() at start of frame
+     *   3. Call Set* methods to inject current input state
+     *   4. Systems can then query input using Is* methods
+     */
     class ZUES_API Input final {
     public:
-        // --- Window Setup ---
-        // Must be called once during initialization to set the GLFW window
-        static void SetWindow(GLFWwindow* window);
-        static GLFWwindow* GetWindow();
+        // --- Frame Lifecycle ---
+        // Call at start of each frame before injecting new state
+        static void BeginFrame();
 
-        // --- Core Lifecycle ---
-        // Must be called once per frame BEFORE systems run (typically in main.cpp)
-        static void UpdateState();
+        // --- State Injection (called by Editor/Game EXE) ---
+        static void SetMouseButtonState(int button, bool pressed);
+        static void SetKeyState(int keycode, bool pressed);
+        static void SetMousePosition(float x, float y);
+        static void AddScrollDelta(float delta);
 
-        // --- Keyboard Functions ---
+        // --- Keyboard Queries ---
+        static bool IsKeyPressed(int keycode);
+        static bool IsKeyJustPressed(int keycode);
+        static bool IsKeyJustReleased(int keycode);
 
-        // Equivalent to Unity's Input.GetKey(KeyCode)
-        static bool IsKeyPressed(int keycode); // Key is currently held down
-
-        // Equivalent to Unity's Input.GetKeyDown(KeyCode)
-        static bool IsKeyJustPressed(int keycode); // Key was pressed this frame
-
-        // Equivalent to Unity's Input.GetKeyUp(KeyCode)
-        static bool IsKeyJustReleased(int keycode); // Key was released this frame
-
-        // --- Mouse Functions ---
-
-        // Equivalent to Unity's Input.GetMouseButton(Button)
-        static bool IsMouseButtonPressed(int button); // Button is currently held down
-
-        // Equivalent to Unity's Input.GetMouseButtonDown(Button)
-        static bool IsMouseButtonJustPressed(int button); // Button was pressed this frame
-
-        // Equivalent to Unity's Input.GetMouseButtonUp(Button)
-        static bool IsMouseButtonJustReleased(int button); // Button was released this frame
+        // --- Mouse Queries ---
+        static bool IsMouseButtonPressed(int button);
+        static bool IsMouseButtonJustPressed(int button);
+        static bool IsMouseButtonJustReleased(int button);
 
         // --- Cursor Position ---
-        static Engine::Math::Vec2 GetMousePosition();
+        static Math::Vec2 GetMousePosition();
+
+        // --- Mouse Scroll ---
+        static float GetMouseScrollDelta();
 
     private:
-        static GLFWwindow* s_Window;
-
-        // Caching the state for one-shot checks
+        // Key state
         static std::map<int, bool> m_CurrentKeyState;
         static std::map<int, bool> m_PreviousKeyState;
+
+        // Mouse button state
         static std::map<int, bool> m_CurrentMouseState;
         static std::map<int, bool> m_PreviousMouseState;
 
-        // Internal helper for GLFW polling (using a wider range than A-Z)
-        static void PollKeys();
-        static void PollMouseButtons();
+        // Mouse position
+        static float m_MouseX;
+        static float m_MouseY;
+
+        // Scroll state
+        static float m_ScrollDelta;
+        static float m_ScrollAccumulator;
     };
 }

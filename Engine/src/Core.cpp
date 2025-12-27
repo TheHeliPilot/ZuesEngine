@@ -187,10 +187,7 @@ bool Engine::Core::AutoGenerateSystem(
 // Exported function for Editor - creates viewport camera safely across DLL boundary
 EntityID Engine::SpawnEditorViewportCamera(World* world) {
     const EntityID cameraEntity = world->CreateEntity("EditorViewportCamera");
-    world->AddComponent<Engine::ECS::Component::TransformComponent>(cameraEntity, {
-        .worldPosition = {0.0f, 0.0f},
-        .worldRotation = 0.0f
-    });
+    // CreateEntity already adds TransformComponent, just add the camera-specific components
     world->AddComponent<Engine::ECS::Component::CameraComponent>(cameraEntity, {
         .zoom = 1.0f,
         .halfHeight = 10.0f,

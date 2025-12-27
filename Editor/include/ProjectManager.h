@@ -17,6 +17,7 @@ namespace Engine {
         std::filesystem::path RootPath;
         std::filesystem::path ConfigFilePath;
         std::filesystem::path EngineIncludePath;
+        std::string StartupWorld;  // Name of the world to load on startup (without .json extension)
     };
 
     class ProjectManager final {
@@ -32,6 +33,10 @@ namespace Engine {
         static bool BuildProject(bool playOnFinish = false);
         static bool BuildProjectAsync(bool playOnFinish = false);
         static bool IsBuilding() { return s_IsBuilding; } // Helper for checking build status
+
+        // Project settings
+        static void SetStartupWorld(const std::string& worldName);
+        static void SaveProjectSettings();
 
     private:
         static Project* s_CurrentProject;

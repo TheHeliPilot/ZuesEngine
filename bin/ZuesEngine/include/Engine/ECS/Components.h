@@ -8,22 +8,20 @@
 // You must include the json header here or ensure it's included higher up
 // #include "../../json/json.hpp" // Uncomment if WorldSerializationHelpers.h doesn't cover this
 
-namespace nlohmann {
-    template <>
-    struct adl_serializer<EntityID> {
-        // Serialization (from C++ to JSON)
-        static void to_json(json& j, const EntityID& entityId) {
-            // Store as the underlying integer value (assuming uint64_t for safety)
-            j = entityId.id;
-        }
+template <>
+struct nlohmann::adl_serializer<EntityID> {
+    // Serialization (from C++ to JSON)
+    static void to_json(json& j, const EntityID& entityId) {
+        // Store as the underlying integer value (assuming uint64_t for safety)
+        j = entityId.id;
+    }
 
-        // Deserialization (from JSON to C++)
-        static void from_json(const json& j, EntityID& entityId) {
-            // Read the JSON value into a standard integer type and cast back
-            entityId.id = j.get<uint64_t>();
-        }
-    };
-}
+    // Deserialization (from JSON to C++)
+    static void from_json(const json& j, EntityID& entityId) {
+        // Read the JSON value into a standard integer type and cast back
+        entityId.id = j.get<uint64_t>();
+    }
+};
 
 namespace Engine::ECS::Component {
 

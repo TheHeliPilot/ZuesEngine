@@ -4,9 +4,9 @@
 #include <stdexcept>
 #include <algorithm>
 
-#include "../include/Engine/Core.h"
 #include "../include/Engine/ECS/HierarchyOutliner.h"
 #include "../include/Engine/ECS/WorldSerializationHelpers.h"
+#include "../include/Engine/ECS/Components.h"
 
 // Global component registry - MUST be exported for game DLLs to access
 namespace Engine::ECS::Component {
@@ -41,7 +41,13 @@ EntityID World::CreateEntity(const std::string &name) {
     entityLookup[index] = { generation, defaultArchetype, defaultArchetype->entityIDs.size() };
     defaultArchetype->entityIDs.push_back(newID);
 
-    Engine::ECS::Hierarchy::BuildCache(Engine::Core::GetCurrentWorld());
+    // Every entity must have a TransformComponent for hierarchy visibility
+    AddComponent<Engine::ECS::Component::TransformComponent>(newID, {
+        .worldPosition = {0.0f, 0.0f},
+        .worldRotation = 0.0f
+    });
+
+    Engine::ECS::Hierarchy::BuildCache(this);
     return newID;
 }
 
@@ -84,7 +90,28 @@ void World::DestroyEntity(const EntityID entityID) {
     data.archetypePtr = nullptr;
     data.archetypeIndex = 0;
     freeIndices.push_back(index);
-    Engine::ECS::Hierarchy::BuildCache(Engine::Core::GetCurrentWorld());
+    Engine::ECS::Hierarchy::BuildCache(this);
+}
+
+bool World::RenameEntity(EntityID entityID, const std::string& newName) {
+    const EntityIndex index = entityID.GetIndex();
+
+    // Validation check
+    if (index >= entityLookup.size() || entityLookup[index].generation != entityID.GetGeneration() || entityLookup[index].archetypePtr == nullptr) {
+        return false;
+    }
+
+    EntityData& data = entityLookup[index];
+    Archetype* currentArchetype = static_cast<Archetype*>(data.archetypePtr);
+    const size_t indexInArchetype = data.archetypeIndex;
+
+    // Update the name in the archetype's entity list
+    if (indexInArchetype < currentArchetype->entityIDs.size()) {
+        currentArchetype->entityIDs[indexInArchetype].name = newName;
+        return true;
+    }
+
+    return false;
 }
 
 void World::RegisterSystem(std::unique_ptr<System> system) {

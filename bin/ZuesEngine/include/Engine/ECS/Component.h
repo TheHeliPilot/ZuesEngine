@@ -6,31 +6,39 @@
 #include <algorithm>
 #include <memory>
 #include <stdexcept>
+#include <string>
+#include <typeinfo>
 
 // Utility function to get a unique ID for each component type at compile time
 namespace Engine::ECS::Component {
     using TypeID = size_t;
 
-    // Use a static counter to generate unique IDs
+    // 1. Declare an exported function to get the counter.
+    // This ensures everyone asks the Engine.dll for the number.
+    ZUES_API TypeID& GetGlobalComponentIDCounter();
+
+    // 2. Centralized type registry - maps type hash to assigned ID
+    // This ensures the SAME type gets the SAME ID across all modules (DLL/EXE)
+    ZUES_API TypeID GetOrAssignTypeID(size_t typeHash);
+
     inline TypeID GetNextID() {
-        static TypeID lastID = 0;
-        // Check for overflow against MAX_COMPONENTS
-        if (lastID >= MAX_COMPONENTS) {
-            throw std::runtime_error("Exceeded MAX_COMPONENTS limit. Increase MAX_COMPONENTS in ECSConfig.h.");
-        }
-        return lastID++;
+        // Increment the GLOBAL counter, not a local static one
+        return GetGlobalComponentIDCounter()++;
     }
 
-    // Template function to get the unique ID for a specific component type T
     template <typename T>
     inline TypeID GetTypeID() {
-        static TypeID id = GetNextID();
+        // Use the centralized registry with typeid name as the key
+        // typeid(T).name() is more stable across DLL boundaries than hash_code() on MinGW
+        static TypeID id = GetOrAssignTypeID(std::hash<std::string>{}(typeid(T).name()));
         return id;
     }
 
-
-    // All components should be plain data structs.
-    // NOTE: Components must be registered via World::RegisterComponent<T>() before use.
+    // Macro to help specialize core components (deprecated - use GetTypeID directly)
+    #define DECLARE_COMPONENT_ID(Type) template<> inline TypeID GetTypeID<Type>() { \
+        static TypeID id = GetOrAssignTypeID(std::hash<std::string>{}(typeid(Type).name())); \
+        return id; \
+    }
 }
 
 

@@ -41,7 +41,16 @@ namespace EditorWindows
         static void BuildProject(bool play);
 
         static void SaveWorld();
+        static void SaveWorldAs();
+        static void NewWorld();
+        static void LoadWorld(const std::string& worldName);
+        static void EnsureWorldExists();  // Creates default world if none exists
         static void MarkWorldAsModified();
+
+        // Settings windows
+        static bool showProjectSettings;
+        static bool showWorldSettings;
+        static std::string currentWorldPath;  // Full path to current world file (empty if unsaved)
 
         static inline Engine::Math::Vec2 FromImVec2(const ImVec2& v) {
             return { v.x, v.y };
