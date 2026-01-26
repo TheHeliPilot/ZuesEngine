@@ -1,14 +1,15 @@
-﻿#ifndef ZUESENGINE_TEXTUREMANAGER_H
+#ifndef ZUESENGINE_TEXTUREMANAGER_H
 #define ZUESENGINE_TEXTUREMANAGER_H
 
 #include "ZuesAPI.h"
+#include "SpriteMetaFile.h"
 #include <cstdint>
 #include <filesystem>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include "ZuesMath.h" // Assuming this is needed for Engine:: namespace or similar context
+#include "ZuesMath.h"
 
 namespace Engine {
 
@@ -39,39 +40,16 @@ namespace Engine {
         static bool CreateSpriteFromTexture(const std::string &sourceTexturePath, const std::string &newSpriteName,
                                             const Math::Vec4 &uvRect);
 
-        static TextureInfo ParseMetaFile(const std::filesystem::path &metafilePath, uint32_t expectedVersion);
-
         static TextureInfo GetTextureInfo(const std::string& textureName);
 
         static void Shutdown();
-
-        static std::vector<std::filesystem::path> FindWildcardMetaFile(const std::string &fullFilePath,
-                                                                       const std::string &requiredSuffix);
-
-        static uint32_t GetNextMetaFileNumber(const std::string &fullFilePath, const std::string &requiredSuffix);
 
         static std::unordered_map<std::string, TextureInfo> &GetAllTextures();
 
         static void RemoveSprite(const std::string &spriteName);
 
-        // Scans project directory for all .spriteMeta files and registers sprites
+        // Scans project directory for all .sprite.meta files and registers sprites
         static void ScanAndRegisterAllSprites(const std::string& projectRootPath);
-
-        // Finds the texture file for a given metafile using multiple strategies
-        static std::filesystem::path FindTextureForMetafile(
-            const std::filesystem::path& metafilePath,
-            const std::string& projectRoot);
-
-        // Parse metafile without loading OpenGL texture (for startup scanning)
-        static TextureInfo ParseMetafileWithoutTexture(
-            const std::filesystem::path& metafilePath,
-            const std::filesystem::path& texturePath);
-
-        // Helper: Extract base texture filename from metafile name
-        static std::string ExtractTextureNameFromMetafile(const std::string& metafileName);
-
-        // Helper: Read SourceFilePath from metafile
-        static std::string ReadSourcePathFromMetafile(const std::filesystem::path& metafilePath);
 
         // Get sprite name from texture ID (returns empty string if not found)
         static std::string GetSpriteNameByID(uint32_t textureID);
@@ -81,13 +59,20 @@ namespace Engine {
 
         static bool UpdateSpriteUVRect(const std::string &spriteName, const Math::Vec4 &newUVRect);
 
-        // Helper: Update SourceFilePath in metafile
-        static void UpdateSourcePathInMetafile(
-            const std::filesystem::path& metafilePath,
-            const std::string& newPath);
+        // Get the SpriteMetaFile for a given texture path (loads/creates if needed)
+        static SpriteMetaFile* GetOrCreateMetaFile(const std::filesystem::path& texturePath);
+
+        // Get all sprites from a specific texture
+        static std::vector<std::string> GetSpritesFromTexture(const std::filesystem::path& texturePath);
+
+        // Reload sprites from a meta file (after editing in texture cutter)
+        static void ReloadMetaFile(const std::filesystem::path& texturePath);
 
         // Static map to store the loaded texture information, keyed by file path.
         static std::unordered_map<std::string, TextureInfo> s_TextureMap;
+
+        // Map of texture paths to their meta files
+        static std::unordered_map<std::string, SpriteMetaFile> s_MetaFiles;
     };
 
 }

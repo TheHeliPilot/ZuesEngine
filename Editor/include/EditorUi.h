@@ -46,11 +46,21 @@ namespace EditorWindows
         static void LoadWorld(const std::string& worldName);
         static void EnsureWorldExists();  // Creates default world if none exists
         static void MarkWorldAsModified();
+        static void BringFloatingWindowsToFront();  // Brings all undocked windows to front
 
         // Settings windows
         static bool showProjectSettings;
         static bool showWorldSettings;
         static std::string currentWorldPath;  // Full path to current world file (empty if unsaved)
+
+        // Window visibility toggles (for View menu)
+        static bool showHierarchy;
+        static bool showInspector;
+        static bool showAssetBrowser;
+        static bool showLogger;
+        static bool showViewport;
+        static bool showTextureCutter;
+        static bool showHotReload;
 
         static inline Engine::Math::Vec2 FromImVec2(const ImVec2& v) {
             return { v.x, v.y };

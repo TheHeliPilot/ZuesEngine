@@ -56,6 +56,8 @@ add_library(ZuesEngine SHARED
         include/Engine/ECS/Systems/TestObjectMoverSystem.h
         src/TextureManager.cpp
         include/Engine/TextureManager.h
+        src/SpriteMetaFile.cpp
+        include/Engine/SpriteMetaFile.h
         src/PhysicsSystem.cpp
         include/Engine/ECS/Systems/PhysicsSystem.h
         include/Engine/GameDLLInterface.h

@@ -1,4 +1,5 @@
 ﻿#include "../include/TextureCutterUI.h"
+#include "../include/EditorUi.h"
 
 #include <algorithm>
 
@@ -7,22 +8,24 @@
 #include <vector>
 
 #include "TextureManager.h"
+#include "SpriteMetaFile.h"
+#include "EngineDefines.h"
 
 using namespace EditorWindows;
 
 namespace {
-    // Represents a sprite region
-    struct SpriteRegion {
+    // Local sprite data for editing (mirrors SpriteRegion but with editing state)
+    struct EditableSpriteRegion {
         std::string name;
-        int x, y, width, height; // Pixel coordinates
+        int x, y, width, height; // Pixel coordinates (top-left origin for editor)
+        float pivotX = 0.5f, pivotY = 0.5f; // Normalized pivot (0-1)
         bool isSelected = false;
     };
 
-    // Interaction modes for canvas manipulation
     enum class InteractionMode {
         None,
-        Selecting,      // Creating new sprite region
-        Moving,         // Moving entire sprite
+        Selecting,
+        Moving,
         ResizingTopLeft,
         ResizingTopRight,
         ResizingBottomLeft,
@@ -30,102 +33,110 @@ namespace {
         ResizingTop,
         ResizingBottom,
         ResizingLeft,
-        ResizingRight
+        ResizingRight,
+        MovingPivot
     };
 
-    // State for the texture cutter window
     struct TextureCutterState {
         std::string currentTexturePath;
         Engine::TextureInfo currentTexture;
+        Engine::SpriteMetaFile* metaFile = nullptr;
         bool isOpen = false;
 
-        // All sprites from this texture
-        std::vector<SpriteRegion> sprites;
+        std::vector<EditableSpriteRegion> sprites;
         int selectedSpriteIndex = -1;
 
-        // Selection state for creating new sprites
         ImVec2 selectionStart = {0, 0};
         ImVec2 selectionEnd = {0, 0};
         InteractionMode currentMode = InteractionMode::None;
 
-        // For moving/resizing
         ImVec2 dragStartPos = {0, 0};
         int originalX = 0, originalY = 0, originalWidth = 0, originalHeight = 0;
+        float originalPivotX = 0.5f, originalPivotY = 0.5f;
 
-        // UI state
         char spriteNameBuffer[128] = "";
         bool showNamePopup = false;
 
-        // Edit buffers for selected sprite
         char editNameBuffer[128] = "";
         int editX = 0, editY = 0, editWidth = 0, editHeight = 0;
+        float editPivotX = 0.5f, editPivotY = 0.5f;
 
-        // Display settings
         float zoomLevel = 1.0f;
         ImVec2 panOffset = {0, 0};
     };
 
     static TextureCutterState s_State;
 
-    // Helper to load all existing sprites for this texture
-    void LoadExistingSprites() {
+    void LoadSpritesFromMeta() {
         s_State.sprites.clear();
 
-        // Iterate through all loaded textures and find ones from this source
-        for (const auto& [name, info] : Engine::TextureManager::GetAllTextures()) {
-            if (info.SourceFilePath == s_State.currentTexturePath) {
-                SpriteRegion region;
-                region.name = name;
+        if (!s_State.metaFile) return;
 
-                // CRITICAL FIX: OpenGL has origin at bottom-left, we need to flip Y coordinate
-                // UV coordinates are stored as (x, y, width, height) where y is from bottom
-                // Convert to top-left origin for editing
-                region.x = static_cast<int>(info.TextureUVRect.x * s_State.currentTexture.Width);
-                region.width = static_cast<int>(info.TextureUVRect.z * s_State.currentTexture.Width);
-                region.height = static_cast<int>(info.TextureUVRect.w * s_State.currentTexture.Height);
-
-                // Flip Y: convert from bottom-origin to top-origin
-                float bottomY = info.TextureUVRect.y;
-                float topY = bottomY + info.TextureUVRect.w;
-                region.y = static_cast<int>((1.0f - topY) * s_State.currentTexture.Height);
-
-                s_State.sprites.push_back(region);
-            }
+        for (const auto& sprite : s_State.metaFile->sprites) {
+            EditableSpriteRegion region;
+            region.name = sprite.name;
+            region.x = sprite.pixelX;
+            region.y = sprite.pixelY;
+            region.width = sprite.pixelWidth;
+            region.height = sprite.pixelHeight;
+            region.pivotX = sprite.pivot.x;
+            region.pivotY = sprite.pivot.y;
+            s_State.sprites.push_back(region);
         }
     }
 
-    // Helper to convert editor coordinates (top-left origin) to OpenGL UV (bottom-left origin)
-    Engine::Math::Vec4 EditorCoordsToUV(int x, int y, int width, int height) {
-        const float texWidth = static_cast<float>(s_State.currentTexture.Width);
-        const float texHeight = static_cast<float>(s_State.currentTexture.Height);
+    void SaveCurrentSpriteToMeta() {
+        if (!s_State.metaFile || s_State.selectedSpriteIndex < 0) return;
+        if (s_State.selectedSpriteIndex >= static_cast<int>(s_State.sprites.size())) return;
 
-        // Convert to normalized coordinates (0-1 range)
-        const float uvX = static_cast<float>(x) / texWidth;
-        const float uvWidth = static_cast<float>(width) / texWidth;
-        const float uvHeight = static_cast<float>(height) / texHeight;
+        const auto& editSprite = s_State.sprites[s_State.selectedSpriteIndex];
 
-        // CRITICAL: Flip Y coordinate from top-origin to bottom-origin
-        // Editor Y is from top (0 at top, increases downward)
-        // OpenGL Y is from bottom (0 at bottom, increases upward)
-        const float topY = static_cast<float>(y) / texHeight;
-        const float uvY = 1.0f - topY - uvHeight;
+        Engine::SpriteRegion* metaSprite = s_State.metaFile->FindSprite(editSprite.name);
+        if (!metaSprite) return;
 
-        return Engine::Math::Vec4(uvX, uvY, uvWidth, uvHeight);
+        // Update UV from pixel coordinates
+        metaSprite->uvRect = s_State.metaFile->PixelToUV(
+            editSprite.x, editSprite.y, editSprite.width, editSprite.height);
+        metaSprite->pixelX = editSprite.x;
+        metaSprite->pixelY = editSprite.y;
+        metaSprite->pixelWidth = editSprite.width;
+        metaSprite->pixelHeight = editSprite.height;
+        metaSprite->pivot.x = editSprite.pivotX;
+        metaSprite->pivot.y = editSprite.pivotY;
+
+        s_State.metaFile->Save();
+
+        // Update TextureManager
+        Engine::TextureManager::ReloadMetaFile(s_State.currentTexturePath);
     }
 
-    // Helper to check if point is near a sprite edge (for resize handles)
-    const float EDGE_THRESHOLD = 8.0f; // pixels
+    Engine::Math::Vec4 EditorCoordsToUV(int x, int y, int width, int height) {
+        if (!s_State.metaFile) return {0, 0, 1, 1};
+        return s_State.metaFile->PixelToUV(x, y, width, height);
+    }
+
+    const float EDGE_THRESHOLD = 8.0f;
+    const float PIVOT_HANDLE_RADIUS = 8.0f;
 
     InteractionMode GetInteractionMode(const ImVec2& mouseTexCoords, int spriteIndex) {
-        if (spriteIndex < 0 || spriteIndex >= s_State.sprites.size()) {
+        if (spriteIndex < 0 || spriteIndex >= static_cast<int>(s_State.sprites.size())) {
             return InteractionMode::None;
         }
 
         const auto& sprite = s_State.sprites[spriteIndex];
-        const float threshold = EDGE_THRESHOLD / s_State.zoomLevel; // Adjust for zoom
+        const float threshold = EDGE_THRESHOLD / s_State.zoomLevel;
 
         const float mx = mouseTexCoords.x;
         const float my = mouseTexCoords.y;
+
+        // Check pivot handle first
+        float pivotScreenX = sprite.x + sprite.width * sprite.pivotX;
+        float pivotScreenY = sprite.y + sprite.height * (1.0f - sprite.pivotY); // Flip Y for screen
+        float pivotDist = Engine::Math::Sqrt((mx - pivotScreenX) * (mx - pivotScreenX) +
+                                    (my - pivotScreenY) * (my - pivotScreenY));
+        if (pivotDist < PIVOT_HANDLE_RADIUS / s_State.zoomLevel) {
+            return InteractionMode::MovingPivot;
+        }
 
         const bool nearLeft = std::abs(mx - sprite.x) < threshold;
         const bool nearRight = std::abs(mx - (sprite.x + sprite.width)) < threshold;
@@ -135,28 +146,25 @@ namespace {
         const bool insideX = mx >= sprite.x && mx <= sprite.x + sprite.width;
         const bool insideY = my >= sprite.y && my <= sprite.y + sprite.height;
 
-        // Check corners first (they take priority)
         if (nearTop && nearLeft) return InteractionMode::ResizingTopLeft;
         if (nearTop && nearRight) return InteractionMode::ResizingTopRight;
         if (nearBottom && nearLeft) return InteractionMode::ResizingBottomLeft;
         if (nearBottom && nearRight) return InteractionMode::ResizingBottomRight;
 
-        // Then check edges
         if (nearTop && insideX) return InteractionMode::ResizingTop;
         if (nearBottom && insideX) return InteractionMode::ResizingBottom;
         if (nearLeft && insideY) return InteractionMode::ResizingLeft;
         if (nearRight && insideY) return InteractionMode::ResizingRight;
 
-        // If inside the sprite but not near edges, it's a move
         if (insideX && insideY) return InteractionMode::Moving;
 
         return InteractionMode::None;
     }
 
-    // Helper to get appropriate mouse cursor for interaction mode
     ImGuiMouseCursor GetCursorForMode(InteractionMode mode) {
         switch (mode) {
             case InteractionMode::Moving: return ImGuiMouseCursor_Hand;
+            case InteractionMode::MovingPivot: return ImGuiMouseCursor_Hand;
             case InteractionMode::ResizingTopLeft:
             case InteractionMode::ResizingBottomRight: return ImGuiMouseCursor_ResizeNWSE;
             case InteractionMode::ResizingTopRight:
@@ -170,34 +178,53 @@ namespace {
     }
 }
 
+bool TextureCutterUI::isOpen = false;
+
 void TextureCutterUI::OpenTextureCutter(const std::string& texturePath) {
     s_State.currentTexturePath = texturePath;
-    s_State.currentTexture = Engine::TextureManager::GetTexture(
-        Engine::TextureManager::GetFileNameWithoutExtension(texturePath)
-    );
+
+    // Ensure meta file exists and load it
+    s_State.metaFile = Engine::TextureManager::GetOrCreateMetaFile(texturePath);
+
+    // Load texture (may lazy-load)
+    std::string defaultSpriteName = s_State.metaFile && !s_State.metaFile->sprites.empty()
+        ? s_State.metaFile->sprites[0].name
+        : Engine::TextureManager::GetFileNameWithoutExtension(texturePath);
+
+    s_State.currentTexture = Engine::TextureManager::GetTexture(defaultSpriteName);
 
     if (s_State.currentTexture.ID == 0) {
         Engine::TextureManager::LoadTexture(texturePath);
-        s_State.currentTexture = Engine::TextureManager::GetTexture(
-            Engine::TextureManager::GetFileNameWithoutExtension(texturePath)
-        );
+        s_State.currentTexture = Engine::TextureManager::GetTexture(defaultSpriteName);
     }
 
     s_State.isOpen = true;
-    s_State.zoomLevel = -1.0f; // -1 signals "auto-fit on first render"
+    isOpen = true;
+    EditorUi::showTextureCutter = true;  // Sync with View menu
+    s_State.zoomLevel = -1.0f;
     s_State.panOffset = {0, 0};
     s_State.currentMode = InteractionMode::None;
     s_State.selectedSpriteIndex = -1;
 
-    LoadExistingSprites();
+    LoadSpritesFromMeta();
 }
 
 void TextureCutterUI::TextureCutterWindow() {
+    // Sync with EditorUi visibility flag
+    if (!s_State.isOpen && !s_State.currentTexturePath.empty()) {
+        // Window was closed, sync visibility flag
+        EditorUi::showTextureCutter = false;
+    }
+
     if (!s_State.isOpen) return;
 
     ImGui::SetNextWindowSize(ImVec2(1200, 700), ImGuiCond_FirstUseEver);
+
     if (!ImGui::Begin("Texture Cutter", &s_State.isOpen)) {
         ImGui::End();
+        isOpen = s_State.isOpen;
+        // Sync with EditorUi visibility flag
+        if (!s_State.isOpen) EditorUi::showTextureCutter = false;
         return;
     }
 
@@ -207,7 +234,6 @@ void TextureCutterUI::TextureCutterWindow() {
         return;
     }
 
-    // FIXED: Use BeginChild with calculated sizes instead of columns for better control
     const float leftPanelWidth = 250.0f;
     const float rightPanelWidth = 300.0f;
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
@@ -219,22 +245,22 @@ void TextureCutterUI::TextureCutterWindow() {
     ImGui::Text("Sprites (%zu)", s_State.sprites.size());
     ImGui::Separator();
 
-    for (int i = 0; i < s_State.sprites.size(); i++) {
+    for (int i = 0; i < static_cast<int>(s_State.sprites.size()); i++) {
         const bool isSelected = (s_State.selectedSpriteIndex == i);
 
         if (ImGui::Selectable(s_State.sprites[i].name.c_str(), isSelected)) {
             s_State.selectedSpriteIndex = i;
             s_State.currentMode = InteractionMode::None;
 
-            // Load into edit buffers
             strcpy(s_State.editNameBuffer, s_State.sprites[i].name.c_str());
             s_State.editX = s_State.sprites[i].x;
             s_State.editY = s_State.sprites[i].y;
             s_State.editWidth = s_State.sprites[i].width;
             s_State.editHeight = s_State.sprites[i].height;
+            s_State.editPivotX = s_State.sprites[i].pivotX;
+            s_State.editPivotY = s_State.sprites[i].pivotY;
         }
 
-        // Show dimensions
         if (isSelected) {
             ImGui::Indent();
             ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f),
@@ -243,6 +269,10 @@ void TextureCutterUI::TextureCutterWindow() {
                 s_State.sprites[i].height,
                 s_State.sprites[i].x,
                 s_State.sprites[i].y);
+            ImGui::TextColored(ImVec4(0.5f, 0.7f, 0.5f, 1.0f),
+                "Pivot: (%.2f, %.2f)",
+                s_State.sprites[i].pivotX,
+                s_State.sprites[i].pivotY);
             ImGui::Unindent();
         }
     }
@@ -258,7 +288,6 @@ void TextureCutterUI::TextureCutterWindow() {
     ImGui::SameLine();
     ImGui::Text("| Size: %dx%d", s_State.currentTexture.Width, s_State.currentTexture.Height);
 
-    // Zoom controls
     ImGui::Text("Zoom:");
     ImGui::SameLine();
     if (ImGui::Button("-")) s_State.zoomLevel = std::max(0.1f, s_State.zoomLevel - 0.1f);
@@ -274,7 +303,6 @@ void TextureCutterUI::TextureCutterWindow() {
 
     ImGui::Separator();
 
-    // Canvas area
     ImGui::BeginChild("CanvasArea", ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
     const ImVec2 canvasPos = ImGui::GetCursorScreenPos();
@@ -282,12 +310,10 @@ void TextureCutterUI::TextureCutterWindow() {
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
 
-    // Background
     drawList->AddRectFilled(canvasPos,
         ImVec2(canvasPos.x + canvasSize.x, canvasPos.y + canvasSize.y),
         IM_COL32(50, 50, 50, 255));
 
-    // Auto-fit on first render
     if (s_State.zoomLevel < 0.0f) {
         const float border = 40.0f;
         const float availWidth = canvasSize.x - border * 2;
@@ -300,7 +326,6 @@ void TextureCutterUI::TextureCutterWindow() {
         s_State.panOffset = {0, 0};
     }
 
-    // Calculate texture display
     const float texWidth = s_State.currentTexture.Width * s_State.zoomLevel;
     const float texHeight = s_State.currentTexture.Height * s_State.zoomLevel;
 
@@ -309,7 +334,7 @@ void TextureCutterUI::TextureCutterWindow() {
         canvasPos.y + (canvasSize.y - texHeight) * 0.5f + s_State.panOffset.y
     );
 
-    // Draw texture (FLIPPED for ImGui coordinate system)
+    // Draw texture (flipped for ImGui)
     drawList->AddImage(
         (void*)static_cast<intptr_t>(s_State.currentTexture.ID),
         texPos,
@@ -317,8 +342,8 @@ void TextureCutterUI::TextureCutterWindow() {
         ImVec2(0, 1), ImVec2(1, 0)
     );
 
-    // Draw all existing sprites
-    for (int i = 0; i < s_State.sprites.size(); i++) {
+    // Draw all sprites
+    for (int i = 0; i < static_cast<int>(s_State.sprites.size()); i++) {
         const auto& sprite = s_State.sprites[i];
         ImVec2 rectMin = ImVec2(
             texPos.x + sprite.x * s_State.zoomLevel,
@@ -338,31 +363,45 @@ void TextureCutterUI::TextureCutterWindow() {
         const ImU32 fillColor = isSelected ? IM_COL32(255, 255, 0, 30) : IM_COL32(0, 255, 255, 20);
         drawList->AddRectFilled(rectMin, rectMax, fillColor);
 
-        // Draw resize handles for selected sprite
+        // Draw pivot point
+        float pivotScreenX = texPos.x + (sprite.x + sprite.width * sprite.pivotX) * s_State.zoomLevel;
+        float pivotScreenY = texPos.y + (sprite.y + sprite.height * (1.0f - sprite.pivotY)) * s_State.zoomLevel;
+        ImU32 pivotColor = isSelected ? IM_COL32(255, 100, 100, 255) : IM_COL32(255, 100, 100, 150);
+        drawList->AddCircleFilled(ImVec2(pivotScreenX, pivotScreenY), 5.0f, pivotColor);
+        drawList->AddCircle(ImVec2(pivotScreenX, pivotScreenY), 5.0f, IM_COL32(255, 255, 255, 200), 12, 1.5f);
+
+        // Draw crosshair at pivot
+        if (isSelected) {
+            float crossSize = 12.0f;
+            drawList->AddLine(
+                ImVec2(pivotScreenX - crossSize, pivotScreenY),
+                ImVec2(pivotScreenX + crossSize, pivotScreenY),
+                IM_COL32(255, 100, 100, 200), 1.5f);
+            drawList->AddLine(
+                ImVec2(pivotScreenX, pivotScreenY - crossSize),
+                ImVec2(pivotScreenX, pivotScreenY + crossSize),
+                IM_COL32(255, 100, 100, 200), 1.5f);
+        }
+
+        // Draw resize handles for selected
         if (isSelected && s_State.zoomLevel > 0.5f) {
             const float handleSize = 6.0f;
             const ImU32 handleColor = IM_COL32(255, 255, 0, 255);
 
-            // Corner handles
             drawList->AddRectFilled(
                 ImVec2(rectMin.x - handleSize/2, rectMin.y - handleSize/2),
-                ImVec2(rectMin.x + handleSize/2, rectMin.y + handleSize/2),
-                handleColor);
+                ImVec2(rectMin.x + handleSize/2, rectMin.y + handleSize/2), handleColor);
             drawList->AddRectFilled(
                 ImVec2(rectMax.x - handleSize/2, rectMin.y - handleSize/2),
-                ImVec2(rectMax.x + handleSize/2, rectMin.y + handleSize/2),
-                handleColor);
+                ImVec2(rectMax.x + handleSize/2, rectMin.y + handleSize/2), handleColor);
             drawList->AddRectFilled(
                 ImVec2(rectMin.x - handleSize/2, rectMax.y - handleSize/2),
-                ImVec2(rectMin.x + handleSize/2, rectMax.y + handleSize/2),
-                handleColor);
+                ImVec2(rectMin.x + handleSize/2, rectMax.y + handleSize/2), handleColor);
             drawList->AddRectFilled(
                 ImVec2(rectMax.x - handleSize/2, rectMax.y - handleSize/2),
-                ImVec2(rectMax.x + handleSize/2, rectMax.y + handleSize/2),
-                handleColor);
+                ImVec2(rectMax.x + handleSize/2, rectMax.y + handleSize/2), handleColor);
         }
 
-        // Draw name label
         if (s_State.zoomLevel > 0.3f) {
             ImVec2 textPos = ImVec2(rectMin.x + 4, rectMin.y + 2);
             drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), sprite.name.c_str());
@@ -377,7 +416,6 @@ void TextureCutterUI::TextureCutterWindow() {
     const ImVec2 mousePos = ImGui::GetMousePos();
     const bool anyPopupOpen = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId);
 
-    // Convert mouse to texture coordinates
     const ImVec2 mouseTexCoords = ImVec2(
         (mousePos.x - texPos.x) / s_State.zoomLevel,
         (mousePos.y - texPos.y) / s_State.zoomLevel
@@ -390,37 +428,38 @@ void TextureCutterUI::TextureCutterWindow() {
         s_State.panOffset.y += delta.y;
     }
 
-    // Update cursor based on hover state
+    // Update cursor
     if (!anyPopupOpen && isHovered && s_State.currentMode == InteractionMode::None) {
         InteractionMode hoverMode = GetInteractionMode(mouseTexCoords, s_State.selectedSpriteIndex);
         ImGui::SetMouseCursor(GetCursorForMode(hoverMode));
     }
 
-    // Handle left mouse button press
+    // Handle left mouse button
     if (!anyPopupOpen && isHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         if (mouseTexCoords.x >= 0 && mouseTexCoords.x <= s_State.currentTexture.Width &&
             mouseTexCoords.y >= 0 && mouseTexCoords.y <= s_State.currentTexture.Height) {
 
-            // Check if we're interacting with selected sprite
             InteractionMode mode = GetInteractionMode(mouseTexCoords, s_State.selectedSpriteIndex);
 
             if (mode != InteractionMode::None) {
-                // Start move/resize operation
                 s_State.currentMode = mode;
                 s_State.dragStartPos = mouseTexCoords;
-                s_State.originalX = s_State.sprites[s_State.selectedSpriteIndex].x;
-                s_State.originalY = s_State.sprites[s_State.selectedSpriteIndex].y;
-                s_State.originalWidth = s_State.sprites[s_State.selectedSpriteIndex].width;
-                s_State.originalHeight = s_State.sprites[s_State.selectedSpriteIndex].height;
+
+                if (s_State.selectedSpriteIndex >= 0) {
+                    s_State.originalX = s_State.sprites[s_State.selectedSpriteIndex].x;
+                    s_State.originalY = s_State.sprites[s_State.selectedSpriteIndex].y;
+                    s_State.originalWidth = s_State.sprites[s_State.selectedSpriteIndex].width;
+                    s_State.originalHeight = s_State.sprites[s_State.selectedSpriteIndex].height;
+                    s_State.originalPivotX = s_State.sprites[s_State.selectedSpriteIndex].pivotX;
+                    s_State.originalPivotY = s_State.sprites[s_State.selectedSpriteIndex].pivotY;
+                }
             } else {
-                // Start new selection
                 s_State.currentMode = InteractionMode::Selecting;
                 s_State.selectionStart = mouseTexCoords;
                 s_State.selectionEnd = mouseTexCoords;
 
-                // Check if we clicked on a different sprite
                 bool clickedSprite = false;
-                for (int i = 0; i < s_State.sprites.size(); i++) {
+                for (int i = 0; i < static_cast<int>(s_State.sprites.size()); i++) {
                     const auto& sprite = s_State.sprites[i];
                     if (mouseTexCoords.x >= sprite.x && mouseTexCoords.x <= sprite.x + sprite.width &&
                         mouseTexCoords.y >= sprite.y && mouseTexCoords.y <= sprite.y + sprite.height) {
@@ -431,18 +470,20 @@ void TextureCutterUI::TextureCutterWindow() {
                         s_State.editY = s_State.sprites[i].y;
                         s_State.editWidth = s_State.sprites[i].width;
                         s_State.editHeight = s_State.sprites[i].height;
+                        s_State.editPivotX = s_State.sprites[i].pivotX;
+                        s_State.editPivotY = s_State.sprites[i].pivotY;
                         s_State.currentMode = InteractionMode::None;
                         break;
-                        }
+                    }
                 }
                 if (!clickedSprite) {
                     s_State.selectedSpriteIndex = -1;
                 }
             }
-            }
+        }
     }
-    // Replace the entire dragging operations switch statement with this fixed version:
 
+    // Handle dragging
     if (!anyPopupOpen && s_State.currentMode != InteractionMode::None && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
         const ImVec2 delta = ImVec2(
             mouseTexCoords.x - s_State.dragStartPos.x,
@@ -454,6 +495,15 @@ void TextureCutterUI::TextureCutterWindow() {
                 std::clamp(mouseTexCoords.x, 0.0f, static_cast<float>(s_State.currentTexture.Width)),
                 std::clamp(mouseTexCoords.y, 0.0f, static_cast<float>(s_State.currentTexture.Height))
             );
+        } else if (s_State.currentMode == InteractionMode::MovingPivot && s_State.selectedSpriteIndex >= 0) {
+            auto& sprite = s_State.sprites[s_State.selectedSpriteIndex];
+            // Calculate new pivot in normalized coordinates
+            float relX = (mouseTexCoords.x - sprite.x) / sprite.width;
+            float relY = 1.0f - (mouseTexCoords.y - sprite.y) / sprite.height; // Flip Y
+            sprite.pivotX = std::clamp(relX, 0.0f, 1.0f);
+            sprite.pivotY = std::clamp(relY, 0.0f, 1.0f);
+            s_State.editPivotX = sprite.pivotX;
+            s_State.editPivotY = sprite.pivotY;
         } else if (s_State.selectedSpriteIndex >= 0) {
             auto& sprite = s_State.sprites[s_State.selectedSpriteIndex];
 
@@ -463,77 +513,59 @@ void TextureCutterUI::TextureCutterWindow() {
                     sprite.y = std::clamp(s_State.originalY + static_cast<int>(delta.y), 0, s_State.currentTexture.Height - sprite.height);
                     break;
 
-                case InteractionMode::ResizingTopLeft:
-                {
+                case InteractionMode::ResizingTopLeft: {
                     int newX = std::clamp(s_State.originalX + static_cast<int>(delta.x), 0, s_State.originalX + s_State.originalWidth - 1);
                     int newY = std::clamp(s_State.originalY + static_cast<int>(delta.y), 0, s_State.originalY + s_State.originalHeight - 1);
-
                     sprite.width = s_State.originalWidth - (newX - s_State.originalX);
                     sprite.height = s_State.originalHeight - (newY - s_State.originalY);
                     sprite.x = newX;
                     sprite.y = newY;
-                }
-                    break;
+                } break;
 
-                case InteractionMode::ResizingTopRight:
-                {
+                case InteractionMode::ResizingTopRight: {
                     int newY = std::clamp(s_State.originalY + static_cast<int>(delta.y), 0, s_State.originalY + s_State.originalHeight - 1);
                     int newWidth = std::clamp(s_State.originalWidth + static_cast<int>(delta.x), 1, s_State.currentTexture.Width - s_State.originalX);
-
                     sprite.width = newWidth;
                     sprite.height = s_State.originalHeight - (newY - s_State.originalY);
                     sprite.y = newY;
-                }
-                    break;
+                } break;
 
-                case InteractionMode::ResizingBottomLeft:
-                {
+                case InteractionMode::ResizingBottomLeft: {
                     int newX = std::clamp(s_State.originalX + static_cast<int>(delta.x), 0, s_State.originalX + s_State.originalWidth - 1);
                     int newHeight = std::clamp(s_State.originalHeight + static_cast<int>(delta.y), 1, s_State.currentTexture.Height - s_State.originalY);
-
                     sprite.width = s_State.originalWidth - (newX - s_State.originalX);
                     sprite.height = newHeight;
                     sprite.x = newX;
-                }
-                    break;
+                } break;
 
                 case InteractionMode::ResizingBottomRight:
                     sprite.width = std::clamp(s_State.originalWidth + static_cast<int>(delta.x), 1, s_State.currentTexture.Width - s_State.originalX);
                     sprite.height = std::clamp(s_State.originalHeight + static_cast<int>(delta.y), 1, s_State.currentTexture.Height - s_State.originalY);
                     break;
 
-                case InteractionMode::ResizingTop:
-                {
+                case InteractionMode::ResizingTop: {
                     int newY = std::clamp(s_State.originalY + static_cast<int>(delta.y), 0, s_State.originalY + s_State.originalHeight - 1);
                     sprite.y = newY;
                     sprite.height = (s_State.originalY + s_State.originalHeight) - newY;
-                }
-                    break;
+                } break;
 
                 case InteractionMode::ResizingBottom:
-                {
-                    int newHeight = std::clamp(s_State.originalHeight + static_cast<int>(delta.y), 1, s_State.currentTexture.Height - s_State.originalY);
-                    sprite.height = newHeight;
-                }
+                    sprite.height = std::clamp(s_State.originalHeight + static_cast<int>(delta.y), 1, s_State.currentTexture.Height - s_State.originalY);
                     break;
 
-                case InteractionMode::ResizingLeft:
-                {
+                case InteractionMode::ResizingLeft: {
                     int newX = std::clamp(s_State.originalX + static_cast<int>(delta.x), 0, s_State.originalX + s_State.originalWidth - 1);
                     sprite.x = newX;
                     sprite.width = (s_State.originalX + s_State.originalWidth) - newX;
-                }
-                    break;
+                } break;
 
                 case InteractionMode::ResizingRight:
-                {
-                    int newWidth = std::clamp(s_State.originalWidth + static_cast<int>(delta.x), 1, s_State.currentTexture.Width - s_State.originalX);
-                    sprite.width = newWidth;
-                }
+                    sprite.width = std::clamp(s_State.originalWidth + static_cast<int>(delta.x), 1, s_State.currentTexture.Width - s_State.originalX);
                     break;
+
+                default: break;
             }
 
-            // Update edit buffers in real-time
             s_State.editX = sprite.x;
             s_State.editY = sprite.y;
             s_State.editWidth = sprite.width;
@@ -550,12 +582,8 @@ void TextureCutterUI::TextureCutterWindow() {
             if (width > 5.0f && height > 5.0f) {
                 s_State.showNamePopup = true;
             }
-        } else if (s_State.currentMode != InteractionMode::None && s_State.selectedSpriteIndex >= 0) {
-            // FIXED: Update sprite instead of deleting and recreating
-            const auto& sprite = s_State.sprites[s_State.selectedSpriteIndex];
-            const Engine::Math::Vec4 uvRect = EditorCoordsToUV(sprite.x, sprite.y, sprite.width, sprite.height);
-
-            Engine::TextureManager::UpdateSpriteUVRect(sprite.name, uvRect);
+        } else if (s_State.selectedSpriteIndex >= 0) {
+            SaveCurrentSpriteToMeta();
         }
 
         s_State.currentMode = InteractionMode::None;
@@ -581,8 +609,8 @@ void TextureCutterUI::TextureCutterWindow() {
         }
     }
 
-    ImGui::EndChild(); // End CanvasArea
-    ImGui::EndChild(); // End CanvasColumn
+    ImGui::EndChild(); // CanvasArea
+    ImGui::EndChild(); // CanvasColumn
 
     ImGui::SameLine();
 
@@ -614,47 +642,69 @@ void TextureCutterUI::TextureCutterWindow() {
         }
 
         ImGui::Separator();
+        ImGui::Text("Pivot");
+        ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "(0,0)=Bottom-Left, (1,1)=Top-Right");
+
+        if (ImGui::DragFloat("Pivot X", &s_State.editPivotX, 0.01f, 0.0f, 1.0f, "%.2f")) {
+            s_State.sprites[s_State.selectedSpriteIndex].pivotX = s_State.editPivotX;
+        }
+        if (ImGui::DragFloat("Pivot Y", &s_State.editPivotY, 0.01f, 0.0f, 1.0f, "%.2f")) {
+            s_State.sprites[s_State.selectedSpriteIndex].pivotY = s_State.editPivotY;
+        }
+
+        // Quick pivot presets
+        ImGui::Text("Presets:");
+        if (ImGui::Button("Center")) { s_State.editPivotX = 0.5f; s_State.editPivotY = 0.5f; }
+        ImGui::SameLine();
+        if (ImGui::Button("Bottom")) { s_State.editPivotX = 0.5f; s_State.editPivotY = 0.0f; }
+        ImGui::SameLine();
+        if (ImGui::Button("Top")) { s_State.editPivotX = 0.5f; s_State.editPivotY = 1.0f; }
+
+        if (ImGui::Button("BL")) { s_State.editPivotX = 0.0f; s_State.editPivotY = 0.0f; }
+        ImGui::SameLine();
+        if (ImGui::Button("BR")) { s_State.editPivotX = 1.0f; s_State.editPivotY = 0.0f; }
+        ImGui::SameLine();
+        if (ImGui::Button("TL")) { s_State.editPivotX = 0.0f; s_State.editPivotY = 1.0f; }
+        ImGui::SameLine();
+        if (ImGui::Button("TR")) { s_State.editPivotX = 1.0f; s_State.editPivotY = 1.0f; }
+
+        s_State.sprites[s_State.selectedSpriteIndex].pivotX = s_State.editPivotX;
+        s_State.sprites[s_State.selectedSpriteIndex].pivotY = s_State.editPivotY;
+
+        ImGui::Separator();
 
         if (ImGui::Button("Apply Changes", ImVec2(-1, 0))) {
             const std::string oldName = s_State.sprites[s_State.selectedSpriteIndex].name;
             const std::string newName = s_State.editNameBuffer;
 
-            // Use the corrected UV conversion function
-            const Engine::Math::Vec4 uvRect = EditorCoordsToUV(
-                s_State.editX,
-                s_State.editY,
-                s_State.editWidth,
-                s_State.editHeight
-            );
+            if (s_State.metaFile) {
+                if (oldName != newName) {
+                    // Rename in meta file
+                    s_State.metaFile->RenameSprite(oldName, newName);
+                    s_State.sprites[s_State.selectedSpriteIndex].name = newName;
+                }
 
-            // FIXED: If name changed, we need to remove old and create new
-            // Otherwise, just update the UV rect
-            if (oldName != newName) {
-                Engine::TextureManager::RemoveSprite(oldName);
-                Engine::TextureManager::CreateSpriteFromTexture(
-                    s_State.currentTexturePath,
-                    newName,
-                    uvRect
-                );
-            } else {
-                Engine::TextureManager::UpdateSpriteUVRect(oldName, uvRect);
-            }
+                SaveCurrentSpriteToMeta();
+                LoadSpritesFromMeta();
 
-            LoadExistingSprites();
-
-            // Re-select the sprite with the new name
-            for (int i = 0; i < s_State.sprites.size(); i++) {
-                if (s_State.sprites[i].name == newName) {
-                    s_State.selectedSpriteIndex = i;
-                    break;
+                // Re-select
+                for (int i = 0; i < static_cast<int>(s_State.sprites.size()); i++) {
+                    if (s_State.sprites[i].name == newName) {
+                        s_State.selectedSpriteIndex = i;
+                        break;
+                    }
                 }
             }
         }
 
         if (ImGui::Button("Delete Sprite", ImVec2(-1, 0))) {
-            Engine::TextureManager::RemoveSprite(s_State.sprites[s_State.selectedSpriteIndex].name);
-            LoadExistingSprites();
-            s_State.selectedSpriteIndex = -1;
+            if (s_State.metaFile) {
+                s_State.metaFile->RemoveSprite(s_State.sprites[s_State.selectedSpriteIndex].name);
+                s_State.metaFile->Save();
+                Engine::TextureManager::ReloadMetaFile(s_State.currentTexturePath);
+                LoadSpritesFromMeta();
+                s_State.selectedSpriteIndex = -1;
+            }
         }
 
     } else {
@@ -666,12 +716,14 @@ void TextureCutterUI::TextureCutterWindow() {
         ImGui::Spacing();
         ImGui::TextWrapped("Drag center to move.");
         ImGui::Spacing();
+        ImGui::TextWrapped("Drag red pivot point to reposition.");
+        ImGui::Spacing();
         ImGui::TextWrapped("Click and drag empty space to create new sprite.");
     }
 
     ImGui::EndChild();
 
-    // ========== POPUP: Name Entry for New Sprite ==========
+    // ========== POPUP: New Sprite Name ==========
     if (s_State.showNamePopup) {
         ImGui::OpenPopup("Sprite Name");
         s_State.showNamePopup = false;
@@ -708,38 +760,46 @@ void TextureCutterUI::TextureCutterWindow() {
         }
 
         if ((ImGui::Button("Create Sprite") || enterPressed) && nameValid) {
-            // Use the corrected UV conversion function
-            const Engine::Math::Vec4 uvRect = EditorCoordsToUV(
-                selMinX,
-                selMinY,
-                selMaxX - selMinX,
-                selMaxY - selMinY
-            );
+            if (s_State.metaFile) {
+                Engine::Math::Vec4 uvRect = s_State.metaFile->PixelToUV(
+                    selMinX, selMinY, selMaxX - selMinX, selMaxY - selMinY);
 
-            const bool success = Engine::TextureManager::CreateSpriteFromTexture(
-                s_State.currentTexturePath,
-                s_State.spriteNameBuffer,
-                uvRect
-            );
-
-            if (success) {
-                LoadExistingSprites();
-
-                // Auto-select the newly created sprite
-                for (int i = 0; i < s_State.sprites.size(); i++) {
-                    if (s_State.sprites[i].name == s_State.spriteNameBuffer) {
-                        s_State.selectedSpriteIndex = i;
-                        strcpy(s_State.editNameBuffer, s_State.sprites[i].name.c_str());
-                        s_State.editX = s_State.sprites[i].x;
-                        s_State.editY = s_State.sprites[i].y;
-                        s_State.editWidth = s_State.sprites[i].width;
-                        s_State.editHeight = s_State.sprites[i].height;
-                        break;
+                if (s_State.metaFile->AddSprite(s_State.spriteNameBuffer, uvRect)) {
+                    // Save first
+                    if (!s_State.metaFile->Save()) {
+                        LOG_ERROR("Failed to save meta file after adding sprite");
                     }
-                }
 
-                justOpened = true;
-                ImGui::CloseCurrentPopup();
+                    // Reload sprites from our local meta file instead of through TextureManager
+                    // This avoids issues when texture isn't fully loaded
+                    LoadSpritesFromMeta();
+
+                    // Now safely update TextureManager (non-blocking)
+                    try {
+                        Engine::TextureManager::ReloadMetaFile(s_State.currentTexturePath);
+                    } catch (...) {
+                        LOG_WARN("Failed to reload meta file in TextureManager");
+                    }
+
+                    // Select the new sprite
+                    std::string newSpriteName = s_State.spriteNameBuffer;
+                    for (int i = 0; i < static_cast<int>(s_State.sprites.size()); i++) {
+                        if (s_State.sprites[i].name == newSpriteName) {
+                            s_State.selectedSpriteIndex = i;
+                            strcpy(s_State.editNameBuffer, s_State.sprites[i].name.c_str());
+                            s_State.editX = s_State.sprites[i].x;
+                            s_State.editY = s_State.sprites[i].y;
+                            s_State.editWidth = s_State.sprites[i].width;
+                            s_State.editHeight = s_State.sprites[i].height;
+                            s_State.editPivotX = s_State.sprites[i].pivotX;
+                            s_State.editPivotY = s_State.sprites[i].pivotY;
+                            break;
+                        }
+                    }
+
+                    justOpened = true;
+                    ImGui::CloseCurrentPopup();
+                }
             }
         }
 
@@ -757,4 +817,10 @@ void TextureCutterUI::TextureCutterWindow() {
     }
 
     ImGui::End();
+    isOpen = s_State.isOpen;
+
+    // Sync visibility flag when window is closed
+    if (!s_State.isOpen) {
+        EditorUi::showTextureCutter = false;
+    }
 }

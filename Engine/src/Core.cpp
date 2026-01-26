@@ -100,7 +100,7 @@ bool Engine::Core::SaveWorld(const std::string &filePath) {
         return false;
     }
 
-    return s_World->SaveToJson(filePath+"World.json");
+    return s_World->SaveToJson(filePath+"World.world");
 }
 
 bool Engine::Core::LoadWorld(const std::string &filePath) {

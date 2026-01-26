@@ -1,10 +1,9 @@
 ﻿#include "../include/LoggerUI.h"
+#include "../include/EditorUi.h"
 #include "imgui.h"
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "imgui.h"
-
 
 using namespace EditorWindows;
 
@@ -62,7 +61,10 @@ void LoggerUI::LoggerWindow()
     static bool toggleState[3] = { true, true, true }; // Info, Warning, Error
     bool noFiltersMessage = false;
 
-    ImGui::Begin("Logger");
+    if (!ImGui::Begin("Logger", &EditorUi::showLogger)) {
+        ImGui::End();
+        return;
+    }
 
     // --- Header ---
     if (ImGui::Button("Clear"))

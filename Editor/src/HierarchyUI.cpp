@@ -188,7 +188,10 @@ void GenerateHierarchyItems()
 
 void HierarchyUI::HierarchyWindow()
 {
-   ImGui::Begin("Hierarchy");
+   if (!ImGui::Begin("Hierarchy", &EditorUi::showHierarchy)) {
+      ImGui::End();
+      return;
+   }
 
    World* world = Engine::Core::GetCurrentWorld();
    if (!world) {

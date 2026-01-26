@@ -47,6 +47,15 @@ bool EditorUi::showProjectSettings = false;
 bool EditorUi::showWorldSettings = false;
 std::string EditorUi::currentWorldPath = "";
 
+// Window visibility toggles (default all visible)
+bool EditorUi::showHierarchy = true;
+bool EditorUi::showInspector = true;
+bool EditorUi::showAssetBrowser = true;
+bool EditorUi::showLogger = true;
+bool EditorUi::showViewport = true;
+bool EditorUi::showTextureCutter = false;  // Texture cutter starts hidden
+bool EditorUi::showHotReload = true;
+
 // Static flag for the modal popup (must be declared before DrawWindowUi)
 static bool s_ShowCannotPlayModal = false;
 static bool s_ShowSaveAsPopup = false;
@@ -338,7 +347,7 @@ static void DrawCustomTitleBar() {
             if (std::filesystem::exists(worldsDir)) {
                 bool hasWorlds = false;
                 for (const auto& entry : std::filesystem::directory_iterator(worldsDir)) {
-                    if (entry.path().extension() == ".json") {
+                    if (entry.path().extension() == ".world") {
                         std::string worldName = entry.path().stem().string();
                         hasWorlds = true;
                         if (ImGui::Selectable(worldName.c_str())) {
@@ -376,6 +385,27 @@ static void DrawCustomTitleBar() {
         ImGui::Separator();
         if (ImGui::Selectable("Project Settings...")) { EditorUi::showProjectSettings = true; }
         if (ImGui::Selectable("World Settings...")) { EditorUi::showWorldSettings = true; }
+        ImGui::EndPopup();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("View")) {
+        ImVec2 pos = ImGui::GetItemRectMin();
+        pos.y = ImGui::GetItemRectMax().y;
+        ImGui::SetNextWindowPos(pos);
+        ImGui::OpenPopup("view_popup");
+    }
+
+    if (ImGui::BeginPopup("view_popup")) {
+        ImGui::Text("Windows");
+        ImGui::Separator();
+        ImGui::MenuItem("Hierarchy", nullptr, &EditorUi::showHierarchy);
+        ImGui::MenuItem("Inspector", nullptr, &EditorUi::showInspector);
+        ImGui::MenuItem("Asset Browser", nullptr, &EditorUi::showAssetBrowser);
+        ImGui::MenuItem("Logger", nullptr, &EditorUi::showLogger);
+        ImGui::MenuItem("Viewport", nullptr, &EditorUi::showViewport);
+        ImGui::MenuItem("Texture Cutter", nullptr, &EditorUi::showTextureCutter);
+        ImGui::MenuItem("Hot Reload", nullptr, &EditorUi::showHotReload);
         ImGui::EndPopup();
     }
 
@@ -685,12 +715,13 @@ void EditorUi::DrawWindowUi() {
         ImGui::DockSpace(dockspace_id, ImVec2(0,0), dockspace_flags);
     }
 
-    LoggerUI::LoggerWindow();
-    HierarchyUI::HierarchyWindow(); //TODO: fix image size 0 crash
-    InspectorUI::InspectorWindow();
-    AssetBrowserUI::AssetBrowserWindow();
-    //TextureCutterUI::TextureCutterWindow(); //TODO: fix implementation to actually work
-    Editor::HotReloadUI::Draw(); // Hot-reload panel
+    // Draw windows based on visibility settings
+    if (showLogger) LoggerUI::LoggerWindow();
+    if (showHierarchy) HierarchyUI::HierarchyWindow();
+    if (showInspector) InspectorUI::InspectorWindow();
+    if (showAssetBrowser) AssetBrowserUI::AssetBrowserWindow();
+    if (showTextureCutter) TextureCutterUI::TextureCutterWindow();
+    if (showHotReload) Editor::HotReloadUI::Draw();
     // SystemsUI removed - systems are managed in World Settings
     //ImGui::ShowDemoWindow();
 
@@ -718,7 +749,7 @@ void EditorUi::DrawWindowUi() {
         if (ImGui::Button("Save", ImVec2(80, 0)) || enterPressed) {
             if (strlen(s_SaveAsNameBuffer) > 0) {
                 std::string newName = s_SaveAsNameBuffer;
-                std::string savePath = projectDir.string() + "/Worlds/" + newName + ".json";
+                std::string savePath = projectDir.string() + "/Worlds/" + newName + ".world";
 
                 // Create Worlds directory if it doesn't exist
                 std::filesystem::create_directories(projectDir.string() + "/Worlds");
@@ -774,7 +805,7 @@ void EditorUi::DrawWindowUi() {
                     std::string worldsDir = projectDir.string() + "/Worlds";
                     if (std::filesystem::exists(worldsDir)) {
                         for (const auto& entry : std::filesystem::directory_iterator(worldsDir)) {
-                            if (entry.path().extension() == ".json") {
+                            if (entry.path().extension() == ".world") {
                                 std::string worldName = entry.path().stem().string();
                                 bool isSelected = (project && project->StartupWorld == worldName);
                                 if (ImGui::Selectable(worldName.c_str(), isSelected)) {
@@ -896,52 +927,88 @@ void EditorUi::DrawWindowUi() {
         ImGui::EndPopup();
     }
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0,0});
+    // Draw Viewport if visible
+    if (showViewport) {
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0,0});
 
-    // Set viewport border color based on play mode
-    if (isPlayMode) {
-        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)); // Green border in play mode
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
-    }
-
-    ImGui::Begin("Viewport");
-
-    const ImVec2 imageStartScreenPos = ImGui::GetCursorScreenPos();
-    g_WindowPosCache["Viewport"] = imageStartScreenPos;
-
-    const ImVec2 mouseScreenPos = ImGui::GetMousePos();
-    viewportMousePos = {
-        mouseScreenPos.x - imageStartScreenPos.x,
-        mouseScreenPos.y - imageStartScreenPos.y
-    };
-
-    const ImVec2 contentSize = ImGui::GetContentRegionAvail();
-    g_WindowSizeCache["Viewport"] = contentSize;
-
-    // Update the static viewportSize for camera/gizmo calculations
-    viewportSize = {contentSize.x, contentSize.y};
-
-    // Only render if we have a valid size (avoid ImGui assertion on zero size)
-    if (contentSize.x > 0.0f && contentSize.y > 0.0f) {
-        Engine::Renderer::SetViewportSize(contentSize.x, contentSize.y);
-
-        if(const uint32_t textureID = Engine::Renderer::GetRenderTextureID(); textureID != 0) {
-            ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(textureID)), contentSize, ImVec2(0,1), ImVec2(1,0));
+        // Set viewport border color based on play mode
+        if (isPlayMode) {
+            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)); // Green border in play mode
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 2.0f);
         }
+
+        ImGui::Begin("Viewport");
+
+        const ImVec2 imageStartScreenPos = ImGui::GetCursorScreenPos();
+        g_WindowPosCache["Viewport"] = imageStartScreenPos;
+
+        const ImVec2 mouseScreenPos = ImGui::GetMousePos();
+        viewportMousePos = {
+            mouseScreenPos.x - imageStartScreenPos.x,
+            mouseScreenPos.y - imageStartScreenPos.y
+        };
+
+        const ImVec2 contentSize = ImGui::GetContentRegionAvail();
+        g_WindowSizeCache["Viewport"] = contentSize;
+
+        // Update the static viewportSize for camera/gizmo calculations
+        viewportSize = {contentSize.x, contentSize.y};
+
+        // Only render if we have a valid size (avoid ImGui assertion on zero size)
+        if (contentSize.x > 0.0f && contentSize.y > 0.0f) {
+            Engine::Renderer::SetViewportSize(contentSize.x, contentSize.y);
+
+            if(const uint32_t textureID = Engine::Renderer::GetRenderTextureID(); textureID != 0) {
+                ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(textureID)), contentSize, ImVec2(0,1), ImVec2(1,0));
+            }
+        }
+
+        ImGui::End();
+
+        if (isPlayMode) {
+            ImGui::PopStyleVar(); // Pop WindowBorderSize
+            ImGui::PopStyleColor(); // Pop Border color
+        }
+
+        ImGui::PopStyleVar(); // Pop WindowPadding
     }
 
-    ImGui::End();
-
-    if (isPlayMode) {
-        ImGui::PopStyleVar(); // Pop WindowBorderSize
-        ImGui::PopStyleColor(); // Pop Border color
-    }
-
-    ImGui::PopStyleVar(); // Pop WindowPadding
+    // Bring all floating (undocked) windows to front so they don't get hidden behind the main window
+    BringFloatingWindowsToFront();
 
     ImGui::End();
 }
 
+void EditorUi::BringFloatingWindowsToFront() {
+    ImGuiContext& g = *GImGui;
+
+    // Collect all floating windows that should be brought to front
+    for (int i = 0; i < g.Windows.Size; i++) {
+        ImGuiWindow* window = g.Windows[i];
+        if (!window || !window->Active || window->Hidden) continue;
+
+        // Skip the main dockspace host and other internal windows
+        if (window->Flags & ImGuiWindowFlags_NoInputs) continue;
+        if (window->Flags & ImGuiWindowFlags_ChildWindow) continue;
+
+        // Check if this is a floating window (not docked)
+        if (!window->DockIsActive && window->DockNode == nullptr) {
+            // Skip windows that are part of the root dockspace
+            const char* name = window->Name;
+            if (name && (
+                strcmp(name, "DockSpaceHost") == 0 ||
+                strcmp(name, "##CustomTitleBar") == 0 ||
+                strstr(name, "##Popup") != nullptr ||
+                strstr(name, "##Menu") != nullptr ||
+                strstr(name, "##Tooltip") != nullptr)) {
+                continue;
+            }
+
+            // Bring this floating window to front
+            ImGui::BringWindowToDisplayFront(window);
+        }
+    }
+}
 
 void EditorUi::BuildProject(bool play) {
     Editor::GameDLLLoader::Get().BuildGameDLL(true);
@@ -1110,7 +1177,7 @@ void EditorUi::NewWorld() {
 void EditorUi::LoadWorld(const std::string& worldName) {
     // TODO: Ask to save current world if modified
 
-    std::string worldPath = projectDir.string() + "/Worlds/" + worldName + ".json";
+    std::string worldPath = projectDir.string() + "/Worlds/" + worldName + ".world";
 
     if (Engine::Core::LoadWorld(worldPath)) {
         currentWorldName = worldName;

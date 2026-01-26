@@ -12,7 +12,10 @@ using namespace EditorWindows;
 static int selectedComponentTypeID = -1;
 
 void InspectorUI::InspectorWindow() {
-    ImGui::Begin("Inspector");
+    if (!ImGui::Begin("Inspector", &EditorUi::showInspector)) {
+        ImGui::End();
+        return;
+    }
 
     if (EditorUi::isReloading) {
         ImGui::Text("Hot-Reloading Game DLL...");

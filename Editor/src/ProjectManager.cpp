@@ -124,9 +124,9 @@ namespace Engine {
 
         LOG_INFO("Project loaded successfully: " + projectName);
 
-        // Load startup world if set, otherwise try default World.json
+        // Load startup world if set, otherwise try default World.world
         std::string worldToLoad = startupWorld.empty() ? "World" : startupWorld;
-        std::string worldPath = projectPath.string() + "/Worlds/" + worldToLoad + ".json";
+        std::string worldPath = projectPath.string() + "/Worlds/" + worldToLoad + ".world";
 
         if (!Core::LoadWorld(worldPath)) {
             LOG_WARN("Failed to load world at " + worldPath + ". Starting with empty world.");

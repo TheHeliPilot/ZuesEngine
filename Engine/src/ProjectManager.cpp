@@ -154,12 +154,12 @@ namespace Engine {
         };
 
         LOG_INFO("Project loaded successfully: " + projectName);
-        if (!Core::LoadWorld(projectPath.string() + "/Worlds/World.json")) {
-            LOG_WARN("Failed to load world at " + projectPath.string() + "/Worlds/World.json. Saving default.");
+        if (!Core::LoadWorld(projectPath.string() + "/Worlds/World.world")) {
+            LOG_WARN("Failed to load world at " + projectPath.string() + "/Worlds/World.world. Saving default.");
             if (!Core::SaveWorld(projectPath.string() + "/Worlds/")) {
                 LOG_ERROR("Failed to save world!");
             }
-        }else LOG_INFO("Loaded world " + projectPath.string() + "/Worlds/World.json");
+        }else LOG_INFO("Loaded world " + projectPath.string() + "/Worlds/World.world");
         return true;
     }
 

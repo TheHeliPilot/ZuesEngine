@@ -1,6 +1,7 @@
 // HotReloadUI.cpp - ImGui panel for hot-reload status and controls
 #include "../include/HotReloadUI.h"
 #include "../include/GameDLLLoader.h"
+#include "../include/EditorUi.h"
 #include <iomanip>
 #include <sstream>
 
@@ -11,12 +12,16 @@ namespace Editor {
     bool HotReloadUI::s_AutoScroll = true;
 
     void HotReloadUI::Draw() {
+        // Sync visibility with EditorUi
+        s_IsVisible = EditorWindows::EditorUi::showHotReload;
+
         if (!s_IsVisible) return;
 
         ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
 
-        if (!ImGui::Begin("Hot-Reload", &s_IsVisible)) {
+        if (!ImGui::Begin("Hot-Reload", &EditorWindows::EditorUi::showHotReload)) {
             ImGui::End();
+            s_IsVisible = EditorWindows::EditorUi::showHotReload;
             return;
         }
 

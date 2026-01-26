@@ -195,20 +195,22 @@ void DrawEditorGrid() {
     float zoom = 1.0f;
     float halfHeight = 10.0f;
     Engine::Math::Vec2 cameraPos = {0, 0};
+    Engine::Math::Vec4 cameraBgColor = {};
 
     world->ForEach<Engine::ECS::Component::TransformComponent*, Engine::ECS::Component::CameraComponent*, Engine::ECS::Component::ViewportCameraTag*>(
-        [&](EntityID entity, Engine::ECS::Component::TransformComponent* transform,
-            Engine::ECS::Component::CameraComponent* cam, Engine::ECS::Component::ViewportCameraTag* tag) {
+        [&](EntityID entity, const Engine::ECS::Component::TransformComponent* transform,
+            const Engine::ECS::Component::CameraComponent* cam, Engine::ECS::Component::ViewportCameraTag* tag) {
             zoom = cam->zoom;
             halfHeight = cam->halfHeight;
             cameraPos = transform->worldPosition;
+            cameraBgColor = cam->backgroundColor;
         }
     );
 
     // Calculate visible area
-    float aspect = EditorUi::viewportSize.x / std::max(1.0f, EditorUi::viewportSize.y);
-    float visibleHeight = (halfHeight * 2.0f) / zoom;
-    float visibleWidth = visibleHeight * aspect;
+    const float aspect = EditorUi::viewportSize.x / std::max(1.0f, EditorUi::viewportSize.y);
+    const float visibleHeight = (halfHeight * 2.0f) / zoom;
+    const float visibleWidth = visibleHeight * aspect;
 
     // Grid settings
     constexpr float SMALL_GRID_SIZE = 1.0f;
@@ -218,22 +220,22 @@ void DrawEditorGrid() {
 
     // Calculate alpha for small grid based on zoom (fade out when zoomed out)
     // When zoom < 0.3, small grid fades out; when zoom > 0.5, fully visible
-    float smallGridAlpha = std::clamp((zoom - 0.2f) / 0.3f, 0.0f, 1.0f) * 0.15f;
-    float largeGridAlpha = 0.25f;
+    const float smallGridAlpha = (std::clamp((zoom - 0.2f) / 0.3f, 0.0f, 1.0f) * 0.15f);
+    constexpr float largeGridAlpha = 0.25f;
 
     // Colors
-    Engine::Math::Vec4 smallGridColor = {1.0f, 1.0f, 1.0f, smallGridAlpha};
-    Engine::Math::Vec4 largeGridColor = {1.0f, 1.0f, 1.0f, largeGridAlpha};
+    const Engine::Math::Vec4 smallGridColor = {.5f, .5f, .5f, smallGridAlpha};
+    const Engine::Math::Vec4 largeGridColor = {.5f, .5f, .5f, largeGridAlpha};
 
     // Calculate grid bounds (extend beyond visible area)
-    float margin = LARGE_GRID_SIZE * 2;
+    constexpr float margin = LARGE_GRID_SIZE * 2;
     float left = std::floor((cameraPos.x - visibleWidth / 2 - margin) / LARGE_GRID_SIZE) * LARGE_GRID_SIZE;
     float right = std::ceil((cameraPos.x + visibleWidth / 2 + margin) / LARGE_GRID_SIZE) * LARGE_GRID_SIZE;
     float bottom = std::floor((cameraPos.y - visibleHeight / 2 - margin) / LARGE_GRID_SIZE) * LARGE_GRID_SIZE;
     float top = std::ceil((cameraPos.y + visibleHeight / 2 + margin) / LARGE_GRID_SIZE) * LARGE_GRID_SIZE;
 
-    float smallThickness = Engine::Renderer::ScreenToWorldSize(SMALL_GRID_THICKNESS);
-    float largeThickness = Engine::Renderer::ScreenToWorldSize(LARGE_GRID_THICKNESS);
+    const float smallThickness = Engine::Renderer::ScreenToWorldSize(SMALL_GRID_THICKNESS);
+    const float largeThickness = Engine::Renderer::ScreenToWorldSize(LARGE_GRID_THICKNESS);
 
     // Draw small grid (1 unit) - only if visible enough
     if (smallGridAlpha > 0.01f) {
@@ -254,6 +256,20 @@ void DrawEditorGrid() {
     }
     for (float y = bottom; y <= top; y += LARGE_GRID_SIZE) {
         Engine::Renderer::DrawLine({left, y}, {right, y}, largeGridColor, largeThickness);
+    }
+
+    // Draw origin axis lines (X=0, Y=0)
+    const float axisThickness = Engine::Renderer::ScreenToWorldSize(2.0f);
+    const Engine::Math::Vec4 xAxisColor = {0.8f, 0.3f, 0.3f, 0.25f};  // Red for X-axis (horizontal, y=0)
+    const Engine::Math::Vec4 yAxisColor = {0.3f, 0.8f, 0.3f, 0.25f};  // Green for Y-axis (vertical, x=0)
+
+    // Y-axis (vertical line at x=0)
+    if (left <= 0.0f && right >= 0.0f) {
+        Engine::Renderer::DrawLine({0.0f, bottom}, {0.0f, top}, yAxisColor, axisThickness);
+    }
+    // X-axis (horizontal line at y=0)
+    if (bottom <= 0.0f && top >= 0.0f) {
+        Engine::Renderer::DrawLine({left, 0.0f}, {right, 0.0f}, xAxisColor, axisThickness);
     }
 }
 
@@ -496,10 +512,10 @@ int main(int argc, char* argv[]) {
 
     // Sync EditorUi world state with what ProjectManager loaded
     if (Engine::ProjectManager::GetCurrent()) {
-        std::string startupWorld = Engine::ProjectManager::GetCurrent()->StartupWorld;
+        const std::string startupWorld = Engine::ProjectManager::GetCurrent()->StartupWorld;
         if (!startupWorld.empty()) {
             EditorUi::currentWorldName = startupWorld;
-            EditorUi::currentWorldPath = EditorUi::projectDir.string() + "/Worlds/" + startupWorld + ".json";
+            EditorUi::currentWorldPath = EditorUi::projectDir.string() + "/Worlds/" + startupWorld + ".world";
             EditorUi::isWorldUnsaved = false;
         }
     }
@@ -538,7 +554,7 @@ int main(int argc, char* argv[]) {
     io.IniFilename = iniPath.c_str();
 
     // --- 2. Load Main UI Font (Exo2) with Fallback ---
-    ImFont* exo2Font = io.Fonts->AddFontFromFileTTF("fonts/Exo2-VariableFont_wght.ttf", 18.0f);
+    const ImFont* exo2Font = io.Fonts->AddFontFromFileTTF("fonts/Exo2-VariableFont_wght.ttf", 18.0f);
     if (!exo2Font) {
         exo2Font = io.Fonts->AddFontFromFileTTF("../../fonts/Exo2-VariableFont_wght.ttf", 18.0f);
     }
@@ -561,7 +577,7 @@ int main(int argc, char* argv[]) {
     snprintf(icons_config.Name, IM_ARRAYSIZE(icons_config.Name), "IconLibs");
 
     // Attempt Merge from current directory, then relative path
-    ImFont* mergedFont = io.Fonts->AddFontFromFileTTF("fonts/IconLibs.ttf", 18.0f, &icons_config, icons_ranges);
+    const ImFont* mergedFont = io.Fonts->AddFontFromFileTTF("fonts/IconLibs.ttf", 18.0f, &icons_config, icons_ranges);
     if (!mergedFont) {
         mergedFont = io.Fonts->AddFontFromFileTTF("../../fonts/IconLibs.ttf", 18.0f, &icons_config, icons_ranges);
     }
@@ -604,7 +620,7 @@ int main(int argc, char* argv[]) {
 
         // Inject key states (common range)
         for (int key = 32; key <= 348; ++key) {
-            int state = glfwGetKey(window, key);
+            const int state = glfwGetKey(window, key);
             if (state == GLFW_PRESS || state == GLFW_REPEAT) {
                 Engine::Input::SetKeyState(key, true);
             } else {
