@@ -1,3 +1,0 @@
-@echo off
-echo Opening ZuesEngine Project Tracker...
-start index.html
