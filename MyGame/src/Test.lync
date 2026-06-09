@@ -1,0 +1,21 @@
+// Test: Lync component.
+// You can add more [Component] / [System] / [OnLoad] decls below.
+// [Category("path/like/this")] groups it in the editor's Add menu.
+
+[Component]
+[Category("Project")]
+Test: struct {
+    // TODO: replace with real fields. Primitives only for now
+    // (int, float, double, char). Vectors and nested structs TBD.
+    value: float
+}
+
+// AddTest(entity, ...) and QueryEachTest(callback) are
+// auto-injected by the zues plugin. Example:
+//   e: int = CreateEntity();
+//   AddTest(e, 1.0f);
+
+
+
+
+

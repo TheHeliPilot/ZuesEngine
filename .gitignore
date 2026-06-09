@@ -1,0 +1,72 @@
+# Build output
+/build/
+/out/
+/cmake-build-*/
+**/cmake-build-*/
+bin/
+obj/
+
+# Compiler artifacts
+*.obj
+*.o
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.lib
+*.so
+*.dylib
+*.a
+*.exp
+*.idb
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+
+# IDE — CLion
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/shelf/
+.idea/dictionaries/
+.idea/httpRequests/
+
+# IDE — Visual Studio
+.vs/
+*.vcxproj.user
+*.VC.db
+*.VC.VC.opendb
+
+# IDE — VS Code
+.vscode/
+!.vscode/c_cpp_properties.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python tooling (asset pipeline scripts)
+__pycache__/
+*.pyc
+.venv/
+
+# User project temp dirs
+MyGame/TempBuild/
+
+# Release bundles (ship via GitHub Releases, not the repo)
+*.zip
+
+# Editor runtime layout state (generated)
+imgui.ini
+
+# Claude Code agent worktrees (embedded git repos)
+.claude/worktrees/

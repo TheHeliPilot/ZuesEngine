@@ -1,0 +1,756 @@
+// Engine math types. Layouts mirror the C++ definitions in
+// zues/math/vec2.h / vec3.h / color.h - we declare them here as plain
+// structs so user lync code can use them as field types AND so the
+// auto-generated `Add<Component>` extern wrappers can pass them through
+// without needing per-engine-type plumbing in the plugin.
+//
+// `Color` is RGBA float (4 components). All four channels are scalar
+// floats so the inspector can render a swatch via FieldKind::Color.
+Vec2: struct {
+    x: float,
+    y: float
+}
+Vec3: struct {
+    x: float,
+    y: float,
+    z: float
+}
+Color: struct {
+    r: float,
+    g: float,
+    b: float,
+    a: float
+}
+
+// Engine built-in component structs. Layouts mirror the C++ definitions
+// in zues/components/{transform,render,physics}.h *exactly* in field
+// order — user code reads/writes through pointers cast from
+// host->get_component, so byte offsets must agree.
+//
+// Internal handle fields (those starting with `_`) are omitted because
+// they sit at the END of each struct in C; truncating them on the Lync
+// side doesn't shift any user-visible offsets.
+
+TextureHandle: struct {
+    index: int,
+    generation: int
+}
+
+Transform2D: struct {
+    position: Vec2,
+    rotation: float,
+    scale: Vec2
+}
+
+Sprite: struct {
+    texture: TextureHandle,
+    size: Vec2,
+    pivot: Vec2,
+    tint: Color,
+    flip_x: bool,
+    flip_y: bool,
+    layer: int,
+    order: int
+}
+
+RigidBody: struct {
+    body_type: int,
+    mass: float,
+    linear_damping: float,
+    angular_damping: float,
+    gravity_scale: float,
+    fixed_rotation: int,
+    is_bullet: int,
+    density: float,
+    friction: float,
+    restitution: float
+}
+
+BoxCollider: struct {
+    half_extents: Vec2,
+    offset: Vec2,
+    is_sensor: int,
+    edit_in_scene: int
+}
+
+CircleCollider: struct {
+    radius: float,
+    offset: Vec2,
+    is_sensor: int,
+    edit_in_scene: int
+}
+
+// HUD / in-game UI. Attach to an entity to render it in SCREEN space
+// instead of world space -- `anchor` is normalized 0..1 across the
+// viewport, `pixel_offset` nudges in raw pixels, `pivot` aligns the
+// rendered element relative to that point.
+UIAnchor: struct {
+    anchor: Vec2,
+    pixel_offset: Vec2,
+    pivot: Vec2
+}
+
+// `Text` (HUD label) is a built-in component but its layout uses a fixed
+// char[256] buffer that doesn't have a clean Lync representation. User
+// code never needs to spell its struct -- attach via the editor (Add
+// Component -> Text) or via `AddTextDefault(...)`, then update content
+// with `SetText(entity, "...")` and tint with `SetTextColor(entity, r,g,b,a)`.
+
+// Reference types. EntityRef is a typed handle to another entity; the
+// inspector renders it as a drag-target slot accepting Hierarchy drags.
+// The asset *Ref types each store a 16-byte GUID under the hood (split
+// across four ints because Lync has no u64); the inspector accepts an
+// Asset Browser drag of the matching file kind.
+//
+// Layouts are byte-equivalent to the C++ definitions:
+//   EntityRef  -> { u32 index, u32 generation }
+//   PrefabRef  -> { Guid guid }     (Guid = { u64 hi; u64 lo }, 16 bytes)
+//   SpriteRef  -> same shape as PrefabRef
+//   TextureRef -> same
+//   AudioRef   -> same
+//   FontRef    -> same
+//
+// Inside Lync user code these are mostly passed around opaquely - the
+// inspector populates the fields, system code calls Instantiate or the
+// matching loader. The interior `_a/_b/_c/_d` int fields are bytes only;
+// don't write them by hand.
+EntityRef: struct {
+    index: int,
+    generation: int
+}
+PrefabRef: struct {
+    _a: int, _b: int, _c: int, _d: int
+}
+SpriteRef: struct {
+    _a: int, _b: int, _c: int, _d: int
+}
+TextureRef: struct {
+    _a: int, _b: int, _c: int, _d: int
+}
+AudioRef: struct {
+    _a: int, _b: int, _c: int, _d: int
+}
+FontRef: struct {
+    _a: int, _b: int, _c: int, _d: int
+}
+
+// AudioCueRef: reference to a .zcue asset (list of audio clips + cue
+// playback settings). The asset registry auto-generates a 1-entry
+// cue alongside every audio file, so dragging a .wav onto an
+// AudioCueRef slot resolves to the auto-cue under the hood.
+AudioCueRef: struct {
+    _a: int, _b: int, _c: int, _d: int
+}
+
+// Audio components. AudioSource emits a voice from an entity (2D or 3D);
+// AudioListener marks "where the ears are" (typically attached to the
+// camera or the player). Field layout MUST match
+// `Engine::components::AudioSource` / `AudioListener` in
+// Core/include/zues/components/audio.h.
+AudioSource: struct {
+    cue:            AudioCueRef,
+    volume:         float,
+    pitch:          float,
+    pan:            float,
+    playing:        int,
+    autoplay:       int,
+    is_3d:          int,
+    min_distance:   float,
+    max_distance:   float,
+    spatial_blend:  float,
+    bus:            int
+}
+
+AudioListener: struct {
+    is_active: int
+}
+
+// Key codes (GLFW values). Lync has no file-scope variables or enums, so
+// the closest thing to Unity's `KeyCode.W` is a free function returning a
+// struct populated with every known key:
+//
+//     if (IsKeyDown(KeyCode().W)) { ... }
+//
+// The struct is small POD; the C compiler inlines + constant-folds the
+// initializer in optimized builds, so per-call cost is effectively zero.
+// Field names mirror Unity's KeyCode where they overlap. Numbers are
+// prefixed `Num` because lync identifiers can't start with a digit.
+KeyCodeT: struct {
+    // Letters
+    A: int, B: int, C: int, D: int, E: int, F: int, G: int, H: int,
+    I: int, J: int, K: int, L: int, M: int, N: int, O: int, P: int,
+    Q: int, R: int, S: int, T: int, U: int, V: int, W: int, X: int,
+    Y: int, Z: int,
+    // Top-row digits
+    Num0: int, Num1: int, Num2: int, Num3: int, Num4: int,
+    Num5: int, Num6: int, Num7: int, Num8: int, Num9: int,
+    // Whitespace + control
+    Space: int, Enter: int, Escape: int, Tab: int, Backspace: int,
+    // Arrows
+    Left: int, Right: int, Up: int, Down: int,
+    // Modifiers
+    LShift: int, RShift: int, LCtrl: int, RCtrl: int,
+    LAlt: int, RAlt: int,
+    // Function row
+    F1: int, F2: int, F3: int, F4: int, F5: int, F6: int,
+    F7: int, F8: int, F9: int, F10: int, F11: int, F12: int
+}
+
+// Zues - Lync API prelude.
+//
+// Pass `--prelude=path/to/zues_api.lync` to the Lync compiler when building
+// a Zues project DLL. This file's extern blocks declare every Lync-callable
+// host wrapper the Zues plugin emits, so user .lync files can call them
+// directly without restating the boilerplate.
+//
+// Per-component `zues_add_<TypeName>(entity, ...fields)` helpers are NOT
+// declared here - each project's components are unique, and the plugin
+// auto-emits the matching C definitions. Lync allows implicit calls (with
+// a warning); we suppress the warning by adding `--include` for the
+// project_api.h location, which provides type definitions the wrappers
+// reference.
+
+// `<zues/project_api.h>` so Lync emits real C forward declarations for
+// every function — `extern <stddef.h>` would suppress them (Lync auto-
+// includes that header and trusts its declarations, which is wrong here
+// since these symbols come from the plugin's emit_top buffer at the END
+// of the .c file).
+extern <zues/project_api.h> {
+    // ---- Entities ------------------------------------------------------
+    // CreateEntity returns a fresh EntityRef (idx + generation). The
+    // generation half lets stale references be detected — a destroyed
+    // entity's slot can be reused, but the generation flips so the old
+    // EntityRef won't compare-equal to the new occupant.
+    def CreateEntity(): EntityRef;
+    def DestroyEntity(e: EntityRef): void;
+    def zues_create_entity(): EntityRef;            // legacy alias
+    def zues_destroy_entity(e: EntityRef): void;    // legacy alias
+
+    // ---- Transform2D (auto-attached to every entity) -------------------
+    def SetTransform(e: EntityRef, x: float, y: float, rot: float, sx: float, sy: float): void;
+    def SetTransformPosition(e: EntityRef, x: float, y: float): void;
+    def zues_set_transform(e: EntityRef, x: float, y: float, rot: float, sx: float, sy: float): void;
+    def zues_set_transform_position(e: EntityRef, x: float, y: float): void;
+
+    // ---- Sprites -------------------------------------------------------
+    // Default white-square sprite, tinted by (r,g,b,a). Use sprite +
+    // texture wrappers (when wired) for real PNGs.
+    def AddSpriteDefault(e: EntityRef, w: float, h: float, r: float, g: float, b: float, a: float): void;
+    def zues_add_sprite_default(e: EntityRef, w: float, h: float, r: float, g: float, b: float, a: float): void;
+
+    // ---- Input ---------------------------------------------------------
+    // Key codes: ASCII for letters/digits (W=87, A=65, S=83, D=68,
+    // SPACE=32). Returns 1 if held / pressed-this-frame, 0 otherwise.
+    // Idiomatic: IsKeyDown(KeyCode().W).
+    def IsKeyDown(key: int): bool;
+    def IsKeyPressed(key: int): bool;
+    def zues_is_key_down(key: int): bool;
+    def zues_is_key_pressed(key: int): bool;
+
+    // ---- Timers -------------------------------------------------------- //
+    // Schedule callbacks. cb is a `def f(): void` -- its function-pointer
+    // value coerces to `ptr` here, same as Each<T>'s callback. SetTimeout
+    // is one-shot; SetInterval re-arms after each fire. Both return a
+    // handle (positive int) that you can pass to CancelTimer; 0 means
+    // scheduling failed. Timers don't survive world reload / hot reload --
+    // re-arm in [OnLoad] if you need them on every project boot.
+    //
+    // Idiomatic:
+    //     def spawn_pipe(): void { /* ... */ }
+    //     SetInterval(2.0, spawn_pipe);   // pipe every 2s
+    //     h: int = SetTimeout(0.5, on_dash_end);
+    //     CancelTimer(h);
+    def SetTimeout(seconds: float, cb: ptr): int;
+    def SetInterval(seconds: float, cb: ptr): int;
+    def CancelTimer(handle: int): int;
+
+    // ---- Random -------------------------------------------------------- //
+    // Engine-side mt19937. Range conventions:
+    //   RandomFloat()       -> [0, 1)
+    //   RandomRange(lo, hi) -> [lo, hi)   -- float
+    //   RandomInt(lo, hi)   -> [lo, hi]   -- int, BOTH inclusive
+    //   RandomSeed(seed)    -> reset for deterministic runs
+    def RandomFloat(): float;
+    def RandomRange(lo: float, hi: float): float;
+    def RandomInt(lo: int, hi: int): int;
+    def RandomSeed(seed: int): void;
+
+    // ---- Hierarchy queries -------------------------------------------- //
+    // Walk parent / child relationships at runtime. Returned EntityRefs
+    // use generation==0 as the "missing" sentinel -- check via IsNull(e)
+    // before dereferencing. ChildCount + GetChild(idx) is the convenient
+    // form for "iterate the children of this entity"; GetFirstChild +
+    // GetNextSibling is the linked-list form.
+    //
+    // Idiomatic:
+    //     n: int = e.ChildCount();
+    //     for (i: 0 to n - 1) {
+    //         c: EntityRef = e.GetChild(i);
+    //         /* ... */
+    //     }
+    //
+    //     parent: EntityRef = e.GetParent();
+    //     if (!IsNull(parent)) { /* parented */ }
+    def GetParent(e: EntityRef): EntityRef;
+    def GetFirstChild(e: EntityRef): EntityRef;
+    def GetNextSibling(e: EntityRef): EntityRef;
+    def ChildCount(e: EntityRef): int;
+    def GetChild(e: EntityRef, idx: int): EntityRef;
+    def IsNull(e: EntityRef): bool;
+
+    // ---- HUD / Text --------------------------------------------------- //
+    // Attach Text to an entity that has UIAnchor and it renders as a HUD
+    // label on top of the game viewport. AddTextDefault creates the Text
+    // component (idempotent -- replaces existing); SetText updates content
+    // each frame for live labels (score, lives, timer); SetTextColor
+    // tints in-place.
+    //
+    //     score_label: EntityRef = CreateEntity();
+    //     /* attach UIAnchor in the editor inspector or via a future
+    //        AddUIAnchorDefault helper */
+    //     AddTextDefault(score_label, "0", 32.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+    //     /* every frame:                                                    */
+    //     SetText(score_label, format_score(Singleton<GameManager>().score));
+    def AddTextDefault(e: EntityRef, utf8: string, size_px: float,
+                        r: float, g: float, b: float, a: float): void;
+    def SetText(e: EntityRef, utf8: string): void;
+    def SetTextColor(e: EntityRef, r: float, g: float, b: float, a: float): void;
+
+    // Typed SetText<T> variants. User writes `SetText<int>(label, score)` and
+    // Lync's template system mangles to `SetText__int`. Common for live HUD
+    // numerics without writing a per-value formatter.
+    //
+    //     SetText<int>(score_label, Singleton<GameManager>().score);
+    //     SetText<float>(timer_label, elapsed);
+    //     SetText<bool>(paused_label, is_paused);
+    def SetText__int   (e: EntityRef, v: int):    void;
+    def SetText__float (e: EntityRef, v: float):  void;
+    def SetText__double(e: EntityRef, v: double): void;
+    def SetText__bool  (e: EntityRef, v: bool):   void;
+
+    // ---- Animator playback (v15) -------------------------------------
+    // The clip table is built in the editor (Animator inspector). At
+    // runtime, pick which clip plays by name. Returns 1 on hit, 0 on
+    // miss / no Animator.
+    //
+    //     PlayByName(player, "Walk");
+    //     SetPlaying(player, false);     // pause
+    //     Seek(player, 0.0);             // rewind
+    def PlayByName (e: EntityRef, name: string): int;
+    def SetPlaying (e: EntityRef, playing: bool): void;
+    def Seek       (e: EntityRef, seconds: float): void;
+
+    // ---- Particles control (v16) -------------------------------------
+    // Drive an entity's Particles emitter at runtime. The editor sets
+    // up the emitter (rate, shape, lifetime); these calls toggle and
+    // burst.
+    //
+    //     EmitBurst(explosion_e, 200);    // one-shot burst right now
+    //     SetEmitting(rain_e, false);     // pause spawning
+    //     RestartEmitter(intro_e);        // replay scheduled bursts
+    def EmitBurst       (e: EntityRef, count: int):  void;
+    def SetEmitting     (e: EntityRef, playing: bool): void;
+    def RestartEmitter  (e: EntityRef): void;
+
+    // ---- Particle pool / extras (v17) -------------------------------
+    // Iterate live particles by index, read/write per-particle
+    // velocities and the eight named scratch slots (Particles.
+    // extra_names). Use this to write swarm AI in Lync without
+    // needing per-entity ECS overhead at scale.
+    //
+    //     n: int = ParticleCount(emitter);
+    //     for (i: 0 to n - 1) {
+    //         hp: float = ParticleGet(emitter, i, "hp");
+    //         if (hp <= 0.0f) { ParticleKill(emitter, i); }
+    //     }
+    def ParticleCount  (e: EntityRef): int;
+    def ParticleGetPos (e: EntityRef, idx: int, out_x: ptr, out_y: ptr): void;
+    def ParticleSetPos (e: EntityRef, idx: int, x: float, y: float): void;
+    def ParticleGetVel (e: EntityRef, idx: int, out_vx: ptr, out_vy: ptr): void;
+    def ParticleSetVel (e: EntityRef, idx: int, vx: float, vy: float): void;
+    def ParticleGet    (e: EntityRef, idx: int, field: string): float;
+    def ParticleSet    (e: EntityRef, idx: int, field: string, value: float): void;
+    def ParticleKill   (e: EntityRef, idx: int): void;
+
+    // ---- v18: Spatial query / bulk movement / iterator -------------
+    // ParticleNearestNeighbor(emitter, x, y, max_radius) -- nearest
+    //     live particle of `emitter` to (x, y). -1 on miss. Backed
+    //     by a lazy uniform spatial grid with cell size = max_radius.
+    // ParticleStepToward(emitter, idx, tx, ty, max_speed, dt) -- one-
+    //     call move. Returns 1 if reached this tick, 0 otherwise.
+    // ParticleForEach(emitter, cb) -- C++-driven loop over live
+    //     particles. The callback runs with a cached pool ptr inside
+    //     the host so subsequent ParticleGet/Set/Pos calls skip the
+    //     per-call entity-id hashmap lookup. Use this instead of a
+    //     manual `for (i: 0 to ParticleCount(e) - 1)` for hot loops.
+    def ParticleNearestNeighbor(emitter: EntityRef, x: float, y: float,
+                                 max_radius: float): int;
+    def ParticleStepToward     (e: EntityRef, idx: int,
+                                 tx: float, ty: float,
+                                 max_speed: float, dt: float): int;
+    def ParticleForEach        (emitter: EntityRef, cb: ptr): void;
+
+    // Raw SoA pointers -- read/write per-particle data with ZERO
+    // host-call overhead inside hot loops. Each returns a writable
+    // float* with length = ParticleCount(emitter), valid until the
+    // pool is resized or erased (Play↔Stop, preview deselect, kill
+    // chain that compacts past the slot, etc). Treat them as
+    // frame-local; re-fetch each frame.
+    //
+    // Idiomatic hot loop:
+    //     n:  int = ParticleCount(emitter);
+    //     px: ptr = ParticleSlicePx(emitter);
+    //     hp: ptr = ParticleSliceField(emitter, "hp");
+    //     /* read px[i] / hp[i] via memcpy + ptr arithmetic */
+    def ParticleSlicePx   (emitter: EntityRef): ptr;
+    def ParticleSlicePy   (emitter: EntityRef): ptr;
+    def ParticleSliceVx   (emitter: EntityRef): ptr;
+    def ParticleSliceVy   (emitter: EntityRef): ptr;
+    def ParticleSliceAge  (emitter: EntityRef): ptr;
+    def ParticleSliceField(emitter: EntityRef, field: string): ptr;
+
+    // ---- Audio (v19) ------------------------------------------------
+    // Two playback styles:
+    //
+    //  * Fire-and-forget by path: `AudioPlayOneShot("assets/audio/coin.wav")`
+    //    or `AudioPlayOneShotAt(...)` for the 3D variant. Returns a u32
+    //    voice handle (0 = failed) you can pass to AudioStopVoice if you
+    //    need to cut it short.
+    //
+    //  * Component-bound: attach an AudioSource to an entity, set the
+    //    `clip` AudioRef + 2D/3D parameters in the inspector, then call
+    //    `e.AudioPlay()` / `e.AudioStop()` from gameplay code (UFCS).
+    //    The audio system reads the entity's Transform2D each frame and
+    //    handles 3D attenuation automatically. The first AudioListener
+    //    in the scene picks where the "ears" are (falls back to the
+    //    active Camera2D when no listener exists).
+    //
+    //  * Master bus: AudioSetMasterVolume / AudioMasterVolume / AudioMute
+    //    drive the sliders shown in the editor's Audio Mixer panel.
+    def AudioPlayOneShot   (path: string, volume: float, pitch: float): int;
+    def AudioPlayOneShotAt (path: string, x: float, y: float,
+                             min_distance: float, max_distance: float,
+                             volume: float): int;
+    def AudioStopVoice     (voice: int): void;
+    def AudioPlay          (e: EntityRef): void;
+    def AudioStop          (e: EntityRef): void;
+    def AudioPause         (e: EntityRef, paused: bool): void;
+    def AudioIsPlaying     (e: EntityRef): bool;
+    def AudioSetMasterVolume(v: float): void;
+    def AudioMasterVolume   (): float;
+    def AudioMute          (muted: bool): void;
+
+    // Fire-and-forget cue spawners. Both create a fresh entity bound
+    // to the cue, play it, and destroy the entity when the voice ends
+    // (one-shot lifetime). Looped cues stay alive until you stop them
+    // manually. SpawnAudio plays 2D; SpawnAudio3D positions the source
+    // at (x, y) and uses inverse falloff with the given max distance.
+    //
+    //     SpawnAudio(coin_pickup_cue);
+    //     SpawnAudio3D(explosion_cue, hit_x, hit_y, 30.0f);
+    def SpawnAudio   (cue: AudioCueRef): EntityRef;
+    def SpawnAudio3D (cue: AudioCueRef, x: float, y: float,
+                       max_distance: float): EntityRef;
+
+    // ---- Logging -------------------------------------------------------
+    // Routes through engine log_write (Console panel + stdout-bypass).
+    // String variants keep the plain `LogInfo("...")` form for the
+    // common case; typed values go through `Log<T>(value)` which Lync
+    // mangles to `Log__T` and routes to the matching extern below.
+    //
+    // Idiomatic:
+    //     LogInfo("booting up");
+    //     Log<int>(score);
+    //     Log<float>(elapsed);
+    //     Log<bool>(is_ready);
+    //     LogWarn<int>(retries);
+    def LogInfo(msg: string): void;
+    def LogWarn(msg: string): void;
+    def LogError(msg: string): void;
+    def LogDebug(msg: string): void;
+    def zues_log_info(msg: string): void;
+    def zues_log_warn(msg: string): void;
+    def zues_log_error(msg: string): void;
+    def zues_log_debug(msg: string): void;
+
+    // Template-mangled value variants. Users write `Log<int>(42)` etc.;
+    // Lync's name mangler turns `Log<int>` into `Log__int` and finds
+    // these externs (the template-drain "concrete extern already
+    // declared" path skips template body lookup). Doubles take a
+    // float-style format on the C side.
+    def Log__int      (v: int):    void;
+    def Log__float    (v: float):  void;
+    def Log__double   (v: double): void;
+    def Log__bool     (v: bool):   void;
+    def Log__string   (v: string): void;
+    def LogWarn__int  (v: int):    void;
+    def LogWarn__float(v: float):  void;
+    def LogWarn__double(v: double):void;
+    def LogWarn__bool (v: bool):   void;
+    def LogWarn__string(v: string):void;
+    def LogError__int   (v: int):    void;
+    def LogError__float (v: float):  void;
+    def LogError__double(v: double): void;
+    def LogError__bool  (v: bool):   void;
+    def LogError__string(v: string): void;
+    def LogDebug__int   (v: int):    void;
+    def LogDebug__float (v: float):  void;
+    def LogDebug__double(v: double): void;
+    def LogDebug__bool  (v: bool):   void;
+    def LogDebug__string(v: string): void;
+
+    // ---- Physics (RigidBody actions; UFCS form preferred) --------------
+    // When the entity has no RigidBody the call is a silent no-op.
+    // Idiomatic call sites:
+    //     e.ApplyImpulse(0.0, 200.0);    // jump
+    //     e.SetVelocity(50.0, 0.0);      // move right
+    //     e.WakeBody();                  // start simulating again
+    // Linear velocity getter -- returns the live RigidBody velocity as
+    // a Vec2 you can do math on directly. Also a Vec2-flavoured
+    // SetVelocityV for the same reason. (The two-float SetVelocity is
+    // kept for code that already uses it.)
+    def GetVelocity    (e: EntityRef): Vec2;
+    def SetVelocityV   (e: EntityRef, v: Vec2): void;
+    def ApplyImpulse   (e: EntityRef, fx: float, fy: float): void;
+    def ApplyForce     (e: EntityRef, fx: float, fy: float): void;
+    def SetVelocity    (e: EntityRef, vx: float, vy: float): void;
+    def SetBodyPosition(e: EntityRef, x: float, y: float, rot: float): void;
+    def WakeBody       (e: EntityRef): void;
+
+    // ---- Prefabs -------------------------------------------------------
+    // Two flavours, same destination:
+    //
+    //   Instantiate(path, x, y)
+    //     - String path, project-relative with forward slashes
+    //       ("assets/prefabs/Player.zprefab"). Pragmatic — survives
+    //       drop-into-text-file edits, doesn't require a populated
+    //       PrefabRef field.
+    //
+    //   InstantiatePrefab(ref, x, y)
+    //     - Typed PrefabRef. Use when the prefab to spawn comes from a
+    //       [Component] field the editor populated via drag-drop. GUID-
+    //       keyed under the hood, so it survives renames and moves of
+    //       the asset file.
+    //
+    // Both return the spawned root EntityRef. The returned generation is
+    // 0 on failure (file missing, parse error, no project loaded), so
+    // checking `if (result.generation == 0)` distinguishes failure from
+    // a real entity at slot 0.
+    def Instantiate      (path: string,     x: float, y: float): EntityRef;
+    def InstantiatePrefab(prefab: PrefabRef, x: float, y: float): EntityRef;
+}
+
+// Engine built-in component wrappers. Declared in a SEPARATE extern block
+// using `<zues/project_api.h>` (which the lync codegen does NOT auto-include
+// and therefore DOES emit forward decls for) so the compiler sees the right
+// signature before user code calls Get__/Has__/Remove__/Each__. If we put
+// these in the `<stddef.h>` block above, lync's codegen would skip the
+// forward decls (auto-included header heuristic) and the C compiler would
+// fall back to implicit `int X()` declarations - mismatched against the
+// macro-emitted `void* X(int)` bodies later in the file.
+//
+// The plugin's emit_header_once provides the C bodies via
+// ZUES_ENGINE_COMP_WRAPPERS() that look up the component id at runtime.
+// Idiomatic UFCS form:
+//     match e.Get<Sprite>() { some(_): {...}, null: {...} };
+//     if (e.Has<RigidBody>()) { ... }
+//     e.Remove<BoxCollider>();
+extern <zues/project_api.h> {
+    // Engine built-in component wrappers. Get returns a typed nullable
+    // pointer (T?) so user code can write
+    //     match e.Get<Sprite>() { some(s): s.size.x; null: { } }
+    // and the analyzer threads `Sprite` through the unwrap so `.size.x`
+    // is checked at compile time.
+    def Get__Transform2D(e: EntityRef): ref? Transform2D;
+    def Has__Transform2D(e: EntityRef): bool;
+    def Remove__Transform2D(e: EntityRef): void;
+    def Each__Transform2D(cb: ptr): void;
+    def Get__Sprite(e: EntityRef): ref? Sprite;
+    def Has__Sprite(e: EntityRef): bool;
+    def Remove__Sprite(e: EntityRef): void;
+    def Each__Sprite(cb: ptr): void;
+    def Get__RigidBody(e: EntityRef): ref? RigidBody;
+    def Has__RigidBody(e: EntityRef): bool;
+    def Remove__RigidBody(e: EntityRef): void;
+    def Each__RigidBody(cb: ptr): void;
+    def Get__BoxCollider(e: EntityRef): ref? BoxCollider;
+    def Has__BoxCollider(e: EntityRef): bool;
+    def Remove__BoxCollider(e: EntityRef): void;
+    def Each__BoxCollider(cb: ptr): void;
+    def Get__CircleCollider(e: EntityRef): ref? CircleCollider;
+    def Has__CircleCollider(e: EntityRef): bool;
+    def Remove__CircleCollider(e: EntityRef): void;
+    def Each__CircleCollider(cb: ptr): void;
+    def Get__AudioSource(e: EntityRef): ref? AudioSource;
+    def Has__AudioSource(e: EntityRef): bool;
+    def Remove__AudioSource(e: EntityRef): void;
+    def Each__AudioSource(cb: ptr): void;
+    def Get__AudioListener(e: EntityRef): ref? AudioListener;
+    def Has__AudioListener(e: EntityRef): bool;
+    def Remove__AudioListener(e: EntityRef): void;
+    def Each__AudioListener(cb: ptr): void;
+
+    // KeyCode singleton: returns a value-initialized struct with every
+    // GLFW key constant. Idiomatic usage:
+    //     if (IsKeyDown(KeyCode().Space)) { ... }
+    // Lives in this extern block (not the stddef.h one) so lync's codegen
+    // emits a real forward decl - otherwise the C compiler falls back to
+    // implicit `int KeyCode()` and rejects `.Space` on a non-struct.
+    def KeyCode(): KeyCodeT;
+}
+
+// =============================================================================
+// Engine math helpers. Plain Lync `def`s on top of libc math -- no host
+// bridge, no per-call allocation, fully inlinable by the C backend. Use
+// them for HUD layout, camera follow, damage falloff, anywhere you'd
+// reach for Vec2 math.
+//
+// For the bigger generic toolbox (`min`, `max`, `clamp`, `lerp<T>`, `abs`,
+// `sqrt`, `sin`, `cos`, `pi()`, ...) write `using std.math.*;` at the top
+// of any .lync file. The engine ships the Lync stdlib alongside lync.exe.
+// =============================================================================
+
+extern <math.h> {
+    def sqrtf(x: float): float;
+    def atan2f(y: float, x: float): float;
+}
+
+// ---- Vec2 ------------------------------------------------------------------
+// Method-style API. Compiles to flat C functions named `Vec2<Method>` -- no
+// vtables, no dispatch tables, identical to hand-written free-function code.
+// Idiomatic:
+//     a: Vec2 = Vec2.Of(3.0f, 4.0f);
+//     b: Vec2 = a + Vec2.Of(1.0f, 2.0f);          // operator overload
+//     n: Vec2 = b.Normalize();                    // UFCS method call
+//     d: float = a.Distance(b);
+
+def Vec2.static Zero(): Vec2 { return Vec2{ x: 0.0f, y: 0.0f }; }
+def Vec2.static One():  Vec2 { return Vec2{ x: 1.0f, y: 1.0f }; }
+def Vec2.static Of(x: float, y: float): Vec2 { return Vec2{ x: x, y: y }; }
+
+def Vec2.+(o: Vec2): Vec2 {
+    return Vec2{ x: this.x + o.x, y: this.y + o.y };
+}
+def Vec2.-(o: Vec2): Vec2 {
+    return Vec2{ x: this.x - o.x, y: this.y - o.y };
+}
+def Vec2.Scale(s: float): Vec2 {
+    return Vec2{ x: this.x * s, y: this.y * s };
+}
+def Vec2.Dot(o: Vec2): float {
+    return this.x * o.x + this.y * o.y;
+}
+def Vec2.LengthSq(): float {
+    return this.x * this.x + this.y * this.y;
+}
+def Vec2.Length(): float {
+    return sqrtf(this.x * this.x + this.y * this.y);
+}
+def Vec2.DistanceSq(o: Vec2): float {
+    dx: float = o.x - this.x;
+    dy: float = o.y - this.y;
+    return dx * dx + dy * dy;
+}
+def Vec2.Distance(o: Vec2): float {
+    return sqrtf(this.DistanceSq(o));
+}
+def Vec2.Normalize(): Vec2 {
+    len: float = this.Length();
+    if (len < 0.0001f) { return Vec2.Zero(); }
+    return Vec2{ x: this.x / len, y: this.y / len };
+}
+def Vec2.Lerp(o: Vec2, t: float): Vec2 {
+    return Vec2{
+        x: this.x + (o.x - this.x) * t,
+        y: this.y + (o.y - this.y) * t
+    };
+}
+
+// ---- Transform2D helpers ---------------------------------------------------
+// Rotation convention: rotation = 0 means right vector is +X, up vector is +Y.
+// At rotation r: right = (cos r, sin r), up = (-sin r, cos r).
+//
+// UFCS-friendly: `t.LookAt(target)` / `t.LookAtRight(target)`. If target is
+// on top of t.position the rotation is left unchanged (no NaN).
+
+// Aim t's right vector at `target` (sprite "front" = +X local).
+def LookAtRight(t: ref Transform2D, target: Vec2): void {
+    dx: float = target.x - t.position.x;
+    dy: float = target.y - t.position.y;
+    if (dx * dx + dy * dy < 0.000001f) { return; }
+    t.rotation = atan2f(dy, dx);
+}
+
+// Aim t's up vector at `target` (sprite "front" = +Y local).
+def LookAt(t: ref Transform2D, target: Vec2): void {
+    dx: float = target.x - t.position.x;
+    dy: float = target.y - t.position.y;
+    if (dx * dx + dy * dy < 0.000001f) { return; }
+    t.rotation = atan2f(dy, dx) - 1.5707963f;
+}
+
+// ---- Color -----------------------------------------------------------------
+// Static constructors for the common palette, plus RGB / RGBA builders and a
+// component-wise lerp. Same OOP-on-flat-C model as Vec2 -- zero runtime tax.
+//     c: Color = Color.Red();
+//     mix: Color = c.Lerp(Color.Blue(), 0.5f);
+
+def Color.static White():  Color { return Color{ r: 1.0f, g: 1.0f, b: 1.0f, a: 1.0f }; }
+def Color.static Black():  Color { return Color{ r: 0.0f, g: 0.0f, b: 0.0f, a: 1.0f }; }
+def Color.static Red():    Color { return Color{ r: 1.0f, g: 0.0f, b: 0.0f, a: 1.0f }; }
+def Color.static Green():  Color { return Color{ r: 0.0f, g: 1.0f, b: 0.0f, a: 1.0f }; }
+def Color.static Blue():   Color { return Color{ r: 0.0f, g: 0.0f, b: 1.0f, a: 1.0f }; }
+def Color.static Yellow(): Color { return Color{ r: 1.0f, g: 1.0f, b: 0.0f, a: 1.0f }; }
+def Color.static Clear():  Color { return Color{ r: 0.0f, g: 0.0f, b: 0.0f, a: 0.0f }; }
+
+def Color.static RGB(r: float, g: float, b: float): Color {
+    return Color{ r: r, g: g, b: b, a: 1.0f };
+}
+def Color.static RGBA(r: float, g: float, b: float, a: float): Color {
+    return Color{ r: r, g: g, b: b, a: a };
+}
+
+def Color.Lerp(o: Color, t: float): Color {
+    return Color{
+        r: this.r + (o.r - this.r) * t,
+        g: this.g + (o.g - this.g) * t,
+        b: this.b + (o.b - this.b) * t,
+        a: this.a + (o.a - this.a) * t
+    };
+}
+
+// ---- Easing ----------------------------------------------------------------
+// Animation curves. All take t in [0, 1] and return [0, 1]. Pair with
+// Vec2Lerp / ColorLerp / Lerp for tweens.
+
+def EaseInQuad(t: float): float    { return t * t; }
+def EaseOutQuad(t: float): float   { return t * (2.0f - t); }
+def EaseInOutQuad(t: float): float {
+    if (t < 0.5f) { return 2.0f * t * t; }
+    return -1.0f + (4.0f - 2.0f * t) * t;
+}
+def EaseInCubic(t: float): float   { return t * t * t; }
+def EaseOutCubic(t: float): float  {
+    u: float = t - 1.0f;
+    return u * u * u + 1.0f;
+}
+
+// ---- Scalar helpers --------------------------------------------------------
+// `Lerp<T>` / `Clamp<T>` / `Min<T>` / `Max<T>` / `Abs<T>` live in std.math
+// (the engine ships the Lync stdlib alongside lync.exe). Write
+// `include std.math.*;` at the top of any .lync file to bring them in.
+// The engine-specific helpers below use the prelude's `sqrtf` directly
+// so they don't pull stdlib unconditionally.
+
+// Move `cur` toward `target` by at most `step` per call. Useful for
+// frame-rate-independent approach without Lerp's overshoot drift.
+def Approach(cur: float, target: float, step: float): float {
+    if (cur < target) {
+        cur = cur + step;
+        if (cur > target) { return target; }
+        return cur;
+    }
+    cur = cur - step;
+    if (cur < target) { return target; }
+    return cur;
+}

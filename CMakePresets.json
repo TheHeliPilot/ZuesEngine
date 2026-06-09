@@ -1,0 +1,54 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 28, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": { "CMAKE_EXPORT_COMPILE_COMMANDS": "ON" }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug (Ninja)",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "release",
+      "displayName": "Release (Ninja)",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    },
+    {
+      "name": "clang-reflection",
+      "displayName": "Clang + P2996 reflection (Ninja)",
+      "description": "Requires clang-p2996 fork on PATH. Enables ZUES_USE_REFLECTION.",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE":    "Debug",
+        "CMAKE_C_COMPILER":    "clang",
+        "CMAKE_CXX_COMPILER":  "clang++",
+        "ZUES_USE_REFLECTION": "ON"
+      }
+    },
+    {
+      "name": "vs2022",
+      "displayName": "Visual Studio 2022 (fallback)",
+      "inherits": "base",
+      "generator": "Visual Studio 17 2022",
+      "architecture": { "value": "x64", "strategy": "set" },
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "debug",            "configurePreset": "debug" },
+    { "name": "release",          "configurePreset": "release" },
+    { "name": "clang-reflection", "configurePreset": "clang-reflection" },
+    { "name": "vs2022-debug",     "configurePreset": "vs2022", "configuration": "Debug" },
+    { "name": "vs2022-release",   "configurePreset": "vs2022", "configuration": "RelWithDebInfo" }
+  ]
+}

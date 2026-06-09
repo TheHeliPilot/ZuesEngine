@@ -1,0 +1,14 @@
+{
+"version":1,
+"next_name_index":2,
+"entities":[
+  {"index":0, "generation":1, "components":[
+    {"type":"Transform2D", "data":{"position":[0,0], "rotation":0, "scale":[1,1]}},
+    {"type":"Name", "data":{"value":"entity_0"}}
+  ]},
+  {"index":1, "generation":1, "components":[
+    {"type":"Transform2D", "data":{"position":[0,0], "rotation":0, "scale":[1,1]}},
+    {"type":"Name", "data":{"value":"entity_1"}}
+  ]}
+]
+}

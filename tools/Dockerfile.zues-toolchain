@@ -1,0 +1,22 @@
+# Zues toolchain image: clang-p2996 + cmake + ninja.
+# Build:  docker build -t zues-toolchain:latest -f tools/Dockerfile.zues-toolchain tools
+# Use:    docker run --rm -v "C:\ZuesEngine:/work" -w /work zues-toolchain:latest <cmd>
+
+FROM vsavkov/clang-p2996:amd64
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        cmake \
+        ninja-build \
+        ca-certificates \
+        libgl-dev \
+        libx11-dev libxcursor-dev libxinerama-dev libxi-dev libxrandr-dev \
+        libwayland-dev libxkbcommon-dev wayland-protocols \
+ && rm -rf /var/lib/apt/lists/*
+
+# Make sure clang-p2996 binaries (and libc++ runtime) are first on PATH.
+ENV PATH=/opt/p2996/clang/bin:$PATH
+ENV LD_LIBRARY_PATH=/opt/p2996/clang/lib/x86_64-unknown-linux-gnu:$LD_LIBRARY_PATH
+
+# Sanity: print versions on import.
+RUN clang++ --version && cmake --version | head -1 && ninja --version

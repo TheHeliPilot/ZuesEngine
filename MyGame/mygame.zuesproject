@@ -1,0 +1,13 @@
+{
+  "build": {
+    "dll_path": "../build/debug2/bin/mygame.dll"
+  },
+  "default_world": "assets/worlds/test.zworld",
+  "engine_version": "0.1.0",
+  "name": "MyGame",
+  "settings": {
+    "window_height": 720,
+    "window_title": "MyGame",
+    "window_width": 1280
+  }
+}

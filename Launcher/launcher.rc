@@ -1,0 +1,6 @@
+// Launcher Win32 resources. The CREATEPROCESS_MANIFEST_RESOURCE_ID (1)
+// embeds the asInvoker manifest so Windows' UAC installer-detection
+// heuristic doesn't elevate the process based on the "launcher" name.
+// Resource id 1 is the magic value Windows looks up at process start.
+#define RT_MANIFEST 24
+1 RT_MANIFEST "launcher.manifest"
