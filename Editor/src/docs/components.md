@@ -227,7 +227,9 @@ Use this rule of thumb when deciding where a `*Ref` field belongs:
 ## Iteration semantics
 
 `Each<T>` only visits entities that **have** T. No null checks needed
-inside the callback -- the pointer is always valid.
+inside the callback -- the pointer is always valid. This works for both
+your own `[Component]` types and engine built-ins (`Each<Transform2D>`,
+`Each<Sprite>`, `Each<RigidBody>`, ...).
 
 ```lync
 [System("PreUpdate", "Game")]
