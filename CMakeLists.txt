@@ -22,6 +22,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # ---- Options ----------------------------------------------------------------
 option(ZUES_BUILD_EDITOR       "Build the editor app"                                 ON)
 option(ZUES_BUILD_SAMPLE_GAME  "Build the MyGame sample project"                      ON)
+option(ZUES_BUILD_TESTS        "Build the engine regression tests"                    ON)
 option(ZUES_USE_REFLECTION     "Enable C++26 P2996 reflection paths (clang-p2996)"    OFF)
 
 # ---- Shared helpers ---------------------------------------------------------
@@ -48,6 +49,11 @@ endif()
 
 if(ZUES_BUILD_SAMPLE_GAME)
     add_subdirectory(MyGame)
+endif()
+
+if(ZUES_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(Tests)
 endif()
 
 # Lync compiler plugin — only built if the LyncLang sibling tree is present.
